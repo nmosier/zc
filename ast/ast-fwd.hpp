@@ -1,9 +1,9 @@
-#ifndef __AST_H
-#error "include ast.h, not ast/ast-fwd.h directly"
+#ifndef __AST_HPP
+#error "include ast.hpp, not ast/ast-fwd.h directly"
 #endif
 
-#ifndef __AST_FWD_H
-#define __AST_FWD_H
+#ifndef __AST_FWD_HPP
+#define __AST_FWD_HPP
 
 namespace zc {
 
@@ -23,28 +23,25 @@ namespace zc {
    typedef ASTNodeVec<Declarator> Declarators;
    class ParamDecl;
    typedef ASTNodeVec<ParamDecl> ParamDecls;
-   class Stat;
-   typedef ASTNodeVec<Stat> Stats;
    class FunctionDef;
    class CompoundStat;
    class TypeSpec;
    class Pointer;
    class DirectDeclarator;
-   class ID;
+   class Identifier;
    class ExprStat;
    class SelectionStat;
    class IterationStat;
    class JumpStat;
-   class Expr;
    class AssignmentExpr;
    class UnaryExpr;
    class TypeName;
    class PostfixExpr;
    class UnaryCastExpr;
    class UnaryOperator;
-
-   
-   
+   class ConditionalExpr;
+   class LogicalOrExpr;
+   class LogicalAndExpr;
 }
 
 #endif

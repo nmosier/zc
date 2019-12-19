@@ -1,7 +1,7 @@
 /* ast.h -- AST */
 
-#ifndef __AST_H
-#define __AST_H
+#ifndef __AST_HPP
+#define __AST_HPP
 
 #include <string>
 #include <vector>
@@ -9,12 +9,12 @@
 #include <type_traits>
 #include <stdint.h>
 
-#include "ast/ast-fwd.h"
+#include "ast/ast-fwd.hpp"
 
-#include "ast/ast-base.h"
-#include "ast/ast-expr.h"
-#include "ast/ast-decl.h"
-#include "ast/ast-stat.h"
+#include "ast/ast-base.hpp"
+#include "ast/ast-expr.hpp"
+#include "ast/ast-decl.hpp"
+#include "ast/ast-stat.hpp"
 
 namespace zc {
 
@@ -41,55 +41,18 @@ namespace zc {
          ASTNode(loc), decls_(decls) {}
    };
 
-
-   class ID: public ASTNode {
+   class Identifier: public ASTNode {
    public:
       const std::string& id() const { return id_; }
 
-      static ID *Create(std::string& id, SourceLoc& loc) { return new ID(id, loc); }
+      static Identifier *Create(std::string& id, SourceLoc& loc) { return new Identifier(id, loc); }
       
    protected:
       std::string id_;
-
-      ID(std::string& id, SourceLoc& loc): ASTNode(loc), id_(id) {}
-   };
-
-   class ParamTypeList: public ASTNode {
-   public:
-      ParamDecls *decls() const { return decls_; }
-
-      static ParamTypeList *Create(ParamDecls *decls, SourceLoc& loc)
-      { return new ParamTypeList(decls, loc); }
       
-   protected:
-      ParamDecls *decls_;
-
-      ParamTypeList(ParamDecls *decls, SourceLoc& loc): ASTNode(loc), decls_(decls) {}
+      Identifier(std::string& id, SourceLoc& loc): ASTNode(loc), id_(id) {}
    };
 
-
-
-   /************************
-    *     EXPRESSIONS      *
-    ************************/
-
-
-
-   class UnaryOperator: public ASTOp {
-   public:
-      enum Kind {AND, DEREFERENCE, PLUS, MINUS, BITWISE_NOT, LOGICAL_NOT};
-      const Kind& kind() const { return kind_; }
-
-      static UnaryOperator *Create(Kind kind, SourceLoc& loc)
-      { return new UnaryOperator(kind, loc); }
-      
-   protected:
-      Kind kind_;
-
-      UnaryOperator(Kind kind, SourceLoc& loc): ASTOp(loc), kind_(kind) {}
-   };
-
-   
 } // namespace zc
 
 #endif

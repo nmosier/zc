@@ -1,19 +1,19 @@
-#ifndef __AST_H
-#error "include ast.h, not ast/ast-decl.h directly"
+#ifndef __AST_HPP
+#error "include ast.hpp, not ast/ast-decl.h directly"
 #endif
 
-#ifndef __AST_DECL_H
-#define __AST_DECL_H
+#ifndef __AST_DECL_HPP
+#define __AST_DECL_HPP
 
 namespace zc {
 
-   class ExternalDecl: public ASTNode, public ASTVariantM<FunctionDef, Decl> {
+   class ExternalDecl: public ASTNode, public ASTVariantFeature<FunctionDef, Decl> {
    public:
       static ExternalDecl *Create(Variant& variant, SourceLoc& loc)
       { return new ExternalDecl(variant, loc); }
       
    protected:
-   ExternalDecl(Variant& variant, SourceLoc& loc): ASTNode(loc), ASTVariantM(variant) {}
+   ExternalDecl(Variant& variant, SourceLoc& loc): ASTNode(loc), ASTVariantFeature(variant) {}
    };
 
    class FunctionDef: public ASTNode {
@@ -51,10 +51,10 @@ namespace zc {
    Decl(DeclSpecs *specs, SourceLoc& loc): ASTNode(loc), specs_(specs) {}
    };
    
-   class DeclSpec: public ASTNode, public ASTVariantM<TypeSpec> {
+   class DeclSpec: public ASTNode, public ASTVariantFeature<TypeSpec> {
    public:
    protected:
-   DeclSpec(Variant& variant, SourceLoc& loc): ASTNode(loc), ASTVariantM(variant) {}
+   DeclSpec(Variant& variant, SourceLoc& loc): ASTNode(loc), ASTVariantFeature(variant) {}
    };
    
    class TypeSpec: public ASTNode {
@@ -98,13 +98,13 @@ namespace zc {
    Pointer(int depth, SourceLoc& loc): ASTNode(loc), depth_(depth) {}
    };
 
-   class DirectDeclarator: public ASTNode, public ASTVariantM<ID *, Declarator *> {
+   class DirectDeclarator: public ASTNode, public ASTVariantFeature<Identifier *, Declarator *> {
    public:
       static DirectDeclarator *Create(Variant& variant, SourceLoc& loc)
       { return new DirectDeclarator(variant, loc); }
       
    protected:
-   DirectDeclarator(Variant& variant, SourceLoc& loc): ASTNode(loc), ASTVariantM(variant) {}
+   DirectDeclarator(Variant& variant, SourceLoc& loc): ASTNode(loc), ASTVariantFeature(variant) {}
    };
 
    class ParamDecl: public ASTNode {

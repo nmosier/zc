@@ -1,7 +1,7 @@
 /* GRAMMAR REFERENCE: http://www.cs.man.ac.uk/~pjj/bnf/c_syntax.bnf */
 
 %{
-  #include "ast.h"
+  #include "ast.hpp"
 
   #define YYDEBUG 1
   #define YYLTYPE zc::SourceLoc
@@ -18,25 +18,32 @@
                         
 %union {
     char *error_msg;
+    zc::StringExpr *string;
+    zc::LiteralExpr *literal;
+    zc::Identifier *identifier;
     zc::TranslationUnit *translation_unit;
     zc::ExternalDecl *external_decl;
-    zc::Decl *decl;
+    zc::FunctionDef *function_def;
     zc::Decls *decls;
+    zc::Decl *decl;
     zc::DeclSpecs *decl_specs;
     zc::Declarators *declarators;
-    zc::TypeSpec *type_spec;
-    zc::FunctionDef *function_def;
-    zc::DirectDeclarator *direct_declarator;
-    zc::Pointer *pointer;
-    zc::ParamTypeList *param_type_list;
-    zc::Stat *stat;
-    zc::Stats *stats;
+    zc::Declarator *declarator;
+    zc::ParamTypes *param_types;
+    zc::ParamType *param_type;
+    zc::ParamDecl *param_decl;
+    zc::ParamDecls *param_decls;
+    zc::ASTStat *stat;
+    zc::ASTStats *stats;
     zc::CompoundStat *compound_stat;
     zc::ExprStat *expr_stat;
-    zc::UnaryOperator *unary_operator;
-    zc::CastExpr *cast_expr;
-    zc::UnaryCastExpr *unary_cast_expr;
-    zc::Expr *expr;
+    zc::ASTExpr *expr;
+    zc::AssignentExpr *assignment_expr;
+    zc::BinaryExpr *binary_expr;
+    zc::UnaryExpr *unary_expr;
+    zc::LiteralExpr *literal_expr;
+    zc::BinaryExpr::Kind binary_operator;
+    zc::UnaryExpr::Kind unary_operator;
 }
 
 /* terminals */
@@ -66,39 +73,40 @@
 %token SHORT            
 %token INT
 %token LONG
-
-                         /* IDENTIFIERS */
 %token <string> STRING  
 %token <literal> INT_CONST
 %token <literal> CHAR_CONST
-%token  <symbol>        ID
+%token <identifier> ID
 
-%type   <translation_unit> translation_unit
-%type   <external_decl> external_decl
-%type   <decl>          decl
-%type   <decl_specs>    decl_specs
-%type   <declarators>         init_declarator_list
-%type   <declarator>    init_declarator
-%type   <declarator>    declarator
-%type   <type_spec>     type_spec
-%type   <function_def>   function_definition
-%type   <direct_declarator> direct_declarator
-%type   <pointer>       optional_pointer
-%type   <pointer>       pointer
-%type   <param_type_list> param_type_list
-%type   <param_type_list> param_list
-%type   <param_decl>    param_decl
-%type   <decls>         decl_list
-%type   <decls>         optional_decl_list
-%type   <stat>          stat
-%type   <compound_stat> compound_stat
-%type   <stats>         optional_stat_list
-%type   <stats>         stat_list
-%type   <expr_stat>     exp_stat
-%type   <unary_operator> unary_operator
-%type   <cast_expr>          cast_exp
-%type   <unary_cast_expr> unary_cast_exp
-%type   <expr>          exp
+                         /* IDENTIFIERS */
+%type  <translation_unit> translation_unit
+%type  <external_decl> external_decl
+%type  <function_def>  function_definition
+%type  <decls>         optional_decl_list decl_list
+%type  <decl>          decl
+%type  <decl_specs>    decl_specs
+%type  <declarators>   init_declarator_list
+%type  <declarator>    init_declarator declarator
+%type  <direct_declarator> direct_declarator
+%type  <pointer>       optional_pointer pointer
+%type  <param_types>   param_types
+%type  <param_type>    param_type
+%type  <param_decl>    param_decl
+%type  <param_decls>   param_type_list param_list
+%type  <stat>          stat
+%type  <stats>         optional_stat_list stat_list
+%type  <compound_stat> compound_stat
+%type  <expr_stat>     exp_stat
+%type  <expr>          optional_expr exp
+%type  <assignment_expr> assignment_exp
+%type  <binary_expr>   conditional_exp logical_or_exp logical_and_exp inclusive_or_exp exclusive_or_exp and_exp equality_exp relational_exp shift_expression additive_exp mult_exp
+%type  <unary_expr>    unary_exp
+%type  <expr>          postfix_exp primary_exp
+%type  <literal_expr> constant
+%type  <binary_operator> relational_operator additive_operator mult_operator
+%type  <unary_operator> unary_operator
+
+                                                
 %%
 
 translation_unit:
@@ -155,9 +163,6 @@ param_decl:     decl_specs declarator
         ; /* incomplete */
 stat:           exp_stat /* TODO */
         |       compound_stat
-        |       selection_stat /* TODO */
-        |       iteration_stat /* TODO */
-        |       jump_stat /* TODO */
         ; /* TODO, incomplete */
 optional_stat_list:
                 /* empty */
@@ -175,16 +180,73 @@ optional_exp:   /* empty */
         ; /* TODO */
 exp:            assignment_exp
         ; /* TODO, incomplete */
-assignment_exp: conditional_exp
-        |       unary_exp '=' assignment_exp
-        ; /* TODO */
+assignment_exp: unary_exp '=' conditional_exp
+        ; /* incomplete */
 conditional_exp:
                 logical_or_exp /* TODO */
         ; /* TODO, incomplete */
 unary_exp:      postfix_exp /* TODO */
-        |       unary_cast_exp
+        |       unary_operator unary_exp
         ; /* TODO, incomplete */
-unary_cast_exp: unary_operator cast_exp
+logical_or_exp: logical_and_exp
+        |       logical_or_exp OR logical_and_exp
+        ;
+logical_and_exp:
+                inclusive_or_exp
+        |       logical_and_exp AND inclusive_or_exp
+        ;
+inclusive_or_exp:
+                exclusive_or_exp
+        |       inclusive_or_exp '|' exclusive_or_exp
+        ;
+exclusive_or_exp:
+                and_exp
+        |       exclusive_or_exp '^' and_exp
+        ;
+and_exp:        equality_exp
+        |       and_exp '&' equality_exp
+        ;
+equality_exp:   relational_exp
+        |       equality_exp EQ relational_exp
+        |       equality_exp NEQ relational_exp
+        ;
+relational_exp: shift_expression
+        |       relational_exp relational_operator shift_expression
+        ;
+shift_expression:
+                additive_exp
+        ; /* incomplete */
+additive_exp:   mult_exp
+        |       additive_exp additive_operator mult_exp
+        ;
+mult_exp:       cast_exp
+        |       mult_exp mult_operator cast_exp
+        ;
+cast_exp:       unary_exp
+        ; /* incomplete */
+
+postfix_exp:    primary_exp
+        ; /* incomplete */
+
+primary_exp:    ID
+        |       constant
+        |       '(' exp ')'
+        ; /* incomplete */
+constant:       INT_CONST
+        |       CHAR_CONST
+        ; /* incomplete */
+
+relational_operator:
+                '<'
+        |       LEQ
+        ; /* incomplete */
+additive_operator:
+                '+'
+        |       '-'
+        ;
+mult_operator:  '*'
+        |       '/'
+        |       '%'
         ;
 unary_operator: '&'
         |       '*'
@@ -193,9 +255,6 @@ unary_operator: '&'
         |       '~'
         |       '!'
         ;
-cast_exp:       unary_exp
-        |       '(' type_name ')' unary_exp /* TODO */
-        ; /* TODO, modified from reference to allow up to one typename */
 
 %%
 

@@ -1,8 +1,8 @@
 .PHONY: all
 all: test
 
-CFLAGS = -std=c++17 -Iast
+CFLAGS = -std=c++2a -Iast
 
-test: test.c
+test: test.cpp
 	c++ $(CFLAGS) -o $@ $^
 
