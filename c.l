@@ -4,6 +4,7 @@
 
 #include <inttypes.h>
 #include <string>
+#include <istream>
 #include "ast.hpp"
 #include "c.tab.hpp"
 
@@ -56,7 +57,7 @@ E  [Ee][+-]?{D}+
 
   /* incomplete */
 {D}+ {
-    yylval.expr = zc::LiteralExpr::Create(strtoimax(yytext, NULL, 10), g_lineno);
+    c_yylval.expr = zc::LiteralExpr::Create(strtoimax(yytext, NULL, 10), g_lineno);
     return INT_CONST;
    }
 
@@ -68,7 +69,7 @@ E  [Ee][+-]?{D}+
     
     /* incomplete, string literal */
 \"[^\\"]*\" {
-        yylval.expr = zc::StringExpr::Create(std::string(yytext), g_lineno);
+        c_yylval.expr = zc::StringExpr::Create(std::string(yytext), g_lineno);
         return STRING;
 }
 
@@ -91,9 +92,9 @@ bool comment(void) {
     char cur;
     char prev;
 
-    for (prev = '\0', cur = input();
+    for (prev = '\0', cur = yyinput();
          cur && !(prev == '*' && cur == '/');
-         prev = cur, cur = input()) {
+         prev = cur, cur = yyinput()) {
         if (cur == '\n') {
             ++g_lineno;
         }
