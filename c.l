@@ -1,14 +1,10 @@
-/* LEXER REFERENCE: https://www.lysator.liu.se/c/ANSI-C-grammar-l.html */
-
-D  [0-9]          /* digit */
-L  [[:alpha:]_]   /* letter */
-H  [[:hexdigit:]] /* hexadecimal */
-E  [Ee][+-]?{D}+  /* exponent */
-               /* OMITTED: FS -- float suffix */
-               /* OMITTED: IS -- integer suffix */
+            /* REFERNEC: https://www.lysator.liu.se/c/ANSI-C-grammar-l.html */
 
 %{
-#include "ast.h"
+
+#include <cinttypes>
+#include <string>
+#include "ast.hpp"
 
 #define YY_NO_UNPUT
 #define yywrap() 1
@@ -24,10 +20,94 @@ E  [Ee][+-]?{D}+  /* exponent */
     }
 };
 
+extern zc::SourceLoc g_lineno;
+extern YYSTYPE c_yylval;
+
+bool comment(void);
+char extract_char(void);
+
 %}
 
+D  [0-9]
+L  [[:alpha:]_]
+H  [[:hexdigit:]]
+E  [Ee][+-]?{D}+
+               /* OMITTED: FS -- float suffix */
+               /* OMITTED: IS -- integer suffix */
+
 %%
 
+"/*" {
+    if (comment()) {
+        return ERROR;
+    }
+}
+"void" { return VOID; }
+"char" { return CHAR; }
+"short" { return SHORT; }
+"int" { return INT; }
+"long" { return LONG; }
 
+{L}({L}|{D})* {
+    /* convert yytext to AST identifier */
+    c_yylval.identifier = zc::Identifier::Create(std::string(yytext), g_lineno);
+    return ID;
+   }
 
+  /* incomplete */
+{D}+ {
+    yylval.expr = zc::LiteralExpr::Create(std::strtoumax(yytext, NULL, 10), g_lineno);
+    return INT_CONST;
+   }
+
+   /* incomplete */
+'[^\\']' {
+        yylval.expr = zc::LiteralExpr::Create(extract_char(), g_lineno);
+        return CHAR_CONST;
+    }
+    
+    /* incomplete, string literal */
+\"[^\\"]*\" {
+        yylval.expr = zc::StringExpr::Create(std::string(yytext), g_lineno);
+        return STRING;
+}
+
+"&&" { return AND; }
+"<=" { return LEQ; }
+"==" { return EQ; }
+"!=" { return NEQ; }
+
+    /* single character tokens */
+[;{},:=()[\].&!~\-+*/%<>^|?] { return yytext[0]; }
+
+\n { ++g_lineno; }
+[ \t\v\f]  { /* ignore */ }
+
+. { c_yylval.error_msg = "invalid character"; return ERROR; }
+    
 %%
+
+bool comment(void) {
+    char cur;
+    char prev;
+
+    for (prev = '\0', cur = input();
+         cur && !(prev == '*' && cur == '/');
+         prev = cur, cur = input()) {
+        if (cur == '\n') {
+            ++g_lineno;
+        }
+    }
+
+    if (!*cur) {
+        c_yylval.error_msg = "reached end-of-line while scanning multiline comment";
+        return false;
+    }
+
+    return true;
+}
+
+    /* extract character from yytext for character constants */
+char extract_char(void) {
+    return yytext[1];
+}
