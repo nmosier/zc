@@ -48,21 +48,21 @@ namespace zc {
    class LiteralExpr: public ASTExpr {
    public:
       const intmax_t& val() const { return val_; }
-      static LiteralExpr *Create(intmax_t& val, const SourceLoc& loc)
+      static LiteralExpr *Create(const intmax_t& val, const SourceLoc& loc)
       { return new LiteralExpr(val, loc); }
    protected:
       intmax_t val_;
-      LiteralExpr(intmax_t& val, const SourceLoc& loc): ASTExpr(loc), val_(val) {}
+      LiteralExpr(const intmax_t& val, const SourceLoc& loc): ASTExpr(loc), val_(val) {}
    };
 
    class StringExpr: public ASTExpr {
    public:
       const std::string& str() const { return str_; }
-      static StringExpr *Create(std::string& str, const SourceLoc& loc)
+      static StringExpr *Create(const std::string& str, const SourceLoc& loc)
       { return new StringExpr(str, loc); }
    protected:
       std::string str_;
-      StringExpr(std::string& str, const SourceLoc& loc): ASTExpr(loc), str_(str) {}
+      StringExpr(const std::string& str, const SourceLoc& loc): ASTExpr(loc), str_(str) {}
    };
 
    class IdentifierExpr: public ASTExpr {

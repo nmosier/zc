@@ -45,12 +45,12 @@ namespace zc {
    public:
       const std::string& id() const { return id_; }
 
-      static Identifier *Create(std::string& id, SourceLoc& loc) { return new Identifier(id, loc); }
+      static Identifier *Create(const std::string& id, SourceLoc& loc) { return new Identifier(id, loc); }
       
    protected:
       std::string id_;
       
-      Identifier(std::string& id, SourceLoc& loc): ASTNode(loc), id_(id) {}
+      Identifier(const std::string& id, SourceLoc& loc): ASTNode(loc), id_(id) {}
    };
 
 } // namespace zc

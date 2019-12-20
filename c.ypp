@@ -17,7 +17,7 @@
 %}
                         
 %union {
-    char *error_msg;
+    const char *error_msg;
     int pointer;
     zc::StringExpr *string;
     zc::LiteralExpr *literal_expr;

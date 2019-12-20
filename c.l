@@ -2,9 +2,10 @@
 
 %{
 
-#include <cinttypes>
+#include <inttypes.h>
 #include <string>
 #include "ast.hpp"
+#include "c.tab.hpp"
 
 #define YY_NO_UNPUT
 #define yywrap() 1
@@ -18,13 +19,12 @@
     if ((result = g_istream->gcount()) < 0) {               \
         YY_FATAL_ERROR("read() in flex scanner failed");    \
     }
-};
-
+    
 extern zc::SourceLoc g_lineno;
 extern YYSTYPE c_yylval;
 
 bool comment(void);
-char extract_char(void);
+char extract_char(const char *);
 
 %}
 
@@ -56,13 +56,13 @@ E  [Ee][+-]?{D}+
 
   /* incomplete */
 {D}+ {
-    yylval.expr = zc::LiteralExpr::Create(std::strtoumax(yytext, NULL, 10), g_lineno);
+    yylval.expr = zc::LiteralExpr::Create(strtoimax(yytext, NULL, 10), g_lineno);
     return INT_CONST;
    }
 
    /* incomplete */
 '[^\\']' {
-        yylval.expr = zc::LiteralExpr::Create(extract_char(), g_lineno);
+        c_yylval.expr = zc::LiteralExpr::Create(extract_char(yytext), g_lineno);
         return CHAR_CONST;
     }
     
@@ -99,7 +99,7 @@ bool comment(void) {
         }
     }
 
-    if (!*cur) {
+    if (!cur) {
         c_yylval.error_msg = "reached end-of-line while scanning multiline comment";
         return false;
     }
@@ -108,6 +108,6 @@ bool comment(void) {
 }
 
     /* extract character from yytext for character constants */
-char extract_char(void) {
-    return yytext[1];
+char extract_char(const char *str) {
+    return str[1];
 }
