@@ -19,15 +19,12 @@ namespace zc {
    typedef ASTNodeVec<ExternalDecl> ExternalDecls;
    class DeclSpec;
    typedef ASTNodeVec<DeclSpec> DeclSpecs;
-   class Declarator;
-   typedef ASTNodeVec<Declarator> Declarators;
-   class ParamDecl;
-   typedef ASTNodeVec<ParamDecl> ParamDecls;
+   class ASTDeclarator;
+   typedef ASTNodeVec<ASTDeclarator> ASTDeclarators;
    class FunctionDef;
    class CompoundStat;
    class TypeSpec;
    class Pointer;
-   class DirectDeclarator;
    class Identifier;
    class ExprStat;
    class SelectionStat;

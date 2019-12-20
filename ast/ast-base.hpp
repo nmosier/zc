@@ -14,7 +14,7 @@ namespace zc {
    protected:
       SourceLoc loc_;
       
-      ASTNode(SourceLoc& loc): loc_(loc) {}
+      ASTNode(const SourceLoc& loc): loc_(loc) {}
    };
 
    /* class ASTExpr -- base class for all expressions. 
@@ -24,7 +24,7 @@ namespace zc {
    class ASTStat: public ASTNode {
    public:
    protected:
-      ASTStat(SourceLoc& loc): ASTNode(loc) {}
+      ASTStat(const SourceLoc& loc): ASTNode(loc) {}
    };
    typedef ASTNodeVec<ASTStat> ASTStats;
    
@@ -32,7 +32,7 @@ namespace zc {
    class ASTVecFeature {
    public:
       typedef std::vector<Node *> Vec;
-      Vec& vec() const { return vec_; }
+      Vec& vec() { return vec_; }
 
    protected:
       Vec vec_;
@@ -43,9 +43,9 @@ namespace zc {
    template <class Node>
    class ASTNodeVec: public ASTNode, public ASTVecFeature<Node> {
    public:
-      static ASTNodeVec<Node> *Create(SourceLoc& loc) { return new ASTNodeVec<Node>(loc); }
+      static ASTNodeVec<Node> *Create(const SourceLoc& loc) { return new ASTNodeVec<Node>(loc); }
    protected:
-      ASTNodeVec(SourceLoc& loc): ASTNode(loc), ASTVecFeature<Node>() {}
+      ASTNodeVec(const SourceLoc& loc): ASTNode(loc), ASTVecFeature<Node>() {}
    };
 
    template <class... Types>
@@ -57,13 +57,13 @@ namespace zc {
    protected:
       Variant variant_;
 
-      ASTVariantFeature(Variant& variant): variant_(variant) {}
+      ASTVariantFeature(const Variant& variant): variant_(variant) {}
    };
 
    class ASTExpr: public ASTNode {
    public:
    protected:
-      ASTExpr(SourceLoc& loc): ASTNode(loc) {}
+      ASTExpr(const SourceLoc& loc): ASTNode(loc) {}
    };
 
    class ASTUnaryExpr: public ASTExpr {
@@ -71,7 +71,7 @@ namespace zc {
       ASTExpr *expr() const { return expr_; }
    protected:
       ASTExpr *expr_;
-      ASTUnaryExpr(ASTExpr *expr, SourceLoc& loc): ASTExpr(loc), expr_(expr) {}
+      ASTUnaryExpr(ASTExpr *expr, const SourceLoc& loc): ASTExpr(loc), expr_(expr) {}
    };
 
    class ASTBinaryExpr: public ASTExpr {
@@ -81,7 +81,7 @@ namespace zc {
    protected:
       ASTExpr *lhs_;
       ASTExpr *rhs_;
-      ASTBinaryExpr(ASTExpr *lhs, ASTExpr *rhs, SourceLoc& loc):
+      ASTBinaryExpr(ASTExpr *lhs, ASTExpr *rhs, const SourceLoc& loc):
          ASTExpr(loc), lhs_(lhs), rhs_(rhs) {}
    };
    
@@ -94,9 +94,9 @@ namespace zc {
    template <class Subexpr>
    class ASTVecExpr: public ASTExpr, public ASTVecFeature<Subexpr> {
    public:
-      static ASTVecExpr *Create(SourceLoc& loc) { return new ASTVecExpr(loc); }
+      static ASTVecExpr *Create(const SourceLoc& loc) { return new ASTVecExpr(loc); }
    protected:
-      ASTVecExpr(SourceLoc& loc): ASTExpr(loc), ASTVecFeature<Subexpr>() {}
+      ASTVecExpr(const SourceLoc& loc): ASTExpr(loc), ASTVecFeature<Subexpr>() {}
    };
 
 }

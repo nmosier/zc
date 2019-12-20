@@ -7,32 +7,32 @@
 
 namespace zc {
 
-   class ExternalDecl: public ASTNode, public ASTVariantFeature<FunctionDef, Decl> {
+   class ExternalDecl: public ASTNode, public ASTVariantFeature<FunctionDef, Decls> {
    public:
-      static ExternalDecl *Create(Variant& variant, SourceLoc& loc)
+      static ExternalDecl *Create(const Variant& variant, const SourceLoc& loc)
       { return new ExternalDecl(variant, loc); }
       
    protected:
-   ExternalDecl(Variant& variant, SourceLoc& loc): ASTNode(loc), ASTVariantFeature(variant) {}
+   ExternalDecl(const Variant& variant, const SourceLoc& loc): ASTNode(loc), ASTVariantFeature(variant) {}
    };
 
    class FunctionDef: public ASTNode {
    public:
       DeclSpecs *specs() const { return specs_; }
-      Declarator *declarator() const { return declarator_; }
+      ASTDeclarator *declarator() const { return declarator_; }
       CompoundStat *comp_stat() const { return comp_stat_; }
 
-      static FunctionDef *Create(DeclSpecs *specs, Declarator *declarator, CompoundStat *comp_stat,
-                                 SourceLoc& loc)
+      static FunctionDef *Create(DeclSpecs *specs, ASTDeclarator *declarator, CompoundStat *comp_stat,
+                                 const SourceLoc& loc)
       { return new FunctionDef(specs, declarator, comp_stat, loc); }
       
    protected:
       DeclSpecs *specs_;
-      Declarator *declarator_;
+      ASTDeclarator *declarator_;
       CompoundStat *comp_stat_;
 
-   FunctionDef(DeclSpecs *specs, Declarator *declarator, CompoundStat *comp_stat,
-               SourceLoc& loc): ASTNode(loc), specs_(specs), declarator_(declarator),
+   FunctionDef(DeclSpecs *specs, ASTDeclarator *declarator, CompoundStat *comp_stat,
+               const SourceLoc& loc): ASTNode(loc), specs_(specs), declarator_(declarator),
          comp_stat_(comp_stat) {}
       
    };
@@ -42,88 +42,81 @@ namespace zc {
    public:
       DeclSpecs *specs() const { return specs_; }
       
-      static Decl *Create(DeclSpecs *specs, SourceLoc& loc) { return new Decl(specs, loc); }
+      static Decl *Create(DeclSpecs *specs, ASTDeclarator *declarator, const SourceLoc& loc)
+      { return new Decl(specs, declarator, loc); }
       
    protected:
       DeclSpecs *specs_;
-      Declarators *declarators_;
+      ASTDeclarator *declarator_;
 
-   Decl(DeclSpecs *specs, SourceLoc& loc): ASTNode(loc), specs_(specs) {}
+      Decl(DeclSpecs *specs, ASTDeclarator *declarator, const SourceLoc& loc):
+         ASTNode(loc), specs_(specs), declarator_(declarator) {}
    };
    
-   class DeclSpec: public ASTNode, public ASTVariantFeature<TypeSpec> {
+   class DeclSpec: public ASTNode {
    public:
    protected:
-   DeclSpec(Variant& variant, SourceLoc& loc): ASTNode(loc), ASTVariantFeature(variant) {}
+      DeclSpec(const SourceLoc& loc): ASTNode(loc) {}
    };
-   
-   class TypeSpec: public ASTNode {
+
+   class TypeSpec: public DeclSpec {
    public:
-      enum Kind { VOID, CHAR, SHORT, INT, LONG };
+      enum Kind { TYPE_VOID, TYPE_CHAR, TYPE_SHORT, TYPE_INT, TYPE_LONG };
       Kind kind() const { return kind_; }
       
-      static TypeSpec *Create(enum Kind kind, SourceLoc& loc) { return new TypeSpec(kind, loc); }
+      static TypeSpec *Create(enum Kind kind, const SourceLoc& loc) { return new TypeSpec(kind, loc); }
       
    protected:
       Kind kind_;
       
-   TypeSpec(Kind kind, SourceLoc& loc): ASTNode(loc), kind_(kind) {}
+      TypeSpec(Kind kind, const SourceLoc& loc): DeclSpec(loc), kind_(kind) {}
    };
 
-   class Declarator: public ASTNode {
+   class ASTDeclarator: public ASTNode {
    public:
-      Pointer *ptr() const { return ptr_; }
-      DirectDeclarator *direct_decl() const { return direct_decl_; }
-      
-      static Declarator *Create(Pointer *ptr, DirectDeclarator *direct_decl, SourceLoc& loc)
-      { return new Declarator(ptr, direct_decl, loc); }
-      
    protected:
-      Pointer *ptr_;
-      DirectDeclarator *direct_decl_;
-      
-   Declarator(Pointer *ptr, DirectDeclarator *direct_decl, SourceLoc& loc):
-      ASTNode(loc), ptr_(ptr), direct_decl_(direct_decl) {}
+      ASTDeclarator(const SourceLoc& loc): ASTNode(loc) {}
    };
 
-   class Pointer: public ASTNode {
+   class PointerDeclarator: public ASTDeclarator {
    public:
       int depth() const { return depth_; }
-
-      static Pointer *Create(int depth, SourceLoc& loc) { return new Pointer(depth, loc); }
+      ASTDeclarator *declarator() const { return declarator_; }
       
+      static PointerDeclarator *Create(int depth, ASTDeclarator *declarator, const SourceLoc& loc)
+      { return new PointerDeclarator(depth, declarator, loc); }
    protected:
-      int depth_ = 0;
-
-   Pointer(int depth, SourceLoc& loc): ASTNode(loc), depth_(depth) {}
+      int depth_;
+      ASTDeclarator *declarator_;
+      PointerDeclarator(int depth, ASTDeclarator *declarator, const SourceLoc& loc):
+         ASTDeclarator(loc), depth_(depth), declarator_(declarator) {}
    };
 
-   class DirectDeclarator: public ASTNode, public ASTVariantFeature<Identifier *, Declarator *> {
+   class BasicDeclarator: public ASTDeclarator {
    public:
-      static DirectDeclarator *Create(Variant& variant, SourceLoc& loc)
-      { return new DirectDeclarator(variant, loc); }
-      
+      Identifier *id() const { return id_; }
+      static BasicDeclarator *Create(Identifier *id, const SourceLoc& loc)
+      { return new BasicDeclarator(id, loc); }
    protected:
-   DirectDeclarator(Variant& variant, SourceLoc& loc): ASTNode(loc), ASTVariantFeature(variant) {}
+      Identifier *id_;
+      BasicDeclarator(Identifier *id, const SourceLoc& loc):
+         ASTDeclarator(loc), id_(id) {}
    };
 
-   class ParamDecl: public ASTNode {
+   class FunctionDeclarator: public ASTDeclarator {
    public:
-      DeclSpecs *specs() const { return specs_; }
-      Declarator *declarator() const { return declarator_; }
-
-      static ParamDecl *Create(DeclSpecs *specs, Declarator *declarator, SourceLoc& loc)
-      { return new ParamDecl(specs, declarator, loc); }
-      
+      ASTDeclarator *declarator() const { return declarator_; }
+      Decls *params() const { return params_; }
+      static FunctionDeclarator *Create(ASTDeclarator *declarator, Decls *params,
+                                        const SourceLoc& loc)
+      { return new FunctionDeclarator(declarator, params, loc); }
    protected:
-      DeclSpecs *specs_;
-      Declarator *declarator_;
-
-   ParamDecl(DeclSpecs *specs, Declarator *declarator, SourceLoc& loc):
-      ASTNode(loc), specs_(specs), declarator_(declarator) {}
+      ASTDeclarator *declarator_;
+      Decls *params_;
+      FunctionDeclarator(ASTDeclarator *declarator, Decls *params, const SourceLoc& loc):
+         ASTDeclarator(loc), declarator_(declarator), params_(params) {}
    };
 
-   
 }
 
 #endif
