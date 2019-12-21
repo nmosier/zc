@@ -80,7 +80,7 @@
 
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 typedef union YYSTYPE
-#line 19 "c.ypp"
+#line 28 "c.ypp"
 {
     const char *error_msg;
     int pointer;

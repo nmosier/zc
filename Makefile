@@ -21,7 +21,7 @@ CLEAN_SRCS = $(BISON_SRC) $(FLEX_SRC)
 CLEAN_HDRS = $(BISON_HDR)
 
 .PHONY: all
-all: test c.tab.o flex lexer-main $(AST_OBJS)
+all: test c.tab.o flex lexer-main parser-main $(AST_OBJS)
 
 .PHONY: bison
 bison: $(BISON_OBJ)
@@ -50,7 +50,10 @@ $(FLEX_OBJ): $(FLEX_SRC)
 test: test.o $(AST_HDRS)
 	c++ $(OFLAGS) -o $@ $<
 
-lexer-main: lexer-main.o lex.yy.o util.o $(AST_OBJS)
+lexer-main: lexer-main.o $(FLEX_OBJ) util.o $(AST_OBJS)
+	c++ $(LDFLAGS) -lfl -o $@ $^
+
+parser-main: parser-main.o $(FLEX_OBJ) $(BISON_OBJ) util.o $(AST_OBJS)
 	c++ $(LDFLAGS) -lfl -o $@ $^
 
 .PHONY: clean

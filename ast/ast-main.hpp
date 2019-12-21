@@ -15,7 +15,7 @@ namespace zc {
    public:
       ExternalDecls *decls() const { return decls_; }
       
-      static TranslationUnit *Create(SourceLoc & loc) { return new TranslationUnit(loc); }
+      static TranslationUnit *Create(ExternalDecls *decls, SourceLoc& loc) { return new TranslationUnit(decls, loc); }
 
       virtual void DumpNode(std::ostream& os) const override { os << "TranslationUnit"; }
 
@@ -26,9 +26,7 @@ namespace zc {
    protected:
       ExternalDecls *decls_;
       
-      TranslationUnit(SourceLoc& loc): ASTNode(loc), decls_(nullptr) {}
-      TranslationUnit(ExternalDecls *decls, SourceLoc& loc):
-         ASTNode(loc), decls_(decls) {}
+      TranslationUnit(ExternalDecls *decls, SourceLoc& loc): ASTNode(loc), decls_(decls) {}
    };
    
 }

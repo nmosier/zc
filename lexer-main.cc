@@ -51,7 +51,7 @@ zc::SourceLoc g_lineno = 1;
 
 // Entry point to the lexer. It returns the next token each time it is called.
 extern int yylex();
-YYSTYPE c_yylval; // Not compiled with parser, so must define this.
+YYSTYPE yylval; // Not compiled with parser, so must define this.
 
 namespace {
 
@@ -99,7 +99,7 @@ int main(int argc, char* argv[]) {
     std::cout << "#name \"" << argv[optind] << "\"" << std::endl;
     int token;
     while ((token = yylex()) != 0) {
-     zc::dump_token(std::cout, g_lineno, token, c_yylval);
+     zc::dump_token(std::cout, g_lineno, token, yylval);
     }
 
     optind++;

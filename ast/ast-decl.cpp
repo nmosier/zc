@@ -35,5 +35,9 @@ namespace zc {
       params_->Dump(os, level);
    }
 
+   void Decl::DumpChildren(std::ostream& os, int level) const {
+      specs_->Dump(os, level);
+      declarator_->Dump(os, level);
+   }
    
 }

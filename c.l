@@ -22,7 +22,7 @@
     }
     
 extern zc::SourceLoc g_lineno;
-extern YYSTYPE c_yylval;
+extern YYSTYPE yylval;
 
 bool comment(void);
 char extract_char(const char *);
@@ -51,25 +51,25 @@ E  [Ee][+-]?{D}+
 
 {L}({L}|{D})* {
     /* convert yytext to AST identifier */
-    c_yylval.identifier = zc::Identifier::Create(std::string(yytext), g_lineno);
+    yylval.identifier = zc::Identifier::Create(std::string(yytext), g_lineno);
     return ID;
    }
 
   /* incomplete */
 {D}+ {
-    c_yylval.expr = zc::LiteralExpr::Create(strtoimax(yytext, NULL, 10), g_lineno);
+    yylval.expr = zc::LiteralExpr::Create(strtoimax(yytext, NULL, 10), g_lineno);
     return INT_CONST;
    }
 
    /* incomplete */
 '[^\\']' {
-        c_yylval.expr = zc::LiteralExpr::Create(extract_char(yytext), g_lineno);
+        yylval.expr = zc::LiteralExpr::Create(extract_char(yytext), g_lineno);
         return CHAR_CONST;
     }
     
     /* incomplete, string literal */
 \"[^\\"]*\" {
-        c_yylval.expr = zc::StringExpr::Create(std::string(yytext), g_lineno);
+        yylval.expr = zc::StringExpr::Create(std::string(yytext), g_lineno);
         return STRING;
 }
 
@@ -84,7 +84,7 @@ E  [Ee][+-]?{D}+
 \n { ++g_lineno; }
 [ \t\v\f]  { /* ignore */ }
 
-. { c_yylval.error_msg = "invalid character"; return ERROR; }
+. { yylval.error_msg = "invalid character"; return ERROR; }
     
 %%
 
@@ -101,7 +101,7 @@ bool comment(void) {
     }
 
     if (!cur) {
-        c_yylval.error_msg = "reached end-of-line while scanning multiline comment";
+        yylval.error_msg = "reached end-of-line while scanning multiline comment";
         return false;
     }
 

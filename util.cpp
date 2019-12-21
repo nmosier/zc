@@ -5,6 +5,7 @@
 #include <cstring>
 #include "ast.hpp"
 #include "c.tab.hpp"
+#include "util.hpp"
 
 namespace zc {
 
@@ -44,9 +45,10 @@ namespace zc {
       }
    }
     
-   void dump_token(std::ostream& out, int lineno, int token, YYSTYPE yylval) {
-      out << "#" << lineno << " " << token_to_string(token);
-       
+
+   void print_token(std::ostream& out, int token, YYSTYPE yylval) {
+      out << token_to_string(token);
+      
       switch (token) {
       case STRING:
          out << " \"";
@@ -68,8 +70,15 @@ namespace zc {
          break;
       }
       out << std::endl;
+        
    }
-    
+
+   void dump_token(std::ostream& out, int lineno, int token, YYSTYPE yylval) {
+      out << "#" << lineno << " " << token_to_string(token);
+      print_token(out, token, yylval);
+   }
+
+   
 }
 
 #endif

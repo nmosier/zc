@@ -12,7 +12,7 @@ namespace zc {
    class ExternalDecl: virtual public ASTNode {
    public:
    protected:
-   ExternalDecl(const SourceLoc& loc): ASTNode(loc) {}
+      ExternalDecl(const SourceLoc& loc): ASTNode(loc) {}
    };
 
    class FunctionDef: public ExternalDecl {
@@ -45,8 +45,9 @@ namespace zc {
       DeclSpecs *specs() const { return specs_; }
       ASTDeclarator *declarator() const { return declarator_; }
       
-      static Decl *Create(DeclSpecs *specs, ASTDeclarator *declarator, const SourceLoc& loc)
-      { return new Decl(specs, declarator, loc); }
+      static Decl *Create(DeclSpecs *specs, ASTDeclarator *declarator, const SourceLoc& loc) {
+         return new Decl(specs, declarator, loc);
+      }
 
       virtual void DumpNode(std::ostream& os) const override { os << "Decl"; }
       virtual void DumpChildren(std::ostream& os, int level) const override;
@@ -54,7 +55,7 @@ namespace zc {
    protected:
       DeclSpecs *specs_;
       ASTDeclarator *declarator_;
-
+      
       Decl(DeclSpecs *specs, ASTDeclarator *declarator, const SourceLoc& loc):
          ASTNode(loc), specs_(specs), declarator_(declarator) {}
    };

@@ -1,18 +1,27 @@
 /* GRAMMAR REFERENCE: http://www.cs.man.ac.uk/~pjj/bnf/c_syntax.bnf */
 
 %{
+
   #include "ast.hpp"
 
   #define YYDEBUG 1
   #define YYLTYPE zc::SourceLoc
   #define YYLLOC_DEFAULT(Cur, Rhs, N)			\
     (Cur) = (N) ? YYRHSLOC(Rhs, 1) : YYRHSLOC(Rhs, 0);
+#define yylloc g_lineno
+
   void yyerror(const char *);
   int yylex(void);
-  extern zc::SourceLoc g_lineno;
+
+//  zc::SourceLoc g_lineno = 1;
+  zc::TranslationUnit *g_AST_root;
+
   extern const char *g_filename;
   extern zc::TranslationUnit *g_translation_unit;
 
+  int omerrs = 0; /* Number of lexing/parsing errors */
+
+#include "util.hpp"
 
 %}
                         
@@ -44,6 +53,10 @@
     zc::BinaryExpr::Kind binary_operator;
     zc::UnaryExpr::Kind unary_operator;
 }
+
+%initial-action {
+    @$ = 1;
+}                   
 
 /* terminals */
 %token ERROR
@@ -93,8 +106,13 @@
 %%
 
 translation_unit:
-                external_decl { $$ = zc::TranslationUnit::Create(@1); }
-        |       translation_unit external_decl { $1->decls()->vec().push_back($2); $$ = $1; @$ = @1; }
+                external_decl {
+                    g_AST_root = $$ = zc::TranslationUnit::Create(zc::ExternalDecls::Create(@1), @1);
+                    $$->decls()->vec().push_back($1);
+                }
+        |       translation_unit external_decl {
+                    $1->decls()->vec().push_back($2); $$ = $1; @$ = @1;
+                }
         ;
 external_decl:  function_definition { $$ = $1; }
         |       decl { $$ = $1; }
@@ -103,7 +121,7 @@ function_definition:
                 decl_specs declarator compound_stat { $$ = zc::FunctionDef::Create($1, $2, $3, @1); }
         ; /* incomplete */
 optional_decl_list:
-                /* empty */ { $$ = zc::Decls::Create(0); @$ = 0; }
+                /* empty */ { $$ = zc::Decls::Create(@$); }
         |       decl_list { $$ = $1; }
         ;
 decl_list:      decl
@@ -126,7 +144,7 @@ type_spec:      VOID { $$ = zc::TypeSpec::Create(zc::TypeSpec::TYPE_VOID, @1); }
         |       LONG { $$ = zc::TypeSpec::Create(zc::TypeSpec::TYPE_LONG, @1); }
         ;
 optional_init_declarator_list:
-                /* empty */ { $$ = zc::ASTDeclarators::Create(0); @$ = 0; }
+                /* empty */ { $$ = zc::ASTDeclarators::Create(@$); @$ = 0; }
         |       init_declarator_list
         ;
 init_declarator_list:
@@ -159,7 +177,7 @@ stat:           exp_stat { $$ = $1; }
         |       compound_stat { $$ = $1; }
         ; /* incomplete */
 optional_stat_list:
-                /* empty */ { $$ = zc::ASTStats::Create(0); @$ = 0; }
+                /* empty */ { $$ = zc::ASTStats::Create(@$); @$ = 0; }
         |       stat_list { $$ = $1; }
         ;
 stat_list:      stat { $$ = zc::ASTStats::Create(@1); $$->vec().push_back($1); }
@@ -171,7 +189,7 @@ compound_stat:  '{' optional_decl_list optional_stat_list '}' {
         ;
 exp_stat:       optional_exp ';' { $$ = zc::ExprStat::Create($1, @1); }
         ;
-optional_exp:   /* empty */ { $$ = zc::NoExpr::Create(0); @$ = 0; }
+optional_exp:   /* empty */ { $$ = zc::NoExpr::Create(@$); @$ = 0; }
         |       exp
         ;
 exp:            assignment_exp { $$ = $1; }
@@ -275,3 +293,17 @@ unary_operator: '&' { $$ = zc::UnaryExpr::Kind::UOP_ADDR; }
 
 %%
 
+void yyerror(const char *s) {
+    extern zc::SourceLoc g_lineno;
+
+    std::cerr << "\"" << g_filename << "\", " << "line " << g_lineno << ": " << s << " at or near ";
+    zc::print_token(std::cerr, yychar, yylval);
+    std::cerr << std::endl;
+
+    ++omerrs;
+
+    if (omerrs > 50) {
+        std::cerr << "More than 50 errors" << std::endl;
+        exit(1);
+    }
+}
