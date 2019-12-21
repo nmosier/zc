@@ -16,6 +16,10 @@ FLEX_OBJ = $(FLEX_SRC:.c=.o)
 
 HDRS = $(AST_HDRS) $(BISON_HDR)
 
+CLEAN_OBJS = $(shell find . -name "*.o")
+CLEAN_SRCS = $(BISON_SRC) $(FLEX_SRC)
+CLEAN_HDRS = $(BISON_HDR)
+
 .PHONY: all
 all: test c.tab.o flex lexer-main $(AST_OBJS)
 
@@ -48,3 +52,7 @@ test: test.o $(AST_HDRS)
 
 lexer-main: lexer-main.o lex.yy.o util.o $(AST_OBJS)
 	c++ $(LDFLAGS) -lfl -o $@ $^
+
+.PHONY: clean
+clean:
+	rm -f $(CLEAN_OBJS) $(CLEAN_SRCS) $(CLEAN_HDRS)
