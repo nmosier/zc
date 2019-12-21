@@ -11,16 +11,20 @@ namespace zc {
    typedef std::size_t SourceLoc;
    
    /* forward declarations */
-   template <class Node> class ASTNodeVec;
+   class ASTNode;
+   template <class Node, const char *name> class ASTNodeVec;
    class TranslationUnit;
    class Decl;
-   typedef ASTNodeVec<Decl> Decls;
+   class Decls;
    class ExternalDecl;
-   typedef ASTNodeVec<ExternalDecl> ExternalDecls;
+   const char ExternalDecls_s[] = "ExternalDecls";
+   typedef ASTNodeVec<ExternalDecl,ExternalDecls_s> ExternalDecls;
    class DeclSpec;
-   typedef ASTNodeVec<DeclSpec> DeclSpecs;
+   const char DeclSpecs_s[] = "DeclSpecs";
+   typedef ASTNodeVec<DeclSpec,DeclSpecs_s> DeclSpecs;
    class ASTDeclarator;
-   typedef ASTNodeVec<ASTDeclarator> ASTDeclarators;
+   const char ASTDeclarators_s[] = "Declarators";
+   typedef ASTNodeVec<ASTDeclarator,ASTDeclarators_s> ASTDeclarators;
    class FunctionDef;
    class CompoundStat;
    class TypeSpec;

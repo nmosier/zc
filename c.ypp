@@ -96,8 +96,8 @@ translation_unit:
                 external_decl { $$ = zc::TranslationUnit::Create(@1); }
         |       translation_unit external_decl { $1->decls()->vec().push_back($2); $$ = $1; @$ = @1; }
         ;
-external_decl:  function_definition { $$ = zc::ExternalDecl::Create(zc::ExternalDecl::Variant($1), @1); }
-        |       decl { $$ = zc::ExternalDecl::Create(zc::ExternalDecl::Variant($1), @1); }
+external_decl:  function_definition { $$ = $1; }
+        |       decl { $$ = $1; }
         ;
 function_definition:
                 decl_specs declarator compound_stat { $$ = zc::FunctionDef::Create($1, $2, $3, @1); }

@@ -12,8 +12,15 @@ namespace zc {
       Decls *decls() const { return decls_; }
       ASTStats *stats() const { return stats_; }
       
-      static CompoundStat *Create(Decls *decls, ASTStats *stats, SourceLoc& loc)
-      { return new CompoundStat(decls, stats, loc); }
+      static CompoundStat *Create(Decls *decls, ASTStats *stats, SourceLoc& loc) {
+         return new CompoundStat(decls, stats, loc);
+      }
+
+      virtual void DumpNode(std::ostream& os) const override { os << "CompoundStat"; }
+      virtual void DumpChildren(std::ostream& os, int level) const override {
+         decls_->Dump(os, level);
+         stats_->Dump(os, level);
+      }
       
    protected:
       Decls *decls_;
@@ -28,6 +35,11 @@ namespace zc {
       ASTExpr *expr() const { return expr_; }
       
       static ExprStat *Create(ASTExpr *expr, SourceLoc& loc) { return new ExprStat(expr, loc); }
+
+      virtual void DumpNode(std::ostream& os) const override { os << "ExprStat"; }
+      virtual void DumpChildren(std::ostream& os, int level) const override {
+         expr_->Dump(os, level);
+      }
       
    protected:
       ASTExpr *expr_;

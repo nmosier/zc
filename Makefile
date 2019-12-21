@@ -1,7 +1,9 @@
-CXXFLAGS += -std=c++2a -I ast/ -Wno-register -g
+CXXFLAGS += -std=c++2a -I . -Wno-register -g
 LDFLAGS += -L/usr/local/opt/flex/lib
 
 AST_HDRS = ast.hpp $(wildcard ast/*.hpp)
+AST_SRCS = $(wildcard ast/*.cpp)
+AST_OBJS = $(AST_SRCS:.cpp=.o)
 
 BISON_FLAGS = -d
 
@@ -15,7 +17,7 @@ FLEX_OBJ = $(FLEX_SRC:.c=.o)
 HDRS = $(AST_HDRS) $(BISON_HDR)
 
 .PHONY: all
-all: test c.tab.o flex lexer-main
+all: test c.tab.o flex lexer-main $(AST_OBJS)
 
 .PHONY: bison
 bison: $(BISON_OBJ)
@@ -44,5 +46,5 @@ $(FLEX_OBJ): $(FLEX_SRC)
 test: test.o $(AST_HDRS)
 	c++ $(OFLAGS) -o $@ $<
 
-lexer-main: lexer-main.o lex.yy.o util.o
+lexer-main: lexer-main.o lex.yy.o util.o $(AST_OBJS)
 	c++ $(LDFLAGS) -lfl -o $@ $^

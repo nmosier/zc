@@ -5,54 +5,61 @@
 #ifndef __AST_BASE_HPP
 #define __AST_BASE_HPP
 
+#include <variant>
+
 namespace zc {
+
 
    class ASTNode {
    public:
       const SourceLoc& loc() const { return loc_; }
-      
+      void Dump(std::ostream& os, size_t level) const;
+      virtual void DumpNode(std::ostream& os) const = 0;
+      virtual void DumpChildren(std::ostream& os, int level) const = 0;
    protected:
       SourceLoc loc_;
-      
       ASTNode(const SourceLoc& loc): loc_(loc) {}
    };
-
-   /* class ASTExpr -- base class for all expressions. 
-    * NOTE: No analogue nonterminal in grammar. */
-
 
    class ASTStat: public ASTNode {
    public:
    protected:
       ASTStat(const SourceLoc& loc): ASTNode(loc) {}
    };
-   typedef ASTNodeVec<ASTStat> ASTStats;
+   const char ASTStats_s[] = "Stats";
+   typedef ASTNodeVec<ASTStat,ASTStats_s> ASTStats;
+
+
    
-   template <class Node>
-   class ASTVecFeature {
+   template <class Node, const char *name>
+   class ASTNodeVec: virtual public ASTNode {
    public:
       typedef std::vector<Node *> Vec;
       Vec& vec() { return vec_; }
 
+      static ASTNodeVec<Node,name> *Create(const SourceLoc& loc) { return new ASTNodeVec(loc); }
+
+      virtual void DumpNode(std::ostream& os) const override { os << name; }
+      
+      virtual void DumpChildren(std::ostream& os, int level) const override {
+         for (const Node *node : vec_) {
+            node->Dump(os, level);
+         }
+      }
+      
    protected:
       Vec vec_;
 
-      ASTVecFeature() {}
+      ASTNodeVec(const SourceLoc& loc): ASTNode(loc) {}
    };
 
-   template <class Node>
-   class ASTNodeVec: public ASTNode, public ASTVecFeature<Node> {
-   public:
-      static ASTNodeVec<Node> *Create(const SourceLoc& loc) { return new ASTNodeVec<Node>(loc); }
-   protected:
-      ASTNodeVec(const SourceLoc& loc): ASTNode(loc), ASTVecFeature<Node>() {}
-   };
 
+   
    template <class... Types>
    class ASTVariantFeature {
    public:
       typedef std::variant<Types*...> Variant;
-      Variant& variant() const { return variant_; }
+      const Variant& variant() const { return variant_; }
       
    protected:
       Variant variant_;
@@ -69,6 +76,9 @@ namespace zc {
    class ASTUnaryExpr: public ASTExpr {
    public:
       ASTExpr *expr() const { return expr_; }
+
+      virtual void DumpChildren(std::ostream& os, int level) const override;
+      
    protected:
       ASTExpr *expr_;
       ASTUnaryExpr(ASTExpr *expr, const SourceLoc& loc): ASTExpr(loc), expr_(expr) {}
@@ -78,25 +88,14 @@ namespace zc {
    public:
       ASTExpr *lhs() const { return lhs_; }
       ASTExpr *rhs() const { return rhs_; }
+
+      virtual void DumpChildren(std::ostream& os, int level) const override;
+      
    protected:
       ASTExpr *lhs_;
       ASTExpr *rhs_;
       ASTBinaryExpr(ASTExpr *lhs, ASTExpr *rhs, const SourceLoc& loc):
          ASTExpr(loc), lhs_(lhs), rhs_(rhs) {}
-   };
-   
-
-   template <class... Exprs>
-   class ASTVariantExpr: public ASTExpr, public ASTVariantFeature<Exprs...> {
-      
-   };
-
-   template <class Subexpr>
-   class ASTVecExpr: public ASTExpr, public ASTVecFeature<Subexpr> {
-   public:
-      static ASTVecExpr *Create(const SourceLoc& loc) { return new ASTVecExpr(loc); }
-   protected:
-      ASTVecExpr(const SourceLoc& loc): ASTExpr(loc), ASTVecFeature<Subexpr>() {}
    };
 
 }
