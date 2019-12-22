@@ -1,1 +1,6 @@
 *~
+*.o
+lex.yy.c
+cool
+lexer-main
+parser-main

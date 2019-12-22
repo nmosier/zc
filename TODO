@@ -1,0 +1,8 @@
+[ ] remove IdentifierExpr
+[ ] finish TypeCheck() for all nodes
+[ ] add annotation for expressions for whether `lvalue' or `rvalue'
+[X] add "dereferencable" annotation to Decl
+[ ] remove Identifier
+[X] add "Address" method to decls
+[ ] add "integral" method to delc
+[ ] TypeSpecs -> TypeSpec, since they are collapsed to 1.
