@@ -43,10 +43,8 @@ namespace zc {
    class LogicalOrExpr;
    class LogicalAndExpr;
 
-   enum TypeSpec {TYPE_VOID, TYPE_CHAR, TYPE_SHORT, TYPE_INT, TYPE_LONG};
-   const char constexpr TypeSpecs_s[] = "TypeSpecs";
-   typedef ASTSpecs<TypeSpec,TypeSpecs_s> TypeSpecs;
-   
+   enum TypeSpec {TYPE_VOID, TYPE_CHAR, TYPE_SHORT, TYPE_INT, TYPE_LONG, TYPE_LL};
+   class TypeSpecs;
 }
 
 #endif

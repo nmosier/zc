@@ -7,6 +7,8 @@
 
 #include <set>
 
+#include "semant.hpp"
+
 namespace zc {
 
    std::ostream& indent(std::ostream& os, int level);
@@ -18,6 +20,7 @@ namespace zc {
       void Dump(std::ostream& os, size_t level) const;
       virtual void DumpNode(std::ostream& os) const = 0;
       virtual void DumpChildren(std::ostream& os, int level) const = 0;
+      virtual void TypeCheck(SemantEnv& env) {} // = 0
    protected:
       SourceLoc loc_;
       ASTNode(const SourceLoc& loc): loc_(loc) {}

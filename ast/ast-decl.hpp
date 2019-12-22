@@ -67,6 +67,20 @@ namespace zc {
       Decls(const SourceLoc& loc): ASTNode(loc), ASTNodeVec<Decl,Decls_s>(loc), ExternalDecl(loc) {}
    };
 
+
+   const char constexpr TypeSpecs_s[] = "TypeSpecs";   
+   class TypeSpecs: public ASTSpecs<TypeSpec,TypeSpecs_s> {
+   public:
+      static TypeSpecs *Create(const SourceLoc& loc) { return new TypeSpecs(loc); }
+
+      virtual void TypeCheck(SemantEnv& env) override;
+      
+   protected:
+
+      TypeSpecs(const SourceLoc& loc): ASTSpecs<TypeSpec,TypeSpecs_s>(loc) {}
+   };
+
+
    class DeclSpecs: public ASTNode {
    public:
       TypeSpecs *type_specs() const { return type_specs_; }
@@ -82,6 +96,7 @@ namespace zc {
       DeclSpecs(const SourceLoc& loc): ASTNode(loc), type_specs_(TypeSpecs::Create(loc)) {}
    };
 
+   
    std::ostream& operator<< (std::ostream& os, const TypeSpec& spec);
 
    class ASTDeclarator: public ASTNode {

@@ -35,6 +35,7 @@ namespace zc {
       case TYPE_SHORT: os << "SHORT"; return os;
       case TYPE_INT:   os << "INT"; return os;
       case TYPE_LONG:  os << "LONG"; return os;
+      case TYPE_LL:    os << "LONG LONG"; return os;
       default:         os << "(invalid)"; return os;
       }
    }
