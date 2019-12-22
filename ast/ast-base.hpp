@@ -20,7 +20,14 @@ namespace zc {
       void Dump(std::ostream& os, size_t level) const;
       virtual void DumpNode(std::ostream& os) const = 0;
       virtual void DumpChildren(std::ostream& os, int level) const = 0;
-      virtual void TypeCheck(SemantEnv& env) {} // = 0
+
+      /** 
+       * Perform semantic analysis on node and all children.
+       * @param env the semantic environment
+       * @param scoped whether this node is allowed to create a new scope
+       */
+      virtual void TypeCheck(SemantEnv& env, bool scoped = true) {} // = 0
+      
    protected:
       SourceLoc loc_;
       ASTNode(const SourceLoc& loc): loc_(loc) {}
@@ -51,7 +58,7 @@ namespace zc {
             node->Dump(os, level);
          }
       }
-      
+
    protected:
       Vec vec_;
 
@@ -101,16 +108,31 @@ namespace zc {
    public:
       Decl *type() const { return type_; }
 
-      enum Kind {EXPR_NONE, EXPR_LVALUE, EXPR_RVALUE};
+      /*! Enumeration of value kind. */
+      enum Kind {EXPR_NONE,   /*!< indeterminate; this is the default upon construction */
+                 EXPR_LVALUE, /*!< expression is an `lvalue'; it can appear on the left-hand side 
+                               *   of an assignment */
+                 EXPR_RVALUE  /*!< expression is an `rvalue'; it can appear on the right-hand side
+                               *   of an assignment */
+      };
       Kind kind() const { return kind_; }
 
       virtual void ExprKind(SemantEnv& env) {} //= 0;
-      
+
    protected:
+      /**
+       * Type of expression; populated by @see TypeCheck()
+       */
       Decl *type_;
+
+      /**
+       * Kind of value. Determined during semantic analysis.
+       * @see Kind
+       * @see TypeCheck()
+       */
       Kind kind_;
       
-      ASTExpr(const SourceLoc& loc): ASTNode(loc), kind_(EXPR_NONE) {}
+      ASTExpr(const SourceLoc& loc): ASTNode(loc), type_(nullptr), kind_(EXPR_NONE) {}
    };
 
    class ASTUnaryExpr: public ASTExpr {

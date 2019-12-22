@@ -39,7 +39,7 @@ limitations under the License.
 #include <forward_list>
 #include <unordered_map>
 
-namespace cool {
+namespace zc {
 
   // TODO: Refactor ScopedTable to use UniquePtr and the eventual observer_ptr
 

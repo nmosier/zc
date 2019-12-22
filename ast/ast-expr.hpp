@@ -19,7 +19,7 @@ namespace zc {
 
       virtual void DumpNode(std::ostream& os) const override { os << "AssignmentExpr"; }
 
-      virtual void TypeCheck(SemantEnv& env) override;
+      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
       virtual void ExprKind(SemantEnv& env) override;
 
    protected:
@@ -38,7 +38,7 @@ namespace zc {
 
       virtual void DumpNode(std::ostream& os) const override;
 
-      virtual void TypeCheck(SemantEnv& env) override;
+      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
 
    protected:
       Kind kind_;

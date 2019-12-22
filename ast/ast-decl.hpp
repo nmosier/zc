@@ -28,7 +28,7 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override;
       virtual void DumpChildren(std::ostream& os, int level) const override;
 
-      virtual void TypeCheck(SemantEnv& env) override;
+      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
       
    protected:
       Decl *decl_;
@@ -52,13 +52,20 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override { os << "Decl"; }
       virtual void DumpChildren(std::ostream& os, int level) const override;
 
-      virtual void TypeCheck(SemantEnv& env) override;
+      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
 
       bool TypeCompat(const Decl *other) const;
 
-      /* returns nullptr if not dereferencable */
+      /** Obtain dereferenced type.
+       * @return dereferenced type on success; nullptr if not dereferencable.
+       */
       Decl *Dereference();
-      
+
+      /** Obtain address type.
+       * @return address type
+       */
+      Decl *Address();
+
    protected:
       DeclSpecs *specs_;
       ASTDeclarator *declarator_;
@@ -86,7 +93,7 @@ namespace zc {
    public:
       static TypeSpecs *Create(const SourceLoc& loc) { return new TypeSpecs(loc); }
 
-      virtual void TypeCheck(SemantEnv& env) override;
+      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
 
       bool TypeCompat(const TypeSpecs *other) const;
       
@@ -105,13 +112,11 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override { os << "DeclSpecs"; }
       virtual void DumpChildren(std::ostream& os, int level) const override;
 
-      virtual void TypeCheck(SemantEnv& env) override {
+      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override {
          type_specs()->TypeCheck(env);
       }
 
       bool TypeCompat(const DeclSpecs *other) const;
-
-      DeclSpecs *Dereference() { return nullptr; /* declspecs cannot be dereferenced */ }
 
    protected:
       TypeSpecs *type_specs_;
@@ -128,6 +133,7 @@ namespace zc {
 
       virtual bool TypeCompat(const ASTDeclarator *other) const = 0;
       virtual ASTDeclarator *Dereference() = 0;
+      virtual ASTDeclarator *Address() = 0;
       
    protected:
       ASTDeclarator(const SourceLoc& loc): ASTNode(loc) {}
@@ -147,9 +153,12 @@ namespace zc {
          declarator_->Dump(os, level);
       }
 
-      virtual void TypeCheck(SemantEnv& env) override { declarator()->TypeCheck(env); }
+      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override {
+         declarator()->TypeCheck(env);
+      }
       virtual bool TypeCompat(const ASTDeclarator *other) const override;
       virtual ASTDeclarator *Dereference() override;
+      virtual ASTDeclarator *Address() override;
       
    protected:
       int depth_;
@@ -169,9 +178,12 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override { os << "BasicDeclarator"; }
       virtual void DumpChildren(std::ostream& os, int level) const override;
 
-      virtual void TypeCheck(SemantEnv& env) override { /* TODO */ }
+      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override {
+         /* redefinition checked by Decl */
+      }
       virtual bool TypeCompat(const ASTDeclarator *other) const override;
       virtual ASTDeclarator *Dereference() override { return nullptr; }
+      virtual ASTDeclarator *Address() override;
       
    protected:
       Identifier *id_;
@@ -193,9 +205,10 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override { os << "FunctionDeclarator"; }
       virtual void DumpChildren(std::ostream& os, int level) const override;
 
-      virtual void TypeCheck(SemantEnv& env) override;
+      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
       bool TypeCompat(const ASTDeclarator *other) const override;
       virtual ASTDeclarator *Dereference() override { return this; }
+      virtual ASTDeclarator *Address() override { return this; }
       
    protected:
       ASTDeclarator *declarator_;
@@ -207,14 +220,14 @@ namespace zc {
 
    class Identifier: public ASTNode {
    public:
-      const std::string *id() const { return id_; }
+      Symbol *id() const { return id_; }
       
       static Identifier *Create(const std::string& id, SourceLoc& loc) { return new Identifier(id, loc); }
 
       virtual void DumpNode(std::ostream& os) const override;
       virtual void DumpChildren(std::ostream& os, int level) const override { /* no children */ }
 
-      virtual void TypeCheck(SemantEnv& env) override {}
+      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override {}
       
    protected:
       Symbol *id_;
