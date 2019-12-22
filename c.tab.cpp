@@ -164,7 +164,7 @@ typedef union YYSTYPE
     zc::FunctionDef *function_def;
     zc::Decls *decls;
     zc::Decl *decl;
-    zc::DeclSpec *decl_spec;
+    zc::TypeSpec type_spec;
     zc::DeclSpecs *decl_specs;
     zc::ASTDeclarators *declarators;
     zc::ASTDeclarator *declarator;
@@ -523,16 +523,16 @@ static const yytype_int8 yyrhs[] =
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
 static const yytype_uint16 yyrline[] =
 {
-       0,   109,   109,   113,   117,   118,   121,   124,   125,   127,
-     128,   130,   137,   138,   140,   141,   142,   143,   144,   147,
-     148,   151,   152,   155,   157,   158,   161,   162,   163,   165,
-     166,   169,   171,   172,   174,   176,   177,   180,   181,   183,
-     184,   186,   190,   192,   193,   195,   197,   200,   202,   203,
-     205,   206,   211,   212,   217,   218,   223,   224,   228,   229,
-     233,   234,   238,   239,   244,   246,   247,   251,   252,   256,
-     259,   262,   263,   264,   266,   267,   271,   272,   275,   276,
-     279,   280,   282,   283,   284,   286,   287,   288,   289,   290,
-     291
+       0,   109,   109,   113,   117,   118,   121,   129,   130,   132,
+     133,   135,   142,   143,   145,   146,   147,   148,   149,   152,
+     153,   156,   157,   160,   162,   163,   166,   167,   168,   170,
+     171,   174,   176,   177,   179,   181,   182,   185,   186,   188,
+     189,   191,   195,   197,   198,   200,   202,   205,   207,   208,
+     210,   211,   216,   217,   222,   223,   228,   229,   233,   234,
+     238,   239,   243,   244,   249,   251,   252,   256,   257,   261,
+     264,   267,   268,   269,   271,   272,   276,   277,   280,   281,
+     284,   285,   287,   288,   289,   291,   292,   293,   294,   295,
+     296
 };
 #endif
 
@@ -1583,26 +1583,31 @@ yyreduce:
 
   case 6:
 #line 121 "c.ypp"
-    { (yyval.function_def) = zc::FunctionDef::Create((yyvsp[(1) - (3)].decl_specs), (yyvsp[(2) - (3)].declarator), (yyvsp[(3) - (3)].compound_stat), (yylsp[(1) - (3)])); ;}
+    {
+                    (yyval.function_def) = zc::FunctionDef::Create
+                        (zc::Decl::Create((yyvsp[(1) - (3)].decl_specs), (yyvsp[(2) - (3)].declarator), (yylsp[(1) - (3)])),
+                         (yyvsp[(3) - (3)].compound_stat),
+                         (yylsp[(1) - (3)]));
+                ;}
     break;
 
   case 7:
-#line 124 "c.ypp"
+#line 129 "c.ypp"
     { (yyval.decls) = zc::Decls::Create((yyloc)); ;}
     break;
 
   case 8:
-#line 125 "c.ypp"
+#line 130 "c.ypp"
     { (yyval.decls) = (yyvsp[(1) - (1)].decls); ;}
     break;
 
   case 10:
-#line 128 "c.ypp"
+#line 133 "c.ypp"
     { (yyvsp[(1) - (2)].decls)->vec().insert((yyvsp[(1) - (2)].decls)->vec().end(), (yyvsp[(2) - (2)].decls)->vec().begin(), (yyvsp[(2) - (2)].decls)->vec().end()); ;}
     break;
 
   case 11:
-#line 130 "c.ypp"
+#line 135 "c.ypp"
     {
                     (yyval.decls) = zc::Decls::Create((yylsp[(1) - (3)]));
                     for (auto decl : (yyvsp[(2) - (3)].declarators)->vec()) {
@@ -1612,318 +1617,318 @@ yyreduce:
     break;
 
   case 12:
-#line 137 "c.ypp"
-    { (yyval.decl_specs) = zc::DeclSpecs::Create((yylsp[(1) - (1)])); (yyval.decl_specs)->vec().push_back((yyvsp[(1) - (1)].decl_spec)); ;}
+#line 142 "c.ypp"
+    { (yyval.decl_specs) = zc::DeclSpecs::Create((yylsp[(1) - (1)])); (yyval.decl_specs)->type_specs()->insert((yyvsp[(1) - (1)].type_spec)); ;}
     break;
 
   case 13:
-#line 138 "c.ypp"
-    { (yyval.decl_specs) = (yyvsp[(1) - (2)].decl_specs); (yyval.decl_specs)->vec().push_back((yyvsp[(2) - (2)].decl_spec)); (yyloc) = (yylsp[(1) - (2)]); ;}
+#line 143 "c.ypp"
+    { (yyval.decl_specs) = (yyvsp[(1) - (2)].decl_specs); (yyval.decl_specs)->type_specs()->insert((yyvsp[(2) - (2)].type_spec)); ;}
     break;
 
   case 14:
-#line 140 "c.ypp"
-    { (yyval.decl_spec) = zc::TypeSpec::Create(zc::TypeSpec::TYPE_VOID, (yylsp[(1) - (1)])); ;}
+#line 145 "c.ypp"
+    { (yyval.type_spec) = zc::TypeSpec::TYPE_VOID; ;}
     break;
 
   case 15:
-#line 141 "c.ypp"
-    { (yyval.decl_spec) = zc::TypeSpec::Create(zc::TypeSpec::TYPE_CHAR, (yylsp[(1) - (1)])); ;}
+#line 146 "c.ypp"
+    { (yyval.type_spec) = zc::TypeSpec::TYPE_CHAR; ;}
     break;
 
   case 16:
-#line 142 "c.ypp"
-    { (yyval.decl_spec) = zc::TypeSpec::Create(zc::TypeSpec::TYPE_SHORT, (yylsp[(1) - (1)])); ;}
+#line 147 "c.ypp"
+    { (yyval.type_spec) = zc::TypeSpec::TYPE_SHORT; ;}
     break;
 
   case 17:
-#line 143 "c.ypp"
-    { (yyval.decl_spec) = zc::TypeSpec::Create(zc::TypeSpec::TYPE_INT, (yylsp[(1) - (1)])); ;}
+#line 148 "c.ypp"
+    { (yyval.type_spec) = zc::TypeSpec::TYPE_INT; ;}
     break;
 
   case 18:
-#line 144 "c.ypp"
-    { (yyval.decl_spec) = zc::TypeSpec::Create(zc::TypeSpec::TYPE_LONG, (yylsp[(1) - (1)])); ;}
+#line 149 "c.ypp"
+    { (yyval.type_spec) = zc::TypeSpec::TYPE_LONG; ;}
     break;
 
   case 19:
-#line 147 "c.ypp"
+#line 152 "c.ypp"
     { (yyval.declarators) = zc::ASTDeclarators::Create((yyloc)); (yyloc) = 0; ;}
     break;
 
   case 21:
-#line 151 "c.ypp"
+#line 156 "c.ypp"
     { (yyval.declarators) = zc::ASTDeclarators::Create((yylsp[(1) - (1)])); (yyval.declarators)->vec().push_back((yyvsp[(1) - (1)].declarator)); ;}
     break;
 
   case 22:
-#line 152 "c.ypp"
+#line 157 "c.ypp"
     { (yyval.declarators) = (yyvsp[(1) - (3)].declarators); (yyval.declarators)->vec().push_back((yyvsp[(3) - (3)].declarator)); ;}
     break;
 
   case 24:
-#line 157 "c.ypp"
+#line 162 "c.ypp"
     { (yyval.declarator) = (yyvsp[(1) - (1)].declarator); ;}
     break;
 
   case 25:
-#line 158 "c.ypp"
+#line 163 "c.ypp"
     { (yyval.declarator) = zc::PointerDeclarator::Create((yyvsp[(1) - (2)].pointer), (yyvsp[(2) - (2)].declarator), (yylsp[(1) - (2)])); ;}
     break;
 
   case 26:
-#line 161 "c.ypp"
+#line 166 "c.ypp"
     { (yyval.declarator) = zc::BasicDeclarator::Create((yyvsp[(1) - (1)].identifier), (yylsp[(1) - (1)])); ;}
     break;
 
   case 27:
-#line 162 "c.ypp"
+#line 167 "c.ypp"
     { (yyval.declarator) = (yyvsp[(2) - (3)].declarator); ;}
     break;
 
   case 28:
-#line 163 "c.ypp"
+#line 168 "c.ypp"
     { (yyval.declarator) = zc::FunctionDeclarator::Create((yyvsp[(1) - (4)].declarator), (yyvsp[(3) - (4)].param_decls), (yylsp[(1) - (4)])); ;}
     break;
 
   case 29:
-#line 165 "c.ypp"
+#line 170 "c.ypp"
     { (yyval.pointer) = 1; ;}
     break;
 
   case 30:
-#line 166 "c.ypp"
+#line 171 "c.ypp"
     { (yyval.pointer) = (yyvsp[(2) - (2)].pointer) + 1; ;}
     break;
 
   case 32:
-#line 171 "c.ypp"
+#line 176 "c.ypp"
     { (yyval.param_decls) = zc::Decls::Create((yylsp[(1) - (1)])); (yyval.param_decls)->vec().push_back((yyvsp[(1) - (1)].param_decl)); ;}
     break;
 
   case 33:
-#line 172 "c.ypp"
+#line 177 "c.ypp"
     { (yyval.param_decls) = (yyvsp[(1) - (3)].param_decls); (yyval.param_decls)->vec().push_back((yyvsp[(3) - (3)].param_decl)); ;}
     break;
 
   case 34:
-#line 174 "c.ypp"
+#line 179 "c.ypp"
     { (yyval.param_decl) = zc::Decl::Create((yyvsp[(1) - (2)].decl_specs), (yyvsp[(2) - (2)].declarator), (yylsp[(1) - (2)])); ;}
     break;
 
   case 35:
-#line 176 "c.ypp"
+#line 181 "c.ypp"
     { (yyval.stat) = (yyvsp[(1) - (1)].expr_stat); ;}
     break;
 
   case 36:
-#line 177 "c.ypp"
+#line 182 "c.ypp"
     { (yyval.stat) = (yyvsp[(1) - (1)].compound_stat); ;}
     break;
 
   case 37:
-#line 180 "c.ypp"
+#line 185 "c.ypp"
     { (yyval.stats) = zc::ASTStats::Create((yyloc)); (yyloc) = 0; ;}
     break;
 
   case 38:
-#line 181 "c.ypp"
+#line 186 "c.ypp"
     { (yyval.stats) = (yyvsp[(1) - (1)].stats); ;}
     break;
 
   case 39:
-#line 183 "c.ypp"
+#line 188 "c.ypp"
     { (yyval.stats) = zc::ASTStats::Create((yylsp[(1) - (1)])); (yyval.stats)->vec().push_back((yyvsp[(1) - (1)].stat)); ;}
     break;
 
   case 40:
-#line 184 "c.ypp"
+#line 189 "c.ypp"
     { (yyval.stats)->vec().push_back((yyvsp[(2) - (2)].stat)); ;}
     break;
 
   case 41:
-#line 186 "c.ypp"
+#line 191 "c.ypp"
     {
                     (yyval.compound_stat) = zc::CompoundStat::Create((yyvsp[(2) - (4)].decls), (yyvsp[(3) - (4)].stats), (yylsp[(1) - (4)]));
                 ;}
     break;
 
   case 42:
-#line 190 "c.ypp"
+#line 195 "c.ypp"
     { (yyval.expr_stat) = zc::ExprStat::Create((yyvsp[(1) - (2)].expr), (yylsp[(1) - (2)])); ;}
     break;
 
   case 43:
-#line 192 "c.ypp"
+#line 197 "c.ypp"
     { (yyval.expr) = zc::NoExpr::Create((yyloc)); (yyloc) = 0; ;}
     break;
 
   case 45:
-#line 195 "c.ypp"
+#line 200 "c.ypp"
     { (yyval.expr) = (yyvsp[(1) - (1)].assignment_expr); ;}
     break;
 
   case 46:
-#line 197 "c.ypp"
+#line 202 "c.ypp"
     { (yyval.assignment_expr) = zc::AssignmentExpr::Create((yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr), (yylsp[(1) - (3)])); ;}
     break;
 
   case 49:
-#line 203 "c.ypp"
+#line 208 "c.ypp"
     { (yyval.expr) = zc::UnaryExpr::Create((yyvsp[(1) - (2)].unary_operator), (yyvsp[(2) - (2)].expr), (yylsp[(1) - (2)])); ;}
     break;
 
   case 51:
-#line 206 "c.ypp"
+#line 211 "c.ypp"
     {
                     (yyval.expr) = zc::BinaryExpr::Create(zc::BinaryExpr::BOP_LOGICAL_OR, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr), (yylsp[(1) - (3)]));
                 ;}
     break;
 
   case 53:
-#line 212 "c.ypp"
+#line 217 "c.ypp"
     {
                     (yyval.expr) = zc::BinaryExpr::Create(zc::BinaryExpr::BOP_LOGICAL_AND, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr), (yylsp[(1) - (3)]));
                 ;}
     break;
 
   case 55:
-#line 218 "c.ypp"
+#line 223 "c.ypp"
     {
                     (yyval.expr) = zc::BinaryExpr::Create(zc::BinaryExpr::BOP_BITWISE_OR, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr), (yylsp[(1) - (3)]));
                 ;}
     break;
 
   case 57:
-#line 224 "c.ypp"
+#line 229 "c.ypp"
     {
                     (yyval.expr) = zc::BinaryExpr::Create(zc::BinaryExpr::BOP_BITWISE_XOR, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr), (yylsp[(1) - (3)]));
                 ;}
     break;
 
   case 59:
-#line 229 "c.ypp"
+#line 234 "c.ypp"
     {
                     (yyval.expr) = zc::BinaryExpr::Create(zc::BinaryExpr::BOP_BITWISE_AND, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr), (yylsp[(1) - (3)]));
                 ;}
     break;
 
   case 61:
-#line 234 "c.ypp"
-    {
-                    (yyval.expr) = zc::BinaryExpr::Create((yyvsp[(2) - (3)].binary_operator), (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr), (yylsp[(1) - (3)]));
-                ;}
-    break;
-
-  case 63:
 #line 239 "c.ypp"
     {
                     (yyval.expr) = zc::BinaryExpr::Create((yyvsp[(2) - (3)].binary_operator), (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr), (yylsp[(1) - (3)]));
                 ;}
     break;
 
-  case 66:
-#line 247 "c.ypp"
+  case 63:
+#line 244 "c.ypp"
     {
                     (yyval.expr) = zc::BinaryExpr::Create((yyvsp[(2) - (3)].binary_operator), (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr), (yylsp[(1) - (3)]));
                 ;}
     break;
 
-  case 68:
+  case 66:
 #line 252 "c.ypp"
     {
                     (yyval.expr) = zc::BinaryExpr::Create((yyvsp[(2) - (3)].binary_operator), (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr), (yylsp[(1) - (3)]));
                 ;}
     break;
 
+  case 68:
+#line 257 "c.ypp"
+    {
+                    (yyval.expr) = zc::BinaryExpr::Create((yyvsp[(2) - (3)].binary_operator), (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr), (yylsp[(1) - (3)]));
+                ;}
+    break;
+
   case 71:
-#line 262 "c.ypp"
+#line 267 "c.ypp"
     { (yyval.expr) = zc::IdentifierExpr::Create((yyvsp[(1) - (1)].identifier), (yylsp[(1) - (1)])); ;}
     break;
 
   case 73:
-#line 264 "c.ypp"
+#line 269 "c.ypp"
     { (yyval.expr) = (yyvsp[(2) - (3)].expr); ;}
     break;
 
   case 76:
-#line 271 "c.ypp"
+#line 276 "c.ypp"
     { (yyval.binary_operator) = zc::BinaryExpr::Kind::BOP_EQ; ;}
     break;
 
   case 77:
-#line 272 "c.ypp"
+#line 277 "c.ypp"
     { (yyval.binary_operator) = zc::BinaryExpr::Kind::BOP_NEQ; ;}
     break;
 
   case 78:
-#line 275 "c.ypp"
+#line 280 "c.ypp"
     { (yyval.binary_operator) = zc::BinaryExpr::Kind::BOP_LT; ;}
     break;
 
   case 79:
-#line 276 "c.ypp"
+#line 281 "c.ypp"
     { (yyval.binary_operator) = zc::BinaryExpr::Kind::BOP_LEQ; ;}
     break;
 
   case 80:
-#line 279 "c.ypp"
+#line 284 "c.ypp"
     { (yyval.binary_operator) = zc::BinaryExpr::Kind::BOP_PLUS; ;}
     break;
 
   case 81:
-#line 280 "c.ypp"
+#line 285 "c.ypp"
     { (yyval.binary_operator) = zc::BinaryExpr::Kind::BOP_MINUS; ;}
     break;
 
   case 82:
-#line 282 "c.ypp"
+#line 287 "c.ypp"
     { (yyval.binary_operator) = zc::BinaryExpr::Kind::BOP_TIMES; ;}
     break;
 
   case 83:
-#line 283 "c.ypp"
+#line 288 "c.ypp"
     { (yyval.binary_operator) = zc::BinaryExpr::Kind::BOP_DIVIDE; ;}
     break;
 
   case 84:
-#line 284 "c.ypp"
+#line 289 "c.ypp"
     { (yyval.binary_operator) = zc::BinaryExpr::Kind::BOP_MOD; ;}
     break;
 
   case 85:
-#line 286 "c.ypp"
+#line 291 "c.ypp"
     { (yyval.unary_operator) = zc::UnaryExpr::Kind::UOP_ADDR; ;}
     break;
 
   case 86:
-#line 287 "c.ypp"
+#line 292 "c.ypp"
     { (yyval.unary_operator) = zc::UnaryExpr::Kind::UOP_DEREFERENCE; ;}
     break;
 
   case 87:
-#line 288 "c.ypp"
+#line 293 "c.ypp"
     { (yyval.unary_operator) = zc::UnaryExpr::Kind::UOP_POSITIVE; ;}
     break;
 
   case 88:
-#line 289 "c.ypp"
+#line 294 "c.ypp"
     { (yyval.unary_operator) = zc::UnaryExpr::Kind::UOP_NEGATIVE; ;}
     break;
 
   case 89:
-#line 290 "c.ypp"
+#line 295 "c.ypp"
     { (yyval.unary_operator) = zc::UnaryExpr::Kind::UOP_BITWISE_NOT; ;}
     break;
 
   case 90:
-#line 291 "c.ypp"
+#line 296 "c.ypp"
     { (yyval.unary_operator) = zc::UnaryExpr::Kind::UOP_LOGICAL_NOT; ;}
     break;
 
 
 /* Line 1267 of yacc.c.  */
-#line 1927 "c.tab.cpp"
+#line 1932 "c.tab.cpp"
       default: break;
     }
   YY_SYMBOL_PRINT ("-> $$ =", yyr1[yyn], &yyval, &yyloc);
@@ -2143,7 +2148,7 @@ yyreturn:
 }
 
 
-#line 294 "c.ypp"
+#line 299 "c.ypp"
 
 
 void yyerror(const char *s) {

@@ -17,26 +17,22 @@ namespace zc {
 
    class FunctionDef: public ExternalDecl {
    public:
-      DeclSpecs *specs() const { return specs_; }
-      ASTDeclarator *declarator() const { return declarator_; }
+      Decl *decl() const { return decl_; }
       CompoundStat *comp_stat() const { return comp_stat_; }
 
-      static FunctionDef *Create(DeclSpecs *specs, ASTDeclarator *declarator, CompoundStat *comp_stat,
-                                 const SourceLoc& loc)
-      { return new FunctionDef(specs, declarator, comp_stat, loc); }
+      static FunctionDef *Create(Decl *decl, CompoundStat *comp_stat, const SourceLoc& loc) {
+         return new FunctionDef(decl, comp_stat, loc);
+      }
 
       virtual void DumpNode(std::ostream& os) const override;
       virtual void DumpChildren(std::ostream& os, int level) const override;
       
    protected:
-      DeclSpecs *specs_;
-      ASTDeclarator *declarator_;
+      Decl *decl_;
       CompoundStat *comp_stat_;
 
-   FunctionDef(DeclSpecs *specs, ASTDeclarator *declarator, CompoundStat *comp_stat,
-               const SourceLoc& loc): ASTNode(loc), ExternalDecl(loc), specs_(specs),
-                                      declarator_(declarator),
-         comp_stat_(comp_stat) {}
+   FunctionDef(Decl *decl, CompoundStat *comp_stat, const SourceLoc& loc):
+      ASTNode(loc), ExternalDecl(loc), decl_(decl), comp_stat_(comp_stat) {}
       
    };
 
@@ -51,7 +47,7 @@ namespace zc {
 
       virtual void DumpNode(std::ostream& os) const override { os << "Decl"; }
       virtual void DumpChildren(std::ostream& os, int level) const override;
-      
+
    protected:
       DeclSpecs *specs_;
       ASTDeclarator *declarator_;
@@ -70,28 +66,23 @@ namespace zc {
    protected:
       Decls(const SourceLoc& loc): ASTNode(loc), ASTNodeVec<Decl,Decls_s>(loc), ExternalDecl(loc) {}
    };
-   
-   class DeclSpec: public ASTNode {
-   public:
-   protected:
-      DeclSpec(const SourceLoc& loc): ASTNode(loc) {}
-   };
 
-   class TypeSpec: public DeclSpec {
+   class DeclSpecs: public ASTNode {
    public:
-      enum Kind { TYPE_VOID, TYPE_CHAR, TYPE_SHORT, TYPE_INT, TYPE_LONG, NTYPES};
-      Kind kind() const { return kind_; }
-      
-      static TypeSpec *Create(enum Kind kind, const SourceLoc& loc) { return new TypeSpec(kind, loc); }
+      TypeSpecs *type_specs() const { return type_specs_; }
 
-      virtual void DumpNode(std::ostream& os) const override;
-      virtual void DumpChildren(std::ostream& os, int level) const override { /* no children */ }
+      static DeclSpecs *Create(const SourceLoc& loc) { return new DeclSpecs(loc); }
+
+      virtual void DumpNode(std::ostream& os) const override { os << "DeclSpecs"; }
+      virtual void DumpChildren(std::ostream& os, int level) const override;
       
    protected:
-      Kind kind_;
-      
-      TypeSpec(Kind kind, const SourceLoc& loc): DeclSpec(loc), kind_(kind) {}
+      TypeSpecs *type_specs_;
+
+      DeclSpecs(const SourceLoc& loc): ASTNode(loc), type_specs_(TypeSpecs::Create(loc)) {}
    };
+
+   std::ostream& operator<< (std::ostream& os, const TypeSpec& spec);
 
    class ASTDeclarator: public ASTNode {
    public:
@@ -157,7 +148,7 @@ namespace zc {
 
    class Identifier: public ASTNode {
    public:
-      const std::string& id() const { return id_; }
+      const std::string *id() const { return id_; }
       
       static Identifier *Create(const std::string& id, SourceLoc& loc) { return new Identifier(id, loc); }
 
@@ -165,9 +156,14 @@ namespace zc {
       virtual void DumpChildren(std::ostream& os, int level) const override { /* no children */ }
       
    protected:
-      std::string id_;
+      Symbol *id_;
       
-      Identifier(const std::string& id, SourceLoc& loc): ASTNode(loc), id_(id) {}
+      Identifier(const std::string& id, SourceLoc& loc): ASTNode(loc), id_(nullptr) {
+         if (g_id_tab.find(id) == g_id_tab.end()) {
+            g_id_tab[id] = new std::string(id);
+         }
+         id_ = g_id_tab[id];
+      }
    };
 
 }

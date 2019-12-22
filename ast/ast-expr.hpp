@@ -7,6 +7,8 @@
 
 #include <cstdint>
 
+#include "symtab.hpp"
+
 namespace zc {
 
    class AssignmentExpr: public ASTBinaryExpr {
@@ -80,7 +82,7 @@ namespace zc {
 
    class StringExpr: public ASTExpr {
    public:
-      const std::string& str() const { return str_; }
+      const std::string *str() const { return str_; }
       static StringExpr *Create(const std::string& str, const SourceLoc& loc)
       { return new StringExpr(str, loc); }
 
@@ -88,8 +90,14 @@ namespace zc {
       virtual void DumpChildren(std::ostream& os, int level) const override { /* no children */ }
       
    protected:
-      std::string str_;
-      StringExpr(const std::string& str, const SourceLoc& loc): ASTExpr(loc), str_(str) {}
+      const std::string *str_;
+       StringExpr(const std::string& str, const SourceLoc& loc): ASTExpr(loc), str_(nullptr) {
+          /* add to global string table */
+           if (g_str_tab.find(str) == g_str_tab.end()) {
+               g_str_tab[str] = new std::string(str);
+           }
+           str_ = g_str_tab[str];
+      }
    };
 
    class IdentifierExpr: public ASTExpr {

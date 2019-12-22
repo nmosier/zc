@@ -23,5 +23,5 @@ const int indent_step = 2;
    void ASTUnaryExpr::DumpChildren(std::ostream& os, int level) const {
       expr_->Dump(os, level);
    }
-   
+
 }

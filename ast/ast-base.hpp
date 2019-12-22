@@ -5,9 +5,11 @@
 #ifndef __AST_BASE_HPP
 #define __AST_BASE_HPP
 
-#include <variant>
+#include <set>
 
 namespace zc {
+
+   std::ostream& indent(std::ostream& os, int level);
 
 
    class ASTNode {
@@ -53,7 +55,32 @@ namespace zc {
       ASTNodeVec(const SourceLoc& loc): ASTNode(loc) {}
    };
 
+   template <typename Spec, const char *name>
+   class ASTSpecs: public ASTNode {
+      static_assert(std::is_enum<Spec>::value);
+   public:
+      typedef std::multiset<Spec> Specs;
+      const Specs& specs() const { return specs_; }
 
+      static ASTSpecs *Create(const SourceLoc& loc) { return new ASTSpecs(loc); }
+      
+      virtual void DumpNode(std::ostream& os) const override {
+         os << name;
+         for (Spec spec : specs_) {
+            os << " " << spec;
+         }
+      }
+      virtual void DumpChildren(std::ostream& os, int level) const override {}
+
+      /* experimental */
+      void insert(Spec spec) { specs_.insert(spec); }
+
+   protected:
+      Specs specs_;
+
+      ASTSpecs(const SourceLoc& loc): ASTNode(loc) {}
+      
+   };
    
    template <class... Types>
    class ASTVariantFeature {

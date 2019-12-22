@@ -92,7 +92,7 @@ typedef union YYSTYPE
     zc::FunctionDef *function_def;
     zc::Decls *decls;
     zc::Decl *decl;
-    zc::DeclSpec *decl_spec;
+    zc::TypeSpec type_spec;
     zc::DeclSpecs *decl_specs;
     zc::ASTDeclarators *declarators;
     zc::ASTDeclarator *declarator;

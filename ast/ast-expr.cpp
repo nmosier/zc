@@ -47,7 +47,7 @@ namespace zc {
    }
 
    void StringExpr::DumpNode(std::ostream& os) const {
-      os << "StringExpr " << str_;
+      os << "StringExpr " << *str_;
    }
 
    void IdentifierExpr::DumpChildren(std::ostream& os, int level) const {
