@@ -63,36 +63,44 @@ namespace zc {
          params()->TypeCompat(other_->params());
    }
 
-   void TypeSpecs::TypeCheck(SemantEnv& env, bool scoped) {
+   TypeSpec TypeSpecs::Combine(SemantEnv& env) const {
+      auto specs = specs_;
+      
       /* check if any specs given */
-      if (specs_.size() == 0) {
+      if (specs.size() == 0) {
          env.error()(g_filename, this) << "declaration missing type specifier" << std::endl;
-         return;
+         return TYPE_INT;
       }
 
       /* reduce long long -> long_long */
-      if (specs_.count(TYPE_LONG) == 2) {
+      if (specs.count(TYPE_LONG) == 2) {
          auto p = specs_.equal_range(TYPE_LONG);
-         specs_.erase(p.first, p.second);
-         specs_.insert(TYPE_LL);
+         specs.erase(p.first, p.second);
+         specs.insert(TYPE_LL);
       }
 
       /* remove redundant INT */
       std::array<TypeSpec,3> int_compat = {TYPE_SHORT, TYPE_LONG, TYPE_LL};
-      if (specs_.find(TYPE_INT) != specs_.end() && specs_.size() >= 2 &&
+      if (specs.find(TYPE_INT) != specs.end() && specs.size() >= 2 &&
           std::any_of(int_compat.begin(), int_compat.end(),
                       [&](TypeSpec spec) {
-                         return specs_.find(spec) != specs_.end();
+                         return specs.find(spec) != specs.end();
                       })) {
-         specs_.erase(specs_.find(TYPE_INT)); /* remove exactly one INT */
+         specs.erase(specs.find(TYPE_INT)); /* remove exactly one INT */
       }
 
       /* NOTE: There should now only be one type left, any of VOID, CHAR, SHORT, INT, LONG, LL. */
       /* check for extraneous types */
-      if (specs_.size() != 1) {
+      if (specs.size() != 1) {
          env.error()(g_filename, this) << "too many or incompatible type specifiers given"
                                           << std::endl;
       }
+
+      return *specs.begin();
+   }
+
+   void TypeSpecs::TypeCheck(SemantEnv& env, bool scoped) {
+      TypeSpecs::Combine(env);
    }
 
    bool Decls::TypeCompat(const Decls *other) const {

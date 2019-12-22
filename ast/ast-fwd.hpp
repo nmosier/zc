@@ -43,7 +43,9 @@ namespace zc {
    class LogicalOrExpr;
    class LogicalAndExpr;
 
-   enum TypeSpec {TYPE_VOID, TYPE_CHAR, TYPE_SHORT, TYPE_INT, TYPE_LONG, TYPE_LL};
+   enum TypeSpec {TYPE_VOID, TYPE_CHAR, TYPE_SHORT, TYPE_INT, TYPE_LONG, TYPE_LL, TYPE_ERROR};
+   TypeSpec Combine(TypeSpec lhs, TypeSpec rhs);
+   
    class TypeSpecs;
 }
 

@@ -98,14 +98,16 @@ namespace zc {
       bool TypeCompat(const TypeSpecs *other) const;
       
    protected:
-
+      TypeSpec Combine(SemantEnv& env) const;
+      
       TypeSpecs(const SourceLoc& loc): ASTSpecs<TypeSpec,TypeSpecs_s>(loc) {}
    };
 
 
    class DeclSpecs: public ASTNode {
    public:
-      TypeSpecs *type_specs() const { return type_specs_; }
+      TypeSpecs *type_specs() const { return std::get<TypeSpecs *>(type_spec_variant_); }
+      TypeSpec type_spec() const { return std::get<TypeSpec>(type_spec_variant_); }
 
       static DeclSpecs *Create(const SourceLoc& loc) { return new DeclSpecs(loc); }
 
@@ -119,9 +121,10 @@ namespace zc {
       bool TypeCompat(const DeclSpecs *other) const;
 
    protected:
-      TypeSpecs *type_specs_;
+      typedef std::variant<TypeSpec,TypeSpecs *> TypeSpecVariant;      
+      TypeSpecVariant type_spec_variant_;
       
-      DeclSpecs(const SourceLoc& loc): ASTNode(loc), type_specs_(TypeSpecs::Create(loc)) {}
+      DeclSpecs(const SourceLoc& loc): ASTNode(loc), type_spec_variant_(TypeSpecs::Create(loc)) {}
    };
 
    

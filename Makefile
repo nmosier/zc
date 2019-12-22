@@ -39,14 +39,14 @@ $(FLEX_SRC): c.l $(HDRS)
 $(FLEX_OBJ): $(FLEX_SRC)
 	c++ -c $(CXXFLAGS) -o $@ $^
 
-%.o: %.cpp
-	c++ -c $(CXXFLAGS) -o $@ $^
+%.o: %.cpp $(AST_HDRS)
+	c++ -c $(CXXFLAGS) -o $@ $<
 
-%.o: %.cc
-	c++ -c $(CXXFLAGS) -o $@ $^
+%.o: %.cc $(AST_HDRS)
+	c++ -c $(CXXFLAGS) -o $@ $<
 
-%.o: %.c
-	c++ -c $(CXXFLAGS) -o $@ $^
+%.o: %.c $(AST_HDRS)
+	c++ -c $(CXXFLAGS) -o $@ $<
 
 lexer-main: lexer-main.o $(FLEX_OBJ) $(OBJS)
 	c++ $(LDFLAGS) -lfl -o $@ $^

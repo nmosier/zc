@@ -20,6 +20,15 @@ namespace zc {
       return out;
    }
 
+   /*** VISITATION & VARIANTS ***/
+   template <class ...Fs>
+   struct visitor : Fs... {
+      visitor(Fs const&... fs): Fs{fs}... {}
+      using Fs::operator()...;
+   };
+   
 }
+
+
 
 #endif

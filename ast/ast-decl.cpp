@@ -1,4 +1,5 @@
 #include "ast.hpp"
+#include "util.hpp"
 
 namespace zc {
 
@@ -41,7 +42,10 @@ namespace zc {
    }
    
    void DeclSpecs::DumpChildren(std::ostream& os, int level) const {
-      type_specs_->Dump(os, level);
+      std::visit(visitor([&](TypeSpec spec) { indent(os, level); os << spec; },
+                         [&](TypeSpecs *specs) { specs->Dump(os, level); }
+                         ),
+                 type_spec_variant_);
    }
 
    Identifier *Decl::id() const { return declarator_->id(); }
