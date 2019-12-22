@@ -44,5 +44,6 @@ namespace zc {
       type_specs_->Dump(os, level);
    }
 
+   Identifier *Decl::id() const { return declarator_->id(); }
    
 }

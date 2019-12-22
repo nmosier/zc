@@ -21,6 +21,8 @@ namespace zc {
          decls_->Dump(os, level);
          stats_->Dump(os, level);
       }
+
+      virtual void TypeCheck(SemantEnv& env) override;
       
    protected:
       Decls *decls_;
@@ -40,6 +42,8 @@ namespace zc {
       virtual void DumpChildren(std::ostream& os, int level) const override {
          expr_->Dump(os, level);
       }
+
+      virtual void TypeCheck(SemantEnv& env) override;
       
    protected:
       ASTExpr *expr_;

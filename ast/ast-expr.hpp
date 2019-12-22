@@ -18,7 +18,10 @@ namespace zc {
       }
 
       virtual void DumpNode(std::ostream& os) const override { os << "AssignmentExpr"; }
-      
+
+      virtual void TypeCheck(SemantEnv& env) override;
+      virtual void ExprKind(SemantEnv& env) override;
+
    protected:
       AssignmentExpr(ASTExpr *lhs, ASTExpr *rhs, const SourceLoc& loc):
          ASTBinaryExpr(lhs, rhs, loc) {}
@@ -34,6 +37,8 @@ namespace zc {
       }
 
       virtual void DumpNode(std::ostream& os) const override;
+
+      virtual void TypeCheck(SemantEnv& env) override;
 
    protected:
       Kind kind_;

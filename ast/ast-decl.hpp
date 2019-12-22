@@ -9,6 +9,7 @@
 
 namespace zc {
 
+   /* NOTE: ExternalDecl is abstract. */
    class ExternalDecl: virtual public ASTNode {
    public:
    protected:
@@ -26,6 +27,8 @@ namespace zc {
 
       virtual void DumpNode(std::ostream& os) const override;
       virtual void DumpChildren(std::ostream& os, int level) const override;
+
+      virtual void TypeCheck(SemantEnv& env) override;
       
    protected:
       Decl *decl_;
@@ -40,6 +43,7 @@ namespace zc {
    public:
       DeclSpecs *specs() const { return specs_; }
       ASTDeclarator *declarator() const { return declarator_; }
+      Identifier *id() const;
       
       static Decl *Create(DeclSpecs *specs, ASTDeclarator *declarator, const SourceLoc& loc) {
          return new Decl(specs, declarator, loc);
@@ -48,6 +52,13 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override { os << "Decl"; }
       virtual void DumpChildren(std::ostream& os, int level) const override;
 
+      virtual void TypeCheck(SemantEnv& env) override;
+
+      bool TypeCompat(const Decl *other) const;
+
+      /* returns nullptr if not dereferencable */
+      Decl *Dereference();
+      
    protected:
       DeclSpecs *specs_;
       ASTDeclarator *declarator_;
@@ -62,6 +73,8 @@ namespace zc {
       static Decls *Create(const SourceLoc& loc) { return new Decls(loc); }
 
       virtual void DumpNode(std::ostream& os) const override { os << "Decls"; }
+
+      bool TypeCompat(const Decls *other) const;
       
    protected:
       Decls(const SourceLoc& loc): ASTNode(loc), ASTNodeVec<Decl,Decls_s>(loc), ExternalDecl(loc) {}
@@ -74,6 +87,8 @@ namespace zc {
       static TypeSpecs *Create(const SourceLoc& loc) { return new TypeSpecs(loc); }
 
       virtual void TypeCheck(SemantEnv& env) override;
+
+      bool TypeCompat(const TypeSpecs *other) const;
       
    protected:
 
@@ -89,10 +104,18 @@ namespace zc {
 
       virtual void DumpNode(std::ostream& os) const override { os << "DeclSpecs"; }
       virtual void DumpChildren(std::ostream& os, int level) const override;
-      
+
+      virtual void TypeCheck(SemantEnv& env) override {
+         type_specs()->TypeCheck(env);
+      }
+
+      bool TypeCompat(const DeclSpecs *other) const;
+
+      DeclSpecs *Dereference() { return nullptr; /* declspecs cannot be dereferenced */ }
+
    protected:
       TypeSpecs *type_specs_;
-
+      
       DeclSpecs(const SourceLoc& loc): ASTNode(loc), type_specs_(TypeSpecs::Create(loc)) {}
    };
 
@@ -101,6 +124,11 @@ namespace zc {
 
    class ASTDeclarator: public ASTNode {
    public:
+      virtual Identifier *id() const = 0;
+
+      virtual bool TypeCompat(const ASTDeclarator *other) const = 0;
+      virtual ASTDeclarator *Dereference() = 0;
+      
    protected:
       ASTDeclarator(const SourceLoc& loc): ASTNode(loc) {}
    };
@@ -109,6 +137,7 @@ namespace zc {
    public:
       int depth() const { return depth_; }
       ASTDeclarator *declarator() const { return declarator_; }
+      virtual Identifier *id() const override { return declarator_->id(); }
       
       static PointerDeclarator *Create(int depth, ASTDeclarator *declarator, const SourceLoc& loc)
       { return new PointerDeclarator(depth, declarator, loc); }
@@ -117,6 +146,10 @@ namespace zc {
       virtual void DumpChildren(std::ostream& os, int level) const override {
          declarator_->Dump(os, level);
       }
+
+      virtual void TypeCheck(SemantEnv& env) override { declarator()->TypeCheck(env); }
+      virtual bool TypeCompat(const ASTDeclarator *other) const override;
+      virtual ASTDeclarator *Dereference() override;
       
    protected:
       int depth_;
@@ -127,13 +160,18 @@ namespace zc {
 
    class BasicDeclarator: public ASTDeclarator {
    public:
-      Identifier *id() const { return id_; }
+      virtual Identifier *id() const override { return id_; }
 
-      static BasicDeclarator *Create(Identifier *id, const SourceLoc& loc)
-      { return new BasicDeclarator(id, loc); }
+      static BasicDeclarator *Create(Identifier *id, const SourceLoc& loc) {
+         return new BasicDeclarator(id, loc);
+      }
 
       virtual void DumpNode(std::ostream& os) const override { os << "BasicDeclarator"; }
       virtual void DumpChildren(std::ostream& os, int level) const override;
+
+      virtual void TypeCheck(SemantEnv& env) override { /* TODO */ }
+      virtual bool TypeCompat(const ASTDeclarator *other) const override;
+      virtual ASTDeclarator *Dereference() override { return nullptr; }
       
    protected:
       Identifier *id_;
@@ -145,6 +183,8 @@ namespace zc {
    public:
       ASTDeclarator *declarator() const { return declarator_; }
       Decls *params() const { return params_; }
+      virtual Identifier *id() const override { return declarator_->id(); }
+      
       static FunctionDeclarator *Create(ASTDeclarator *declarator, Decls *params,
                                         const SourceLoc& loc) {
          return new FunctionDeclarator(declarator, params, loc);
@@ -152,6 +192,10 @@ namespace zc {
 
       virtual void DumpNode(std::ostream& os) const override { os << "FunctionDeclarator"; }
       virtual void DumpChildren(std::ostream& os, int level) const override;
+
+      virtual void TypeCheck(SemantEnv& env) override;
+      bool TypeCompat(const ASTDeclarator *other) const override;
+      virtual ASTDeclarator *Dereference() override { return this; }
       
    protected:
       ASTDeclarator *declarator_;
@@ -169,6 +213,8 @@ namespace zc {
 
       virtual void DumpNode(std::ostream& os) const override;
       virtual void DumpChildren(std::ostream& os, int level) const override { /* no children */ }
+
+      virtual void TypeCheck(SemantEnv& env) override {}
       
    protected:
       Symbol *id_;

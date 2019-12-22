@@ -99,8 +99,18 @@ namespace zc {
 
    class ASTExpr: public ASTNode {
    public:
+      Decl *type() const { return type_; }
+
+      enum Kind {EXPR_NONE, EXPR_LVALUE, EXPR_RVALUE};
+      Kind kind() const { return kind_; }
+
+      virtual void ExprKind(SemantEnv& env) {} //= 0;
+      
    protected:
-      ASTExpr(const SourceLoc& loc): ASTNode(loc) {}
+      Decl *type_;
+      Kind kind_;
+      
+      ASTExpr(const SourceLoc& loc): ASTNode(loc), kind_(EXPR_NONE) {}
    };
 
    class ASTUnaryExpr: public ASTExpr {
