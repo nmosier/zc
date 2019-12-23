@@ -66,8 +66,8 @@ namespace zc {
       void DumpType(std::ostream& os) const;
       
       virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
-
-      bool TypeCompat(const Decl *other) const;
+      bool TypeEq(const Decl *other) const;
+      bool TypeCoerce(const Decl *from) const;
 
       /** Obtain dereferenced type.
        * @return dereferenced type on success; nullptr if not dereferencable.
@@ -95,8 +95,9 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override { os << "Decls"; }
       void DumpType(std::ostream& os) const;
 
-      bool TypeCompat(const Decls *other) const;
       virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
+      bool TypeEq(const Decls *other) const;
+      bool TypeCoerce(const Decls *from) const;
       
    protected:
       Decls(const SourceLoc& loc): ASTNode(loc), ASTNodeVec<Decl,Decls_s>(loc), ExternalDecl(loc) {}
@@ -108,8 +109,7 @@ namespace zc {
    public:
       static TypeSpecs *Create(const SourceLoc& loc) { return new TypeSpecs(loc); }
       
-      bool TypeCompat(const TypeSpecs *other) const;
-       TypeSpec TypeCombine(SemantEnv& env) const;
+      TypeSpec TypeCombine(SemantEnv& env) const;
       virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
       
    protected:
@@ -134,8 +134,9 @@ namespace zc {
       void DumpType(std::ostream& os) const;
 
       virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
+      bool TypeEq(const DeclSpecs *other) const;
+      bool TypeCoerce(const DeclSpecs *from) const;
 
-      bool TypeCompat(const DeclSpecs *other) const;
 
    protected:
       typedef std::variant<TypeSpec,TypeSpecs *> TypeSpecVariant;      
@@ -149,6 +150,8 @@ namespace zc {
    
    std::ostream& operator<< (std::ostream& os, TypeSpec spec);
 
+   bool TypeCoerce(TypeSpec to, TypeSpec from);
+   
    class ASTDeclarator: public ASTNode {
    public:
       /** The fundamental kind of declarator. */
@@ -160,7 +163,9 @@ namespace zc {
 
       virtual void DumpType(std::ostream& os) const = 0;
       
-      virtual bool TypeCompat(const ASTDeclarator *other) const = 0;
+      virtual bool TypeEq(const ASTDeclarator *other) const = 0;
+      virtual bool TypeCoerce(const ASTDeclarator *from) const = 0;
+      
       virtual ASTDeclarator *Dereference() = 0;
       virtual ASTDeclarator *Address() = 0;
       
@@ -187,7 +192,9 @@ namespace zc {
       virtual void TypeCheck(SemantEnv& env, bool scoped = true) override {
          declarator()->TypeCheck(env);
       }
-      virtual bool TypeCompat(const ASTDeclarator *other) const override;
+      virtual bool TypeEq(const ASTDeclarator *other) const override;
+      virtual bool TypeCoerce(const ASTDeclarator *other) const override;
+
       virtual ASTDeclarator *Dereference() override;
       virtual ASTDeclarator *Address() override;
       
@@ -214,7 +221,10 @@ namespace zc {
       virtual void TypeCheck(SemantEnv& env, bool scoped = true) override {
          /* redefinition checked by Decl */
       }
-      virtual bool TypeCompat(const ASTDeclarator *other) const override;
+      virtual bool TypeEq(const ASTDeclarator *other) const override;
+      virtual bool TypeCoerce(const ASTDeclarator *from) const override {
+         return TypeEq(from);
+      }      
       virtual ASTDeclarator *Dereference() override { return nullptr; }
       virtual ASTDeclarator *Address() override;
       
@@ -241,7 +251,8 @@ namespace zc {
       virtual void DumpType(std::ostream& os) const override;
 
       virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
-      bool TypeCompat(const ASTDeclarator *other) const override;
+      virtual bool TypeEq(const ASTDeclarator *other) const override;
+      virtual bool TypeCoerce(const ASTDeclarator *other) const override;      
       virtual ASTDeclarator *Dereference() override { return this; }
       virtual ASTDeclarator *Address() override { return this; }
       

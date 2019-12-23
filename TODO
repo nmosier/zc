@@ -8,6 +8,10 @@
 [X] Least-upper bound of integer. Perhaps via integer sorting? 
 [ ] when first line is error, root is NULL, causing segfault
 
+PARSER
+[ ] Handle nested pointers properly, e.g. *(*id) -> **id
+
 SEMANTIC ANALYSIS
 [ ] `long long int` -> `LONG`, not `LONG_LONG`
 [ ] print annotated types
+[ ] type serialization for easy equality check

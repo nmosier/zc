@@ -23,56 +23,6 @@ namespace zc {
       return os_;
    }
 
-   bool Decl::TypeCompat(const Decl *other) const {
-      return specs()->TypeCompat(other->specs()) && declarator()->TypeCompat(other->declarator());
-   }
-
-   bool DeclSpecs::TypeCompat(const DeclSpecs *other) const {
-      /* declaration specs are compatible iff type specs are identical 
-       * (after preprocessing performed in TypeCheck() */
-      return type_specs()->TypeCompat(other->type_specs());
-   }
-
-   bool TypeSpecs::TypeCompat(const TypeSpecs *other) const {
-      /* ensure preprocessing has been performed */
-      assert(this->specs().size() == 1);
-      assert(other->specs().size() == 1);
-
-      return this->specs() == other->specs();
-   }
-
-   bool PointerDeclarator::TypeCompat(const ASTDeclarator *other) const {
-      /* check if _other_ is a pointer declarator; if not, not compatible. */
-      const PointerDeclarator *other_ = dynamic_cast<const PointerDeclarator *>(other);
-      if (other_ == nullptr) {
-         return false;
-      }
-
-      if (this->depth_ != other_->depth_) {
-         return false;
-      }
-
-      return declarator()->TypeCompat(other_->declarator());
-   }
-
-   bool BasicDeclarator::TypeCompat(const ASTDeclarator *other) const {
-      const BasicDeclarator *other_ = dynamic_cast<const BasicDeclarator *>(other);
-      if (other_ == nullptr) {
-         return false;
-      }
-
-      return true; /* base case */
-   }
-
-   bool FunctionDeclarator::TypeCompat(const ASTDeclarator *other) const {
-      const FunctionDeclarator *other_ = dynamic_cast<const FunctionDeclarator *>(other);
-      if (other_ == nullptr) {
-         return false;
-      }
-
-      return declarator()->TypeCompat(other_->declarator()) &&
-         params()->TypeCompat(other_->params());
-   }
 
    TypeSpec TypeSpecs::TypeCombine(SemantEnv& env) const {
       auto specs = specs_;
@@ -131,22 +81,6 @@ namespace zc {
       env.error()(g_filename, this) << "compiler error: TypeSpecs should have been reduced, "
                                     << "terminating..." << std::endl;
       abort();
-   }
-
-   bool Decls::TypeCompat(const Decls *other) const {
-      if (this->vec_.size() != other->vec_.size()) {
-         return false;
-      }
-
-      for (auto this_it = this->vec_.begin(), other_it = other->vec_.begin();
-           this_it != this->vec_.end();
-           ++this_it, ++other_it) {
-         if (!(*this_it)->TypeCompat(*other_it)) {
-            return false;
-         }
-      }
-
-      return true;
    }
 
    void Decl::TypeCheck(SemantEnv& env, bool scoped) {
@@ -210,8 +144,8 @@ namespace zc {
          env.error()(g_filename, this) << "left-hand side of expression is not an lvalue"
                                        << std::endl;
       }
-      
-      if (!lhs_->type()->TypeCompat(rhs_->type())) {
+
+      if (!lhs_->type()->TypeCoerce(rhs_->type())) {
          env.error()(g_filename, this) << "assignment to incompatible type" << std::endl;
       }
       
@@ -419,6 +353,123 @@ namespace zc {
 
    ASTExpr::ExprKind IdentifierExpr::expr_kind() const {
       return ExprKind::EXPR_LVALUE;
+   }
+
+   /*** TYPE EQUALITY ***/
+   bool Decl::TypeEq(const Decl *other) const {
+      return specs()->TypeEq(other->specs()) && declarator()->TypeEq(other->declarator());
+   }
+
+   bool DeclSpecs::TypeEq(const DeclSpecs *other) const {
+      return this->type_spec() == other->type_spec();
+   }
+
+   bool PointerDeclarator::TypeEq(const ASTDeclarator *other) const {
+      const PointerDeclarator *other_ = dynamic_cast<const PointerDeclarator *>(other);
+      if (other_ == nullptr) {
+         return false;
+      }
+      
+      if (this->depth_ != other_->depth_) {
+         return false;
+      }
+
+      return declarator()->TypeEq(other_->declarator());
+   }
+
+   bool BasicDeclarator::TypeEq(const ASTDeclarator *other) const {
+      const BasicDeclarator *other_ = dynamic_cast<const BasicDeclarator *>(other);
+      if (other_ == nullptr) {
+         return false;
+      }
+      
+      return true; /* base case */
+   }
+
+   bool FunctionDeclarator::TypeEq(const ASTDeclarator *other) const {
+      const FunctionDeclarator *other_ = dynamic_cast<const FunctionDeclarator *>(other);
+      if (other_ == nullptr) {
+         return false;
+      }
+      return declarator()->TypeEq(other_->declarator()) && params()->TypeEq(other_->params());
+   }
+
+   bool Decls::TypeEq(const Decls *other) const {
+      if (this->vec_.size() != other->vec_.size()) {
+         return false;
+      }
+
+      for (auto this_it = this->vec_.begin(), other_it = other->vec_.begin();
+           this_it != this->vec_.end();
+           ++this_it, ++other_it) {
+         if (!(*this_it)->TypeEq(*other_it)) {
+            return false;
+         }
+      }
+
+      return true;
+   }
+
+   bool Decls::TypeCoerce(const Decls *from) const {
+      return TypeEq(from);
+   }
+
+   /*** IMPLICIT TYPE COERCION ***/
+   bool Decl::TypeCoerce(const Decl *from) const {
+      if (declarator()->kind() == ASTDeclarator::Kind::DECLARATOR_POINTER) {
+         PointerDeclarator *ptr = dynamic_cast<PointerDeclarator *>(declarator());
+         
+         /* If type spec is VOID, then verify _from_ is pointer */
+         if (specs()->type_spec() == TypeSpec::TYPE_VOID &&
+             ptr->depth() == 1 &&
+             ptr->declarator()->kind() == ASTDeclarator::Kind::DECLARATOR_BASIC &&
+             from->declarator()->kind() == ASTDeclarator::Kind::DECLARATOR_POINTER) {
+            return true;
+         }
+
+         /* otherwise, require strict type equality */
+         return specs()->TypeEq(from->specs()) && declarator()->TypeEq(from->declarator());
+      } else {
+         return specs()->TypeCoerce(from->specs()) && declarator()->TypeCoerce(from->declarator());
+      }
+   }
+
+   bool DeclSpecs::TypeCoerce(const DeclSpecs *from) const {
+      return ::zc::TypeCoerce(this->type_spec(), from->type_spec());
+   }
+
+   bool TypeCoerce(TypeSpec to, TypeSpec from) {
+      if (to == TypeSpec::TYPE_VOID) {
+         return true;
+      }
+
+      if (IsIntegral(to) && IsIntegral(from)) {
+         return true;
+      }
+
+      return false;
+   }
+
+   bool PointerDeclarator::TypeCoerce(const ASTDeclarator *from) const {
+      if (from->kind() != Kind::DECLARATOR_POINTER) {
+         return false;
+      }
+
+      const PointerDeclarator *from_ = dynamic_cast<const PointerDeclarator *>(from);
+      if (this->depth_ != from_->depth_) {
+         return false;
+      }
+
+      return declarator()->TypeCoerce(from_->declarator());
+   }
+
+   bool FunctionDeclarator::TypeCoerce(const ASTDeclarator *from) const {
+      if (from->kind() != Kind::DECLARATOR_FUNCTION) {
+         return false;
+      }
+
+      const FunctionDeclarator *from_ = dynamic_cast<const FunctionDeclarator *>(from);
+      return declarator()->TypeCoerce(from_->declarator()) && params()->TypeCoerce(from_->params());
    }
    
 }
