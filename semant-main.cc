@@ -34,31 +34,30 @@ limitations under the License.
  */
 
 #include <iostream>
-#include <unistd.h>
+#include <unistd.h>     // getopt
+#include <stdio.h>
 
 #include "ast.hpp"
-#include "c.tab.hpp"
+#include "semant.hpp"
 
-extern int yy_flex_debug;                // Control Flex debugging (set to 1 to turn on)
-std::istream *g_istream = &std::cin;  // istream being lexed/parsed
-const char *g_filename = "<stdin>";   // Path to current file being lexed/parsed
+extern zc::TranslationUnit *g_AST_root;      // root of the abstract syntax tree
 
-int c_yydebug;           // Control Bison debugging (set to 1 to turn on)
-extern zc::TranslationUnit *g_AST_root;
-extern int omerrs;              // Number of lexing and parsing errors
-extern int yyparse();         // Entry point to the parser
+extern int yy_flex_debug;
+extern int yyparse(void);  // Entry point to the AST parser
+
+std::istream* g_istream = &std::cin; // we read the AST from standard input
+const char *g_filename = "<stdin>";
 
 namespace {
 
 void usage(const char *program) {
-  std::cerr << "Usage: " << program << " [-lp]" << std::endl;
+  std::cerr << "Usage: " << program << " [-s]" << std::endl;
 }
 
 }
 
 int main(int argc, char *argv[]) {
   yy_flex_debug = 0;
-  c_yydebug = 0;
 
   int c;
   opterr = 0;  // getopt shouldn't print any messages
@@ -68,8 +67,8 @@ int main(int argc, char *argv[]) {
       case 'l':
         yy_flex_debug = 1;
         break;
-      case 'p':
-        cool_yydebug = 1;
+      case 's':
+        zc::g_semant_debug = true;
         break;
 #endif
       case 'h':
@@ -83,15 +82,12 @@ int main(int argc, char *argv[]) {
     }
   }
 
-
+  // Parse AST dump
   yyparse();
-  if (omerrs != 0) {
-    std::cerr << "Compilation halted due to lex and parse errors" << std::endl;
-    exit(1);
-  }
 
-  g_AST_root->Dump(std::cout, 0, false);
-  // g_AST_root->Dump(std::cout, 0, false /* No types dumped as this stage */);
+  zc::Semant(g_AST_root);
+
+  g_AST_root->Dump(std::cout, 0, true); /* dump types as well */
 
   return 0;
 }

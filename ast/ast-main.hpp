@@ -19,9 +19,11 @@ namespace zc {
 
       virtual void DumpNode(std::ostream& os) const override { os << "TranslationUnit"; }
 
-      virtual void DumpChildren(std::ostream& os, int level) const override {
-         decls()->Dump(os, level);
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {
+         decls()->Dump(os, level, with_types);
       }
+
+      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
       
    protected:
       ExternalDecls *decls_;

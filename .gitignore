@@ -4,3 +4,5 @@ lex.yy.c
 cool
 lexer-main
 parser-main
+semant-main
+test.c

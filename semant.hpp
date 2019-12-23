@@ -43,6 +43,10 @@
 
 namespace zc {
 
+   extern bool g_semant_debug;
+
+   void Semant(TranslationUnit *root);
+
    /**
     * Provide error tracking and structured printing of semantic errors
     */
@@ -63,6 +67,8 @@ namespace zc {
       std::ostream& os_;
       std::size_t errors_;
    };
+
+   extern SemantError g_semant_error;
 
    typedef ScopedTable<Symbol *, Decl> ScopedSymtab;
 

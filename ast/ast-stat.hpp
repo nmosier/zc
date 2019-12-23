@@ -17,9 +17,9 @@ namespace zc {
       }
 
       virtual void DumpNode(std::ostream& os) const override { os << "CompoundStat"; }
-      virtual void DumpChildren(std::ostream& os, int level) const override {
-         decls_->Dump(os, level);
-         stats_->Dump(os, level);
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {
+         decls_->Dump(os, level, with_types);
+         stats_->Dump(os, level, with_types);
       }
 
       virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
@@ -39,8 +39,8 @@ namespace zc {
       static ExprStat *Create(ASTExpr *expr, SourceLoc& loc) { return new ExprStat(expr, loc); }
 
       virtual void DumpNode(std::ostream& os) const override { os << "ExprStat"; }
-      virtual void DumpChildren(std::ostream& os, int level) const override {
-         expr_->Dump(os, level);
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {
+         expr_->Dump(os, level, with_types);
       }
 
       virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;

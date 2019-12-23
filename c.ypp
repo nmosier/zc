@@ -209,30 +209,30 @@ unary_exp:      postfix_exp
         ; /* incomplete */
 logical_or_exp: logical_and_exp
         |       logical_or_exp OR logical_and_exp {
-                    $$ = zc::BinaryExpr::Create(zc::BinaryExpr::BOP_LOGICAL_OR, $1, $3, @1);
+                    $$ = zc::BinaryExpr::Create(zc::BinaryExpr::Kind::BOP_LOGICAL_OR, $1, $3, @1);
                 }
         ;
 logical_and_exp:
                 inclusive_or_exp
         |       logical_and_exp AND inclusive_or_exp {
-                    $$ = zc::BinaryExpr::Create(zc::BinaryExpr::BOP_LOGICAL_AND, $1, $3, @1);
+                    $$ = zc::BinaryExpr::Create(zc::BinaryExpr::Kind::BOP_LOGICAL_AND, $1, $3, @1);
                 }
         ;
 inclusive_or_exp:
                 exclusive_or_exp
         |       inclusive_or_exp '|' exclusive_or_exp {
-                    $$ = zc::BinaryExpr::Create(zc::BinaryExpr::BOP_BITWISE_OR, $1, $3, @1);
+                    $$ = zc::BinaryExpr::Create(zc::BinaryExpr::Kind::BOP_BITWISE_OR, $1, $3, @1);
                 }
         ;
 exclusive_or_exp:
                 and_exp
         |       exclusive_or_exp '^' and_exp {
-                    $$ = zc::BinaryExpr::Create(zc::BinaryExpr::BOP_BITWISE_XOR, $1, $3, @1);
+                    $$ = zc::BinaryExpr::Create(zc::BinaryExpr::Kind::BOP_BITWISE_XOR, $1, $3, @1);
                 }
         ;
 and_exp:        equality_exp
         |       and_exp '&' equality_exp {
-                    $$ = zc::BinaryExpr::Create(zc::BinaryExpr::BOP_BITWISE_AND, $1, $3, @1);
+                    $$ = zc::BinaryExpr::Create(zc::BinaryExpr::Kind::BOP_BITWISE_AND, $1, $3, @1);
                 }           
         ;
 equality_exp:   relational_exp

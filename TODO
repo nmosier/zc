@@ -4,5 +4,10 @@
 [X] add "dereferencable" annotation to Decl
 [ ] remove Identifier
 [X] add "Address" method to decls
-[ ] add "integral" method to delc
-[ ] TypeSpecs -> TypeSpec, since they are collapsed to 1.
+[X] add "integral" method to decl
+[X] Least-upper bound of integer. Perhaps via integer sorting? 
+[ ] when first line is error, root is NULL, causing segfault
+
+SEMANTIC ANALYSIS
+[ ] `long long int` -> `LONG`, not `LONG_LONG`
+[ ] print annotated types

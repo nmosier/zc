@@ -2,18 +2,19 @@
 
 namespace zc {
 
-   void UnaryExpr::DumpNode(std::ostream& os) const {
-      const char *strs[] =
-         {"UOP_ADDR", "UOP_DEREFERENCE", "UOP_POSITIVE", "UOP_NEGATIVE", "UOP_BITWISE_NOT",
-          "UOP_LOGICAL_NOT"};
-      
-      os << "UnaryExpr ";
-
-      if (kind_ < 0 || kind_ >= Kind::NUOPS) {
-         os << "(invalid)";
-      } else {
-         os << strs[kind_];
+   const char *UnaryExpr::kindstr() const {
+      switch (kind_) {
+      case Kind::UOP_ADDR: return "UOP_ADDR";
+      case Kind::UOP_DEREFERENCE: return "UOP_DEREFERENCE";
+      case Kind::UOP_POSITIVE:   return "UOP_POSITIVE";
+      case Kind::UOP_NEGATIVE:   return "UOP_NEGATIVE";
+      case Kind::UOP_BITWISE_NOT:          return "UOP_BITWISE_NOT";
+      case Kind::UOP_LOGICAL_NOT: return "UOP_LOGICAL_NOT";
       }
+   }
+   
+   void UnaryExpr::DumpNode(std::ostream& os) const {
+      os << "UnaryExpr " << kindstr();
    }
 
    const char *BinaryExpr::kindstr() const {
@@ -50,8 +51,8 @@ namespace zc {
       os << "StringExpr " << *str_;
    }
 
-   void IdentifierExpr::DumpChildren(std::ostream& os, int level) const {
-      id_->Dump(os, level);
+   void IdentifierExpr::DumpChildren(std::ostream& os, int level, bool with_types) const {
+      id_->Dump(os, level, with_types);
    }
 
 }

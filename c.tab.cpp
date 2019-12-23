@@ -1781,35 +1781,35 @@ yyreduce:
   case 51:
 #line 211 "c.ypp"
     {
-                    (yyval.expr) = zc::BinaryExpr::Create(zc::BinaryExpr::BOP_LOGICAL_OR, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr), (yylsp[(1) - (3)]));
+                    (yyval.expr) = zc::BinaryExpr::Create(zc::BinaryExpr::Kind::BOP_LOGICAL_OR, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr), (yylsp[(1) - (3)]));
                 ;}
     break;
 
   case 53:
 #line 217 "c.ypp"
     {
-                    (yyval.expr) = zc::BinaryExpr::Create(zc::BinaryExpr::BOP_LOGICAL_AND, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr), (yylsp[(1) - (3)]));
+                    (yyval.expr) = zc::BinaryExpr::Create(zc::BinaryExpr::Kind::BOP_LOGICAL_AND, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr), (yylsp[(1) - (3)]));
                 ;}
     break;
 
   case 55:
 #line 223 "c.ypp"
     {
-                    (yyval.expr) = zc::BinaryExpr::Create(zc::BinaryExpr::BOP_BITWISE_OR, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr), (yylsp[(1) - (3)]));
+                    (yyval.expr) = zc::BinaryExpr::Create(zc::BinaryExpr::Kind::BOP_BITWISE_OR, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr), (yylsp[(1) - (3)]));
                 ;}
     break;
 
   case 57:
 #line 229 "c.ypp"
     {
-                    (yyval.expr) = zc::BinaryExpr::Create(zc::BinaryExpr::BOP_BITWISE_XOR, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr), (yylsp[(1) - (3)]));
+                    (yyval.expr) = zc::BinaryExpr::Create(zc::BinaryExpr::Kind::BOP_BITWISE_XOR, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr), (yylsp[(1) - (3)]));
                 ;}
     break;
 
   case 59:
 #line 234 "c.ypp"
     {
-                    (yyval.expr) = zc::BinaryExpr::Create(zc::BinaryExpr::BOP_BITWISE_AND, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr), (yylsp[(1) - (3)]));
+                    (yyval.expr) = zc::BinaryExpr::Create(zc::BinaryExpr::Kind::BOP_BITWISE_AND, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr), (yylsp[(1) - (3)]));
                 ;}
     break;
 

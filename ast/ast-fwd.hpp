@@ -43,8 +43,18 @@ namespace zc {
    class LogicalOrExpr;
    class LogicalAndExpr;
 
-   enum TypeSpec {TYPE_VOID, TYPE_CHAR, TYPE_SHORT, TYPE_INT, TYPE_LONG, TYPE_LL, TYPE_ERROR};
-   TypeSpec Combine(TypeSpec lhs, TypeSpec rhs);
+   /** Collection of type specification categories */
+   enum class TypeSpec {TYPE_VOID,
+                        TYPE_CHAR,
+                        TYPE_SHORT,
+                        TYPE_INT,
+                        TYPE_LONG,
+                        TYPE_LONG_LONG,
+                        TYPE_POINTER,
+                        TYPE_FUNCTION,
+   };
+   bool IsIntegral(TypeSpec type);
+   TypeSpec Max(TypeSpec lhs, TypeSpec rhs);
    
    class TypeSpecs;
 }

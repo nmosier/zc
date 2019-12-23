@@ -17,16 +17,16 @@ namespace zc {
    class ASTNode {
    public:
       const SourceLoc& loc() const { return loc_; }
-      void Dump(std::ostream& os, size_t level) const;
+      virtual void Dump(std::ostream& os, int level, bool with_types) const;
       virtual void DumpNode(std::ostream& os) const = 0;
-      virtual void DumpChildren(std::ostream& os, int level) const = 0;
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const = 0;
 
       /** 
        * Perform semantic analysis on node and all children.
        * @param env the semantic environment
        * @param scoped whether this node is allowed to create a new scope
        */
-      virtual void TypeCheck(SemantEnv& env, bool scoped = true) {} // = 0
+      virtual void TypeCheck(SemantEnv& env, bool scoped = true) = 0;
       
    protected:
       SourceLoc loc_;
@@ -53,9 +53,15 @@ namespace zc {
 
       virtual void DumpNode(std::ostream& os) const override { os << name; }
       
-      virtual void DumpChildren(std::ostream& os, int level) const override {
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {
          for (const Node *node : vec_) {
-            node->Dump(os, level);
+            node->Dump(os, level, with_types);
+         }
+      }
+
+      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override {
+         for (Node *node : vec_) {
+            node->TypeCheck(env, true);
          }
       }
 
@@ -80,7 +86,7 @@ namespace zc {
             os << " " << spec;
          }
       }
-      virtual void DumpChildren(std::ostream& os, int level) const override {}
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
 
       /* experimental */
       void insert(Spec spec) { specs_.insert(spec); }
@@ -109,15 +115,17 @@ namespace zc {
       Decl *type() const { return type_; }
 
       /*! Enumeration of value kind. */
-      enum Kind {EXPR_NONE,   /*!< indeterminate; this is the default upon construction */
-                 EXPR_LVALUE, /*!< expression is an `lvalue'; it can appear on the left-hand side 
-                               *   of an assignment */
-                 EXPR_RVALUE  /*!< expression is an `rvalue'; it can appear on the right-hand side
-                               *   of an assignment */
-      };
-      Kind kind() const { return kind_; }
+      enum class ExprKind
+         {EXPR_NONE,   /*!< indeterminate; this is the default upon construction */
+          EXPR_LVALUE, /*!< expression is an `lvalue'; it can appear on the left-hand side 
+                        *   of an assignment */
+          EXPR_RVALUE  /*!< expression is an `rvalue'; it can appear on the right-hand side
+                        *   of an assignment */
+         };
+      virtual ExprKind expr_kind() const = 0;
 
-      virtual void ExprKind(SemantEnv& env) {} //= 0;
+      virtual void Dump(std::ostream& os, int level, bool with_types) const override;
+      void DumpType(std::ostream& os) const;
 
    protected:
       /**
@@ -125,21 +133,14 @@ namespace zc {
        */
       Decl *type_;
 
-      /**
-       * Kind of value. Determined during semantic analysis.
-       * @see Kind
-       * @see TypeCheck()
-       */
-      Kind kind_;
-      
-      ASTExpr(const SourceLoc& loc): ASTNode(loc), type_(nullptr), kind_(EXPR_NONE) {}
+      ASTExpr(const SourceLoc& loc): ASTNode(loc), type_(nullptr) {}
    };
 
    class ASTUnaryExpr: public ASTExpr {
    public:
       ASTExpr *expr() const { return expr_; }
 
-      virtual void DumpChildren(std::ostream& os, int level) const override;
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
       
    protected:
       ASTExpr *expr_;
@@ -151,7 +152,7 @@ namespace zc {
       ASTExpr *lhs() const { return lhs_; }
       ASTExpr *rhs() const { return rhs_; }
 
-      virtual void DumpChildren(std::ostream& os, int level) const override;
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
       
    protected:
       ASTExpr *lhs_;
