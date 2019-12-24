@@ -39,6 +39,7 @@ namespace zc {
       
    };
 
+
    class Decl: public ASTNode {
    public:
       DeclSpecs *specs() const { return specs_; }
@@ -100,7 +101,8 @@ namespace zc {
       bool TypeCoerce(const Decls *from) const;
       
    protected:
-      Decls(const SourceLoc& loc): ASTNode(loc), ASTNodeVec<Decl,Decls_s>(loc), ExternalDecl(loc) {}
+      Decls(const SourceLoc& loc): ASTNode(loc), ASTNodeVec<Decl,Decls_s>(loc),
+                                   ExternalDecl(loc) {}
    };
 
 

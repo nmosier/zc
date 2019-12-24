@@ -18,15 +18,15 @@ namespace zc {
    public:
       const SourceLoc& loc() const { return loc_; }
       virtual void Dump(std::ostream& os, int level, bool with_types) const;
-      virtual void DumpNode(std::ostream& os) const = 0;
-      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const = 0;
+      virtual void DumpNode(std::ostream& os) const {} // = 0;
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const {} // = 0;
 
       /** 
        * Perform semantic analysis on node and all children.
        * @param env the semantic environment
        * @param scoped whether this node is allowed to create a new scope
        */
-      virtual void TypeCheck(SemantEnv& env, bool scoped = true) = 0;
+      virtual void TypeCheck(SemantEnv& env, bool scoped = true) {} // = 0;
       
    protected:
       SourceLoc loc_;

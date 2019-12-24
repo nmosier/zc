@@ -16,5 +16,6 @@
 #include "ast/ast-expr.hpp"
 #include "ast/ast-decl.hpp"
 #include "ast/ast-stat.hpp"
+#include "ast/ast-type.hpp"
 
 #endif

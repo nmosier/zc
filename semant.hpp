@@ -82,9 +82,7 @@ namespace zc {
    private:
       SemantError& error_;
       ScopedSymtab symtab_; 
-   };
-
-   
+   };   
    
 }
 
