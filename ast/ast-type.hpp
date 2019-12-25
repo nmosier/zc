@@ -16,8 +16,9 @@ namespace zc {
 
       virtual bool is_integral() const = 0;
 
-      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}      
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
 
+      virtual void TypeCheck(SemantEnv& env) = 0;
       virtual bool TypeEq(const ASTType *other) const = 0;
       virtual bool TypeCoerce(const ASTType *from) const = 0;
 
@@ -42,7 +43,7 @@ namespace zc {
 
       virtual bool TypeEq(const ASTType *other) const override;
       virtual bool TypeCoerce(const ASTType *from) const override;
-      virtual void TypeCheck(SemantEnv& env, bool scoped) override;
+      virtual void TypeCheck(SemantEnv& env) override;
 
       virtual ASTType *Address() override;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) override;
@@ -64,7 +65,7 @@ namespace zc {
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
       
       bool TypeEq(const Types *others) const;
-      void TypeCheck(SemantEnv& env, bool scoped) override;
+      void TypeCheck(SemantEnv& env);
 
    protected:
       Types(Vec vec, const SourceLoc& loc): ASTNode(loc), ASTNodeVec<ASTType, Types_s>(vec, loc) {}
@@ -86,7 +87,7 @@ namespace zc {
 
       virtual bool TypeEq(const ASTType *other) const override;
       virtual bool TypeCoerce(const ASTType *from) const override;
-      virtual void TypeCheck(SemantEnv& env, bool scoped) override;
+      virtual void TypeCheck(SemantEnv& env) override;
 
       virtual ASTType *Address() override;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) override;
@@ -115,7 +116,7 @@ namespace zc {
 
       virtual bool TypeEq(const ASTType *other) const override;
       virtual bool TypeCoerce(const ASTType *from) const override;
-      virtual void TypeCheck(SemantEnv& env, bool scoped) override;      
+      virtual void TypeCheck(SemantEnv& env) override;      
 
       virtual ASTType *Address() override;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) override;

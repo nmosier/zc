@@ -22,13 +22,6 @@ namespace zc {
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const = 0;
       virtual void DumpType(std::ostream& os) const {}
 
-      /** 
-       * Perform semantic analysis on node and all children.
-       * @param env the semantic environment
-       * @param scoped whether this node is allowed to create a new scope
-       */
-      virtual void TypeCheck(SemantEnv& env, bool scoped = true) {} // = 0;
-      
    protected:
       SourceLoc loc_;
       ASTNode(const SourceLoc& loc): loc_(loc) {}
@@ -36,6 +29,8 @@ namespace zc {
 
    class ASTStat: public ASTNode {
    public:
+      virtual void TypeCheck(SemantEnv& env) = 0;
+
    protected:
       ASTStat(const SourceLoc& loc): ASTNode(loc) {}
    };
@@ -63,9 +58,10 @@ namespace zc {
          }
       }
 
-      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override {
+      template <typename... Args>
+      void TypeCheck(SemantEnv& env, Args... args) {
          for (Node *node : vec_) {
-            node->TypeCheck(env, true);
+            node->TypeCheck(env, args...);
          }
       }
 
@@ -128,6 +124,8 @@ namespace zc {
                         *   of an assignment */
          };
       virtual ExprKind expr_kind() const = 0;
+
+      virtual void TypeCheck(SemantEnv& env) = 0;
 
       void DumpType(std::ostream& os) const;
 

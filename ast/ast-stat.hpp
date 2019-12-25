@@ -22,7 +22,8 @@ namespace zc {
          stats_->Dump(os, level, with_types);
       }
 
-      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
+      virtual void TypeCheck(SemantEnv& env) override { return TypeCheck(env, true); }
+      void TypeCheck(SemantEnv& env, bool scoped);
       
    protected:
       Decls *decls_;
@@ -43,7 +44,7 @@ namespace zc {
          expr_->Dump(os, level, with_types);
       }
 
-      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
+      virtual void TypeCheck(SemantEnv& env) override;
       
    protected:
       ASTExpr *expr_;

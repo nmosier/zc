@@ -18,3 +18,8 @@ SEMANTIC ANALYSIS
 [ ] Convert Decl to ASTType
 [ ] rewrite DeclSpecs to return TypeSpecs converted to single TypeSpec.
 [ ] Handle function to function pointer TypeCoercion edge cases.
+[ ] Don't add identifiers in function declarations that are not definitions to scope
+[ ] Introduce declarations as types
+
+AST
+[ ] Add bindings of types to identifiers (TypeID, perhaps?)

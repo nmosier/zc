@@ -13,11 +13,8 @@ namespace zc {
 
    void Semant(TranslationUnit *root) {
       SemantEnv env(g_semant_error);
-      
-      root->TypeCheck(env, true);
+      root->TypeCheck(env);
    }
-
-   
 
    std::ostream& SemantError::operator()(const char *filename, const ASTNode *node) {
       errors_++;
@@ -72,72 +69,70 @@ namespace zc {
 
    /*** TYPE CHECK ***/
 
-   void BasicType::TypeCheck(SemantEnv& env, bool scoped) {
+   void BasicType::TypeCheck(SemantEnv& env) {
       if (type_spec() == TypeSpec::TYPE_VOID) {
          env.error()(g_filename, this) << "incomplete type 'void'" << std::endl;
       }
    }
 
-   void PointerType::TypeCheck(SemantEnv& env, bool scoped) {
-      pointee()->TypeCheck(env, scoped);
+   void PointerType::TypeCheck(SemantEnv& env) {
+      pointee()->TypeCheck(env);
    }
 
-   void FunctionType::TypeCheck(SemantEnv& env, bool scoped) {
+   void FunctionType::TypeCheck(SemantEnv& env) {
       /* NOTE: function's don't need to have complete return types (i.e. they can be 'void'. */
-      params()->TypeCheck(env, scoped);
+      params()->TypeCheck(env);
    }
 
-   void Types::TypeCheck(SemantEnv& env, bool scoped) {
-      ASTNodeVec::TypeCheck(env, scoped);
+   void Types::TypeCheck(SemantEnv& env) {
+      ASTNodeVec::TypeCheck(env);
    }
    
-   void TranslationUnit::TypeCheck(SemantEnv& env, bool scoped) {
+   void TranslationUnit::TypeCheck(SemantEnv& env) {
       env.symtab().EnterScope();
-      decls()->TypeCheck(env, true);
+      decls()->TypeCheck(env);
    }
 
-   void Decls::TypeCheck(SemantEnv& env, bool scoped) {
-      ASTNodeVec::TypeCheck(env, scoped);
+   void DeclSpecs::TypeCheck(SemantEnv& env) {
+      type_specs()->TypeCheck(env);
    }
 
-   void DeclSpecs::TypeCheck(SemantEnv& env, bool scoped) {
-      type_specs()->TypeCheck(env, scoped);
-   }
-
-   void TypeSpecs::TypeCheck(SemantEnv& env, bool scoped) {
+   void TypeSpecs::TypeCheck(SemantEnv& env) {
       /* make sure all type specifiers present are compatible */
       TypeCombine(&env);
    }
 
-   void Decl::TypeCheck(SemantEnv& env, bool scoped) {
+   void Decl::TypeCheck(SemantEnv& env, int level) {
       specs()->TypeCheck(env);
-      declarator()->TypeCheck(env);
-      
-      /* check for previous declarations in scope */
-      Symbol *sym = id()->id();
-      if (env.symtab().Probe(sym) != nullptr) {
-         /* ERROR: symbol already defined in this scope. */
-         env.error()(g_filename, this) << "redefinition of '" << sym << "'" << std::endl;
-         return;
+      declarator()->TypeCheck(env, level);
+
+      if (level > 0) {
+         /* check for previous declarations in scope */
+         Symbol *sym = id()->id();
+         if (env.symtab().Probe(sym) != nullptr) {
+            /* ERROR: symbol already defined in this scope. */
+            env.error()(g_filename, this) << "redefinition of '" << sym << "'" << std::endl;
+            return;
+         }
+         
+         ASTType *type = Type();
+         type->TypeCheck(env);
+         
+         /* add symbol to scope */
+         env.symtab().AddToScope(sym, type);
       }
-
-      ASTType *type = Type();
-      type->TypeCheck(env, scoped);
-      
-      /* add symbol to scope */
-      env.symtab().AddToScope(sym, type);
    }
 
-   void FunctionDeclarator::TypeCheck(SemantEnv& env, bool scoped) {
-      declarator()->TypeCheck(env);
-      params()->TypeCheck(env);
+   void FunctionDeclarator::TypeCheck(SemantEnv& env, int level) {
+      declarator()->TypeCheck(env, level);
+      params()->TypeCheck(env, level);
    }
 
-   void FunctionDef::TypeCheck(SemantEnv& env, bool scoped) {
-      decl()->TypeCheck(env);
-      env.symtab().EnterScope();      /* push scope for fn body */
+   void FunctionDef::TypeCheck(SemantEnv& env) {
+      decl()->TypeCheck(env, false); /* not abstract -- enter types in scoped symbol table */
+      env.symtab().EnterScope();          /* push scope for fn body */
       comp_stat()->TypeCheck(env, false); /* function body doesn't get new scope */
-      env.symtab().ExitScope();       /* pop scope */
+      env.symtab().ExitScope();           /* pop scope */
    }
 
    void CompoundStat::TypeCheck(SemantEnv& env, bool scoped) {
@@ -153,12 +148,12 @@ namespace zc {
       }
    }
 
-   void ExprStat::TypeCheck(SemantEnv& env, bool scoped) {
+   void ExprStat::TypeCheck(SemantEnv& env) {
       expr()->TypeCheck(env);
    }
 
 
-   void AssignmentExpr::TypeCheck(SemantEnv& env, bool scoped) {
+   void AssignmentExpr::TypeCheck(SemantEnv& env) {
       lhs_->TypeCheck(env);
       rhs_->TypeCheck(env);
 
@@ -175,7 +170,7 @@ namespace zc {
    }
 
 
-   void UnaryExpr::TypeCheck(SemantEnv& env, bool scoped) {
+   void UnaryExpr::TypeCheck(SemantEnv& env) {
       expr_->TypeCheck(env);
 
       ASTType *type = expr_->type();
@@ -210,9 +205,9 @@ namespace zc {
       }
    }
 
-   void BinaryExpr::TypeCheck(SemantEnv& env, bool scoped) {
-      lhs_->TypeCheck(env, scoped);
-      rhs_->TypeCheck(env, scoped);
+   void BinaryExpr::TypeCheck(SemantEnv& env) {
+      lhs_->TypeCheck(env);
+      rhs_->TypeCheck(env);
       
       switch (kind()) {
       case Kind::BOP_LOGICAL_AND:
@@ -237,7 +232,7 @@ namespace zc {
 
             if (lhs_int && rhs_int) {
                type_ = dynamic_cast<const BasicType *>
-                  (lhs_)->Max(dynamic_cast<const BasicType *>(rhs_));
+                  (lhs_->type())->Max(dynamic_cast<const BasicType *>(rhs_->type()));
             } else {
                if (!lhs_int) {
                   env.error()(g_filename, this) << "left-hand expression in binary operation "
@@ -253,15 +248,15 @@ namespace zc {
       }
    }
 
-   void LiteralExpr::TypeCheck(SemantEnv& env, bool scoped) {
+   void LiteralExpr::TypeCheck(SemantEnv& env) {
       type_ = BasicType::Create(TypeSpec::TYPE_LONG_LONG, loc());
    }
 
-   void StringExpr::TypeCheck(SemantEnv& env, bool scoped) {
+   void StringExpr::TypeCheck(SemantEnv& env) {
       type_ = PointerType::Create(1, BasicType::Create(TypeSpec::TYPE_CHAR, loc()), loc());
    }
 
-   void IdentifierExpr::TypeCheck(SemantEnv& env, bool scoped) {
+   void IdentifierExpr::TypeCheck(SemantEnv& env) {
       if ((type_ = env.symtab().Lookup(id()->id())) == nullptr) {
          env.error()(g_filename, this) << "use of undeclared identifier '" << id()->id()
                                        << "'" << std::endl;
@@ -507,7 +502,7 @@ namespace zc {
    ASTType *BasicType::Address() {
       return PointerType::Create(1, this, loc());
    }
-
+   
    ASTType *PointerType::Address() {
       return PointerType::Create(depth() + 1, pointee(), loc());
    }

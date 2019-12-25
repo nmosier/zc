@@ -23,7 +23,7 @@ namespace zc {
          decls()->Dump(os, level, with_types);
       }
 
-      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
+      void TypeCheck(SemantEnv& env);
       
    protected:
       ExternalDecls *decls_;

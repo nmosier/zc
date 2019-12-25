@@ -21,7 +21,7 @@ namespace zc {
 
       virtual void DumpNode(std::ostream& os) const override { os << "AssignmentExpr"; }
 
-      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
+      virtual void TypeCheck(SemantEnv& env) override;
 
    protected:
       AssignmentExpr(ASTExpr *lhs, ASTExpr *rhs, const SourceLoc& loc):
@@ -47,7 +47,7 @@ namespace zc {
 
       virtual void DumpNode(std::ostream& os) const override;
 
-      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
+      virtual void TypeCheck(SemantEnv& env) override;
 
    protected:
       Kind kind_;
@@ -84,7 +84,7 @@ namespace zc {
       virtual ExprKind expr_kind() const override;      
 
       virtual void DumpNode(std::ostream& os) const override;
-      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
+      virtual void TypeCheck(SemantEnv& env) override;
       
    protected:
       Kind kind_;
@@ -108,7 +108,7 @@ namespace zc {
          /* no children */
       }
 
-      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
+      virtual void TypeCheck(SemantEnv& env) override;
       
    protected:
       intmax_t val_;
@@ -127,7 +127,7 @@ namespace zc {
          /* no children */
       }
 
-      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
+      virtual void TypeCheck(SemantEnv& env) override;
       
    protected:
       const std::string *str_;
@@ -152,7 +152,7 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override { os << "IdentifierExpr"; }
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
 
-      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
+      virtual void TypeCheck(SemantEnv& env) override;
       
    protected:
       Identifier *id_;
@@ -169,7 +169,7 @@ namespace zc {
          /* no children */
       }
 
-      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override {}
+      virtual void TypeCheck(SemantEnv& env) override {}
 
    protected:
       NoExpr(const SourceLoc& loc): ASTExpr(loc) {}
