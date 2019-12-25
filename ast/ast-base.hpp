@@ -18,8 +18,9 @@ namespace zc {
    public:
       const SourceLoc& loc() const { return loc_; }
       virtual void Dump(std::ostream& os, int level, bool with_types) const;
-      virtual void DumpNode(std::ostream& os) const {} // = 0;
-      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const {} // = 0;
+      virtual void DumpNode(std::ostream& os) const = 0;
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const = 0;
+      virtual void DumpType(std::ostream& os) const {}
 
       /** 
        * Perform semantic analysis on node and all children.
@@ -50,6 +51,9 @@ namespace zc {
       Vec& vec() { return vec_; }
 
       static ASTNodeVec<Node,name> *Create(const SourceLoc& loc) { return new ASTNodeVec(loc); }
+      static ASTNodeVec<Node,name> *Create(Vec vec, const SourceLoc& loc) {
+         return new ASTNodeVec(vec, loc);
+      }
 
       virtual void DumpNode(std::ostream& os) const override { os << name; }
       
@@ -69,6 +73,7 @@ namespace zc {
       Vec vec_;
 
       ASTNodeVec(const SourceLoc& loc): ASTNode(loc) {}
+      ASTNodeVec(Vec vec, const SourceLoc& loc): ASTNode(loc), vec_(vec) {}
    };
 
    template <typename Spec, const char *name>
@@ -112,7 +117,7 @@ namespace zc {
 
    class ASTExpr: public ASTNode {
    public:
-      Decl *type() const { return type_; }
+      ASTType *type() const { return type_; }
 
       /*! Enumeration of value kind. */
       enum class ExprKind
@@ -124,15 +129,14 @@ namespace zc {
          };
       virtual ExprKind expr_kind() const = 0;
 
-      virtual void Dump(std::ostream& os, int level, bool with_types) const override;
       void DumpType(std::ostream& os) const;
 
    protected:
       /**
        * Type of expression; populated by @see TypeCheck()
        */
-      Decl *type_;
-
+      ASTType *type_;
+      
       ASTExpr(const SourceLoc& loc): ASTNode(loc), type_(nullptr) {}
    };
 
@@ -151,7 +155,7 @@ namespace zc {
    public:
       ASTExpr *lhs() const { return lhs_; }
       ASTExpr *rhs() const { return rhs_; }
-
+      
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
       
    protected:

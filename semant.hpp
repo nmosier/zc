@@ -70,7 +70,7 @@ namespace zc {
 
    extern SemantError g_semant_error;
 
-   typedef ScopedTable<Symbol *, Decl> ScopedSymtab;
+   typedef ScopedTable<Symbol *, ASTType> ScopedSymtab;
 
    class SemantEnv {
    public:

@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "ast.hpp"
 #include "symtab.hpp"
 #include "semant.hpp"
@@ -23,13 +25,18 @@ namespace zc {
       return os_;
    }
 
+   TypeSpec TypeSpecs::TypeCombine() const {
+      return TypeCombine(nullptr);
+   }
 
-   TypeSpec TypeSpecs::TypeCombine(SemantEnv& env) const {
+   TypeSpec TypeSpecs::TypeCombine(SemantEnv *env) const {
       auto specs = specs_;
       
       /* check if any specs given */
       if (specs.size() == 0) {
-         env.error()(g_filename, this) << "declaration missing type specifier" << std::endl;
+         if (env) {
+            env->error()(g_filename, this) << "declaration missing type specifier" << std::endl;
+         }
          return TypeSpec::TYPE_INT;
       }
 
@@ -54,8 +61,10 @@ namespace zc {
       /* NOTE: There should now only be one type left, any of VOID, CHAR, SHORT, INT, LONG, LL. */
       /* check for extraneous types */
       if (specs.size() != 1) {
-         env.error()(g_filename, this) << "too many or incompatible type specifiers given"
-                                          << std::endl;
+         if (env) {
+            env->error()(g_filename, this) << "too many or incompatible type specifiers given"
+                                           << std::endl;
+         }
       }
 
       return *specs.begin();
@@ -63,6 +72,25 @@ namespace zc {
 
    /*** TYPE CHECK ***/
 
+   void BasicType::TypeCheck(SemantEnv& env, bool scoped) {
+      if (type_spec() == TypeSpec::TYPE_VOID) {
+         env.error()(g_filename, this) << "incomplete type 'void'" << std::endl;
+      }
+   }
+
+   void PointerType::TypeCheck(SemantEnv& env, bool scoped) {
+      pointee()->TypeCheck(env, scoped);
+   }
+
+   void FunctionType::TypeCheck(SemantEnv& env, bool scoped) {
+      /* NOTE: function's don't need to have complete return types (i.e. they can be 'void'. */
+      params()->TypeCheck(env, scoped);
+   }
+
+   void Types::TypeCheck(SemantEnv& env, bool scoped) {
+      ASTNodeVec::TypeCheck(env, scoped);
+   }
+   
    void TranslationUnit::TypeCheck(SemantEnv& env, bool scoped) {
       env.symtab().EnterScope();
       decls()->TypeCheck(env, true);
@@ -73,14 +101,12 @@ namespace zc {
    }
 
    void DeclSpecs::TypeCheck(SemantEnv& env, bool scoped) {
-      TypeSpec combined_type_spec = type_specs()->TypeCombine(env);
-      type_spec_variant_ = combined_type_spec;
+      type_specs()->TypeCheck(env, scoped);
    }
 
    void TypeSpecs::TypeCheck(SemantEnv& env, bool scoped) {
-      env.error()(g_filename, this) << "compiler error: TypeSpecs should have been reduced, "
-                                    << "terminating..." << std::endl;
-      abort();
+      /* make sure all type specifiers present are compatible */
+      TypeCombine(&env);
    }
 
    void Decl::TypeCheck(SemantEnv& env, bool scoped) {
@@ -95,15 +121,11 @@ namespace zc {
          return;
       }
 
-      /* check if type is complete */
-      if (specs()->type_spec() == TypeSpec::TYPE_VOID &&
-          declarator()->kind() == ASTDeclarator::Kind::DECLARATOR_BASIC) {
-         env.error()(g_filename, this) << "declaration has incomplete type 'void'";
-      }
+      ASTType *type = Type();
+      type->TypeCheck(env, scoped);
       
       /* add symbol to scope */
-      env.symtab().AddToScope(id()->id(), this);
-      
+      env.symtab().AddToScope(sym, type);
    }
 
    void FunctionDeclarator::TypeCheck(SemantEnv& env, bool scoped) {
@@ -156,7 +178,7 @@ namespace zc {
    void UnaryExpr::TypeCheck(SemantEnv& env, bool scoped) {
       expr_->TypeCheck(env);
 
-      Decl *type = expr_->type();
+      ASTType *type = expr_->type();
       switch (kind_) {
       case Kind::UOP_ADDR: /* requires LVALUE */
          if (expr_->expr_kind() != ExprKind::EXPR_LVALUE) {
@@ -178,11 +200,12 @@ namespace zc {
       case Kind::UOP_BITWISE_NOT:
       case Kind::UOP_LOGICAL_NOT:
          /* requires integral type */
-         if (expr_->type()->kind() != Decl::Kind::DECL_INTEGRAL) {
+         
+         if (!expr_->type()->is_integral()) {
             env.error()(g_filename, this) << "positive/negative sign verboten for non-integral type"
                                           << std::endl;
          }
-         type_ = type;
+         type_ = expr_->type();
          break;
       }
    }
@@ -209,16 +232,12 @@ namespace zc {
       case Kind::BOP_DIVIDE:
       case Kind::BOP_MOD:
          {
-            bool lhs_int = (lhs_->type()->kind() != Decl::Kind::DECL_INTEGRAL);
-            bool rhs_int = (rhs_->type()->kind() != Decl::Kind::DECL_INTEGRAL);
+            bool lhs_int = lhs_->type()->is_integral();
+            bool rhs_int = rhs_->type()->is_integral();
 
             if (lhs_int && rhs_int) {
-               TypeSpec lhs_type = lhs_->type()->specs()->type_spec();
-               TypeSpec rhs_type = rhs_->type()->specs()->type_spec();
-               TypeSpec int_type = Max(lhs_type, rhs_type);
-               DeclSpecs *specs = DeclSpecs::Create(int_type, loc_);
-               type_ = Decl::Create(DeclSpecs::Create(int_type, loc_),
-                                      BasicDeclarator::Create(nullptr, loc_), loc_);
+               type_ = dynamic_cast<const BasicType *>
+                  (lhs_)->Max(dynamic_cast<const BasicType *>(rhs_));
             } else {
                if (!lhs_int) {
                   env.error()(g_filename, this) << "left-hand expression in binary operation "
@@ -235,241 +254,292 @@ namespace zc {
    }
 
    void LiteralExpr::TypeCheck(SemantEnv& env, bool scoped) {
-      type_ = Decl::Create(DeclSpecs::Create(TypeSpec::TYPE_LONG_LONG, loc_),
-                           BasicDeclarator::Create(nullptr, loc_),
-                           loc_);
+      type_ = BasicType::Create(TypeSpec::TYPE_LONG_LONG, loc());
    }
 
    void StringExpr::TypeCheck(SemantEnv& env, bool scoped) {
-      type_ = Decl::Create(DeclSpecs::Create(TypeSpec::TYPE_CHAR, loc_),
-                           PointerDeclarator::Create(1, BasicDeclarator::Create(nullptr, loc_),
-                                                     loc_),
-                           loc_);
+      type_ = PointerType::Create(1, BasicType::Create(TypeSpec::TYPE_CHAR, loc()), loc());
    }
 
    void IdentifierExpr::TypeCheck(SemantEnv& env, bool scoped) {
       if ((type_ = env.symtab().Lookup(id()->id())) == nullptr) {
          env.error()(g_filename, this) << "use of undeclared identifier '" << id()->id()
                                        << "'" << std::endl;
-
-         /* set default type int */
-         type_ = Decl::Create(DeclSpecs::Create(TypeSpec::TYPE_INT, loc_),
-                              BasicDeclarator::Create(id_, loc_),
-                              loc_);
+         type_ = BasicType::Create(TypeSpec::TYPE_INT, loc());
       }
    }
 
 
    
    
-   /*** DEREFERENCE ***/
+    /*** DEREFERENCE ***/
    
-   Decl *Decl::Dereference() {
-      ASTDeclarator *new_declarator = declarator()->Dereference();
-      if (new_declarator == nullptr) {
-         return nullptr;
-      }
 
-      return Decl::Create(specs_, new_declarator, loc_);
+    /*** EXPRESSION KIND (LVALUE or RVALUE) ***/
+    ASTExpr::ExprKind AssignmentExpr::expr_kind() const {
+       /* assignments always produce rvalues */
+       return ExprKind::EXPR_RVALUE;
+    }
+
+    ASTExpr::ExprKind UnaryExpr::expr_kind() const {
+       switch (kind_) {
+       case Kind::UOP_ADDR:
+          return ExprKind::EXPR_RVALUE;
+       
+       case Kind::UOP_DEREFERENCE:
+          return ExprKind::EXPR_LVALUE;
+       
+       case Kind::UOP_POSITIVE:
+       case Kind::UOP_NEGATIVE:
+       case Kind::UOP_BITWISE_NOT:
+       case Kind::UOP_LOGICAL_NOT:
+          return ExprKind::EXPR_RVALUE;
+       }
+    }
+
+    ASTExpr::ExprKind BinaryExpr::expr_kind() const {
+       switch (kind_) {
+       case Kind::BOP_LOGICAL_AND:
+       case Kind::BOP_BITWISE_AND:
+       case Kind::BOP_LOGICAL_OR:
+       case Kind::BOP_BITWISE_OR:
+       case Kind::BOP_BITWISE_XOR:
+       case Kind::BOP_EQ:
+       case Kind::BOP_NEQ:
+       case Kind::BOP_LT:
+       case Kind::BOP_LEQ:
+       case Kind::BOP_GT:
+       case Kind::BOP_GEQ:
+       case Kind::BOP_PLUS:
+       case Kind::BOP_MINUS:
+       case Kind::BOP_TIMES:
+       case Kind::BOP_DIVIDE:
+       case Kind::BOP_MOD:
+          return ExprKind::EXPR_RVALUE;
+       }
+    }
+
+    ASTExpr::ExprKind LiteralExpr::expr_kind() const {
+       return ExprKind::EXPR_RVALUE;
+    }
+
+    ASTExpr::ExprKind StringExpr::expr_kind() const {
+       return ExprKind::EXPR_RVALUE;
+    }
+
+    ASTExpr::ExprKind IdentifierExpr::expr_kind() const {
+       return ExprKind::EXPR_LVALUE;
+    }
+
+    /*** TYPE EQUALITY ***/
+    bool BasicType::TypeEq(const ASTType *other) const {
+       const BasicType *basic_other = dynamic_cast<const BasicType *>(other);
+       if (basic_other == nullptr) {
+          return false;
+       } else {
+          return this->type_spec() == basic_other->type_spec();
+       }
+    }
+
+    bool PointerType::TypeEq(const ASTType *other) const {
+       const PointerType *ptr_other = dynamic_cast<const PointerType *>(other);
+       if (ptr_other == nullptr) {
+          return false;
+       } else {
+          return this->depth() == ptr_other->depth() && pointee()->TypeEq(ptr_other->pointee());
+       }
+    }
+
+    bool FunctionType::TypeEq(const ASTType *other) const {
+       const FunctionType *fn_other = dynamic_cast<const FunctionType *>(other);
+       if (fn_other == nullptr) {
+          return false;
+       } else {
+          return return_type()->TypeEq(fn_other->return_type()) &&
+             params()->TypeEq(fn_other->params());
+       }
+    }
+
+    bool Types::TypeEq(const Types *others) const {
+       if (this->vec_.size() != others->vec_.size()) {
+          return false;
+       }
+    
+       for (auto this_it = this->vec_.begin(), others_it = others->vec_.begin();
+            this_it != this->vec_.end();
+            ++this_it, ++others_it) {
+          if (!(*this_it)->TypeEq(*others_it)) {
+             return false;
+          }
+       }
+    
+       return true;
+    }
+
+    /*** TYPE COERCION ***/
+    bool BasicType::TypeCoerce(const ASTType *from) const {
+       const BasicType *basic_from = dynamic_cast<const BasicType *>(from);
+       if (basic_from == nullptr) {
+          return false;
+       } else {
+          return IsIntegral(this->type_spec()) && IsIntegral(basic_from->type_spec());
+      }
    }
-   
-   ASTDeclarator *PointerDeclarator::Dereference() {
-      if (depth_ == 1) {
-         return declarator_; /* no longer a pointer */
+
+   bool PointerType::TypeCoerce(const ASTType *from) const {
+      /* -1. Check if types are equal. */
+      if (this->TypeEq(from)) {
+         return true;
       }
       
-      return PointerDeclarator::Create(depth_ - 1, declarator_, loc_);
-   }
-
-   /*** ADDRESS OF ***/
-   Decl *Decl::Address() {
-      ASTDeclarator *new_declarator = declarator()->Address();
-      if (new_declarator == nullptr) {
-         return nullptr;
-      }
-
-      return Decl::Create(specs_, new_declarator, loc_);
-   }
-
-   ASTDeclarator *PointerDeclarator::Address() {
-      return PointerDeclarator::Create(depth_ + 1, declarator_, loc_);
-   }
-
-   ASTDeclarator *BasicDeclarator::Address() {
-      return PointerDeclarator::Create(1, this, loc_);
-   }
-
-   /*** EXPRESSION KIND (LVALUE or RVALUE) ***/
-   ASTExpr::ExprKind AssignmentExpr::expr_kind() const {
-      /* assignments always produce rvalues */
-      return ExprKind::EXPR_RVALUE;
-   }
-
-   ASTExpr::ExprKind UnaryExpr::expr_kind() const {
-      switch (kind_) {
-      case Kind::UOP_ADDR:
-         return ExprKind::EXPR_RVALUE;
-         
-      case Kind::UOP_DEREFERENCE:
-         return ExprKind::EXPR_LVALUE;
-         
-      case Kind::UOP_POSITIVE:
-      case Kind::UOP_NEGATIVE:
-      case Kind::UOP_BITWISE_NOT:
-      case Kind::UOP_LOGICAL_NOT:
-         return ExprKind::EXPR_RVALUE;
-      }
-   }
-
-   ASTExpr::ExprKind BinaryExpr::expr_kind() const {
-      switch (kind_) {
-      case Kind::BOP_LOGICAL_AND:
-      case Kind::BOP_BITWISE_AND:
-      case Kind::BOP_LOGICAL_OR:
-      case Kind::BOP_BITWISE_OR:
-      case Kind::BOP_BITWISE_XOR:
-      case Kind::BOP_EQ:
-      case Kind::BOP_NEQ:
-      case Kind::BOP_LT:
-      case Kind::BOP_LEQ:
-      case Kind::BOP_GT:
-      case Kind::BOP_GEQ:
-      case Kind::BOP_PLUS:
-      case Kind::BOP_MINUS:
-      case Kind::BOP_TIMES:
-      case Kind::BOP_DIVIDE:
-      case Kind::BOP_MOD:
-         return ExprKind::EXPR_RVALUE;
-      }
-   }
-
-   ASTExpr::ExprKind LiteralExpr::expr_kind() const {
-      return ExprKind::EXPR_RVALUE;
-   }
-
-   ASTExpr::ExprKind StringExpr::expr_kind() const {
-      return ExprKind::EXPR_RVALUE;
-   }
-
-   ASTExpr::ExprKind IdentifierExpr::expr_kind() const {
-      return ExprKind::EXPR_LVALUE;
-   }
-
-   /*** TYPE EQUALITY ***/
-   bool Decl::TypeEq(const Decl *other) const {
-      return specs()->TypeEq(other->specs()) && declarator()->TypeEq(other->declarator());
-   }
-
-   bool DeclSpecs::TypeEq(const DeclSpecs *other) const {
-      return this->type_spec() == other->type_spec();
-   }
-
-   bool PointerDeclarator::TypeEq(const ASTDeclarator *other) const {
-      const PointerDeclarator *other_ = dynamic_cast<const PointerDeclarator *>(other);
-      if (other_ == nullptr) {
-         return false;
+      /* 0. Verify `from' is a pointer. */
+      const PointerType *from_ptr = dynamic_cast<const PointerType *>(from);
+      if (from_ptr == nullptr) {
+         return false; /* can never implicitly cast from non-pointer type to pointer type */
       }
       
-      if (this->depth_ != other_->depth_) {
-         return false;
-      }
-
-      return declarator()->TypeEq(other_->declarator());
-   }
-
-   bool BasicDeclarator::TypeEq(const ASTDeclarator *other) const {
-      const BasicDeclarator *other_ = dynamic_cast<const BasicDeclarator *>(other);
-      if (other_ == nullptr) {
-         return false;
-      }
-      
-      return true; /* base case */
-   }
-
-   bool FunctionDeclarator::TypeEq(const ASTDeclarator *other) const {
-      const FunctionDeclarator *other_ = dynamic_cast<const FunctionDeclarator *>(other);
-      if (other_ == nullptr) {
-         return false;
-      }
-      return declarator()->TypeEq(other_->declarator()) && params()->TypeEq(other_->params());
-   }
-
-   bool Decls::TypeEq(const Decls *other) const {
-      if (this->vec_.size() != other->vec_.size()) {
-         return false;
-      }
-
-      for (auto this_it = this->vec_.begin(), other_it = other->vec_.begin();
-           this_it != this->vec_.end();
-           ++this_it, ++other_it) {
-         if (!(*this_it)->TypeEq(*other_it)) {
-            return false;
+      /* 1. Check if coercing to 'void *'. */
+      ASTType *void_ptr = PointerType::Create(1,
+                                              BasicType::Create(TypeSpec::TYPE_VOID, loc()),
+                                              loc());
+      if (this->TypeEq(void_ptr)) {
+         /* Verify that pointer is basic (i.e. not a function). */
+         if (from_ptr->pointee()->kind() != Kind::TYPE_BASIC) {
+            return false; /* cannot cast from function pointer to void pointer */
+         } else {
+            return true; /* but you can cast any basic pointer to a void pointer. */
          }
       }
 
-      return true;
+      return false; /* cannot coerce since pointers are non-identical and `to' is not void ptr */
    }
-
-   bool Decls::TypeCoerce(const Decls *from) const {
+   
+   bool FunctionType::TypeCoerce(const ASTType *from) const {
       return TypeEq(from);
    }
 
-   /*** IMPLICIT TYPE COERCION ***/
-   bool Decl::TypeCoerce(const Decl *from) const {
-      if (declarator()->kind() == ASTDeclarator::Kind::DECLARATOR_POINTER) {
-         PointerDeclarator *ptr = dynamic_cast<PointerDeclarator *>(declarator());
+   /*** JOIN POINTERS ***/
+
+   void PointerDeclarator::JoinPointers() {
+      if (declarator()->kind() == Kind::DECLARATOR_POINTER) {
+         /* merge consecutive pointers */
+         PointerDeclarator *other_ptr = dynamic_cast<PointerDeclarator *>(declarator());
+         depth_ += other_ptr->depth_;
+         declarator_ = other_ptr->declarator_;
+      }
+
+      declarator()->JoinPointers();
+   }
+
+   void FunctionDeclarator::JoinPointers() {
+      declarator()->JoinPointers();
+      params()->JoinPointers();
+   }
+
+   void Decls::JoinPointers() {
+      std::for_each(vec_.begin(), vec_.end(),
+                    [](Decl *decl) {
+                       decl->JoinPointers();
+                    });
+   }
+
+   void Decl::JoinPointers() {
+      declarator()->JoinPointers();
+   }
+
+   ASTType *BasicDeclarator::Type(ASTType *type) const {
+      return type;
+   }
+
+   /* This is so fucking confusing. */
+   ASTType *PointerDeclarator::Type(ASTType *type) const {
+      switch (declarator()->kind()) {
+      case Kind::DECLARATOR_BASIC:
+         /* basic pointer */
+         return PointerType::Create(depth(), declarator()->Type(type), loc());
          
-         /* If type spec is VOID, then verify _from_ is pointer */
-         if (specs()->type_spec() == TypeSpec::TYPE_VOID &&
-             ptr->depth() == 1 &&
-             ptr->declarator()->kind() == ASTDeclarator::Kind::DECLARATOR_BASIC &&
-             from->declarator()->kind() == ASTDeclarator::Kind::DECLARATOR_POINTER) {
-            return true;
-         }
+      case Kind::DECLARATOR_POINTER:
+         /* this shouldn't happen */
+         abort();
+         
+      case Kind::DECLARATOR_FUNCTION:
+         /* tricky: pointer is actualy part of the return value type */
+         return declarator()->Type(PointerType::Create(depth(), type, loc()));
+      }
+   }
 
-         /* otherwise, require strict type equality */
-         return specs()->TypeEq(from->specs()) && declarator()->TypeEq(from->declarator());
+   ASTType *FunctionDeclarator::Type(ASTType *type) const {
+      /* NOTE: _type_ represents the (possibly partial) return value of this function. */
+      Types *param_types = params()->Type();
+
+      /* WHOA -- if this works, it's beautiful. */
+      switch (declarator()->kind()) {
+      case Kind::DECLARATOR_BASIC:
+         return FunctionType::Create(type, param_types, loc());
+         
+      case Kind::DECLARATOR_POINTER:
+         /* Actually a function pointer -- but primarily a pointer. */
+         return declarator()->Type(FunctionType::Create(type, param_types, loc()));
+         
+      case Kind::DECLARATOR_FUNCTION:
+         /* This function is actually the RETURN TYPE of another function declared
+          * _declarator()_. */
+         return declarator()->Type(FunctionType::Create(type, param_types, loc()));
+      }
+   }
+
+   ASTType *Decl::Type() const {
+      ASTType *init_type = BasicType::Create(specs()->type_spec(), loc());
+      return declarator()->Type(init_type);
+   }
+
+   Types *Decls::Type() const {
+      Types::Vec type_vec(vec_.size());
+      std::transform(vec_.begin(), vec_.end(), type_vec.begin(),
+                     [](Decl *decl) -> ASTType * {
+                        return decl->Type();
+                     });
+      return Types::Create(type_vec, loc());
+   }
+
+
+   /*** ADDRESS OF TYPE ***/
+   ASTType *BasicType::Address() {
+      return PointerType::Create(1, this, loc());
+   }
+
+   ASTType *PointerType::Address() {
+      return PointerType::Create(depth() + 1, pointee(), loc());
+   }
+
+   ASTType *FunctionType::Address() {
+      return this;
+   }
+
+   /*** DEREFERENCE TYPE ***/
+   ASTType *BasicType::Dereference(SemantEnv *env) {
+      if (env) {
+         env->error()(g_filename, this) << "cannot derereference type" << std::endl;
+      }
+
+      return nullptr;
+   }
+
+   ASTType *PointerType::Dereference(SemantEnv *env) {
+      if (depth() == 1) {
+         return pointee();
       } else {
-         return specs()->TypeCoerce(from->specs()) && declarator()->TypeCoerce(from->declarator());
+         return PointerType::Create(depth() - 1, pointee(), loc());
       }
    }
 
-   bool DeclSpecs::TypeCoerce(const DeclSpecs *from) const {
-      return ::zc::TypeCoerce(this->type_spec(), from->type_spec());
+   ASTType *FunctionType::Dereference(SemantEnv *env) {
+      return this; /* function types are infinitely dereferencable */
    }
 
-   bool TypeCoerce(TypeSpec to, TypeSpec from) {
-      if (to == TypeSpec::TYPE_VOID) {
-         return true;
-      }
-
-      if (IsIntegral(to) && IsIntegral(from)) {
-         return true;
-      }
-
-      return false;
+   /*** COMBINE ***/
+   BasicType *BasicType::Max(const BasicType *with) const {
+      return BasicType::Create(::zc::Max(this->type_spec(), with->type_spec()), loc());
    }
 
-   bool PointerDeclarator::TypeCoerce(const ASTDeclarator *from) const {
-      if (from->kind() != Kind::DECLARATOR_POINTER) {
-         return false;
-      }
-
-      const PointerDeclarator *from_ = dynamic_cast<const PointerDeclarator *>(from);
-      if (this->depth_ != from_->depth_) {
-         return false;
-      }
-
-      return declarator()->TypeCoerce(from_->declarator());
-   }
-
-   bool FunctionDeclarator::TypeCoerce(const ASTDeclarator *from) const {
-      if (from->kind() != Kind::DECLARATOR_FUNCTION) {
-         return false;
-      }
-
-      const FunctionDeclarator *from_ = dynamic_cast<const FunctionDeclarator *>(from);
-      return declarator()->TypeCoerce(from_->declarator()) && params()->TypeCoerce(from_->params());
-   }
-   
 }

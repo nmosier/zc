@@ -14,6 +14,7 @@ namespace zc {
    class ASTNode;
    template <class Node, const char *name> class ASTNodeVec;
    template <class Spec, const char *name> class ASTSpecs;
+   class ASTType;
    
    class TranslationUnit;
    class Decl;

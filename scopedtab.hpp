@@ -81,8 +81,8 @@ namespace zc {
      * @return value
      */
     Value* AddToScope(const Key& key, Value* value) {
-      if (scopes_.empty()) {
-        EnterScope();
+       if (scopes_.empty()) {
+         EnterScope();
       }
       auto r = scopes_.front().emplace(key, value);
       if (!r.second) {

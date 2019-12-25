@@ -6,6 +6,7 @@
 #define __AST_DECL_HPP
 
 #include "ast/ast-base.hpp"
+#include "ast/ast-type.hpp"
 
 namespace zc {
 
@@ -46,39 +47,21 @@ namespace zc {
       ASTDeclarator *declarator() const { return declarator_; }
       Identifier *id() const;
 
-      enum class Kind {DECL_VOID,
-                       DECL_INTEGRAL,
-                       DECL_POINTER,
-                       DECL_FUNCTION,
-      };
-      Kind kind() const;
-                       
-      
       static Decl *Create(DeclSpecs *specs, ASTDeclarator *declarator, const SourceLoc& loc) {
          return new Decl(specs, declarator, loc);
       }
 
       virtual void DumpNode(std::ostream& os) const override { os << "Decl"; }
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
+      virtual void DumpType(std::ostream& os) const override;
 
-      /** Print type in C-language-like format
-       * @see ASTExpr::DumpType() 
-       */
-      void DumpType(std::ostream& os) const;
-      
       virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
-      bool TypeEq(const Decl *other) const;
-      bool TypeCoerce(const Decl *from) const;
 
-      /** Obtain dereferenced type.
-       * @return dereferenced type on success; nullptr if not dereferencable.
+      /** Convert declaration to type.
        */
-      Decl *Dereference();
+      ASTType *Type() const;
 
-      /** Obtain address type.
-       * @return address type
-       */
-      Decl *Address();
+      void JoinPointers();
 
    protected:
       DeclSpecs *specs_;
@@ -94,11 +77,13 @@ namespace zc {
       static Decls *Create(const SourceLoc& loc) { return new Decls(loc); }
 
       virtual void DumpNode(std::ostream& os) const override { os << "Decls"; }
-      void DumpType(std::ostream& os) const;
 
       virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
       bool TypeEq(const Decls *other) const;
       bool TypeCoerce(const Decls *from) const;
+      Types *Type() const;
+
+      void JoinPointers();
       
    protected:
       Decls(const SourceLoc& loc): ASTNode(loc), ASTNodeVec<Decl,Decls_s>(loc),
@@ -111,7 +96,9 @@ namespace zc {
    public:
       static TypeSpecs *Create(const SourceLoc& loc) { return new TypeSpecs(loc); }
       
-      TypeSpec TypeCombine(SemantEnv& env) const;
+      TypeSpec TypeCombine() const;
+      TypeSpec TypeCombine(SemantEnv *env) const;
+      
       virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
       
    protected:
@@ -121,39 +108,27 @@ namespace zc {
 
    class DeclSpecs: public ASTNode {
    public:
-      TypeSpecs *type_specs() const { return std::get<TypeSpecs *>(type_spec_variant_); }
-      TypeSpec type_spec() const {
-         return std::get<TypeSpec>(type_spec_variant_);
-      }
+      TypeSpecs *type_specs() const { return type_specs_; }
+      TypeSpec type_spec() const { return type_specs()->TypeCombine(); }
 
       static DeclSpecs *Create(const SourceLoc& loc) { return new DeclSpecs(loc); }
-      static DeclSpecs *Create(TypeSpec type_spec, const SourceLoc& loc) {
-         return new DeclSpecs(type_spec, loc);
-      }
 
       virtual void DumpNode(std::ostream& os) const override { os << "DeclSpecs"; }
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
-      void DumpType(std::ostream& os) const;
 
       virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
       bool TypeEq(const DeclSpecs *other) const;
       bool TypeCoerce(const DeclSpecs *from) const;
 
-
    protected:
-      typedef std::variant<TypeSpec,TypeSpecs *> TypeSpecVariant;      
-      TypeSpecVariant type_spec_variant_;
+      TypeSpecs *type_specs_;
       
-      DeclSpecs(const SourceLoc& loc): ASTNode(loc), type_spec_variant_(TypeSpecs::Create(loc)) {}
-      DeclSpecs(TypeSpec type_spec, const SourceLoc& loc): ASTNode(loc),
-                                                           type_spec_variant_(type_spec) {}
+      DeclSpecs(const SourceLoc& loc): ASTNode(loc), type_specs_(TypeSpecs::Create(loc)) {}
    };
 
    
    std::ostream& operator<< (std::ostream& os, TypeSpec spec);
 
-   bool TypeCoerce(TypeSpec to, TypeSpec from);
-   
    class ASTDeclarator: public ASTNode {
    public:
       /** The fundamental kind of declarator. */
@@ -163,17 +138,45 @@ namespace zc {
       virtual Identifier *id() const = 0;
       virtual Kind kind() const = 0;
 
-      virtual void DumpType(std::ostream& os) const = 0;
-      
-      virtual bool TypeEq(const ASTDeclarator *other) const = 0;
-      virtual bool TypeCoerce(const ASTDeclarator *from) const = 0;
-      
-      virtual ASTDeclarator *Dereference() = 0;
-      virtual ASTDeclarator *Address() = 0;
+      virtual ASTType *Type(ASTType *init_type) const = 0; 
+
+      /** Unwrap a type during Decl -> Type conversion. */
+      virtual void JoinPointers() = 0;      
       
    protected:
+      
       ASTDeclarator(const SourceLoc& loc): ASTNode(loc) {}
    };
+
+   
+   class BasicDeclarator: public ASTDeclarator {
+   public:
+      virtual Identifier *id() const override { return id_; }
+      virtual Kind kind() const override { return Kind::DECLARATOR_BASIC; }
+
+      static BasicDeclarator *Create(Identifier *id, const SourceLoc& loc) {
+         return new BasicDeclarator(id, loc);
+      }
+
+      virtual void DumpNode(std::ostream& os) const override { os << "BasicDeclarator"; }
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
+
+      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override {
+         /* redefinition checked by Decl */
+      }
+
+      virtual ASTType *Type(ASTType *init_type) const override;
+
+      virtual void JoinPointers() override { /* base case */ }
+      
+   protected:
+      Identifier *id_;
+
+      
+      BasicDeclarator(Identifier *id, const SourceLoc& loc):
+         ASTDeclarator(loc), id_(id) {}
+   };
+
 
    class PointerDeclarator: public ASTDeclarator {
    public:
@@ -189,51 +192,21 @@ namespace zc {
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {
          declarator_->Dump(os, level, with_types);
       }
-      virtual void DumpType(std::ostream& os) const override;
 
       virtual void TypeCheck(SemantEnv& env, bool scoped = true) override {
          declarator()->TypeCheck(env);
       }
-      virtual bool TypeEq(const ASTDeclarator *other) const override;
-      virtual bool TypeCoerce(const ASTDeclarator *other) const override;
-
-      virtual ASTDeclarator *Dereference() override;
-      virtual ASTDeclarator *Address() override;
       
+      virtual ASTType *Type(ASTType *init_type) const override;
+      
+      virtual void JoinPointers() override;
+
    protected:
       int depth_;
       ASTDeclarator *declarator_;
+
       PointerDeclarator(int depth, ASTDeclarator *declarator, const SourceLoc& loc):
          ASTDeclarator(loc), depth_(depth), declarator_(declarator) {}
-   };
-
-   class BasicDeclarator: public ASTDeclarator {
-   public:
-      virtual Identifier *id() const override { return id_; }
-      virtual Kind kind() const override { return Kind::DECLARATOR_BASIC; }
-
-      static BasicDeclarator *Create(Identifier *id, const SourceLoc& loc) {
-         return new BasicDeclarator(id, loc);
-      }
-
-      virtual void DumpNode(std::ostream& os) const override { os << "BasicDeclarator"; }
-      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
-      virtual void DumpType(std::ostream& os) const override;
-
-      virtual void TypeCheck(SemantEnv& env, bool scoped = true) override {
-         /* redefinition checked by Decl */
-      }
-      virtual bool TypeEq(const ASTDeclarator *other) const override;
-      virtual bool TypeCoerce(const ASTDeclarator *from) const override {
-         return TypeEq(from);
-      }      
-      virtual ASTDeclarator *Dereference() override { return nullptr; }
-      virtual ASTDeclarator *Address() override;
-      
-   protected:
-      Identifier *id_;
-      BasicDeclarator(Identifier *id, const SourceLoc& loc):
-         ASTDeclarator(loc), id_(id) {}
    };
 
    class FunctionDeclarator: public ASTDeclarator {
@@ -250,17 +223,17 @@ namespace zc {
 
       virtual void DumpNode(std::ostream& os) const override { os << "FunctionDeclarator"; }
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
-      virtual void DumpType(std::ostream& os) const override;
 
       virtual void TypeCheck(SemantEnv& env, bool scoped = true) override;
-      virtual bool TypeEq(const ASTDeclarator *other) const override;
-      virtual bool TypeCoerce(const ASTDeclarator *other) const override;      
-      virtual ASTDeclarator *Dereference() override { return this; }
-      virtual ASTDeclarator *Address() override { return this; }
+      
+      virtual ASTType *Type(ASTType *init_type) const override;
+      
+      virtual void JoinPointers() override;
       
    protected:
       ASTDeclarator *declarator_;
       Decls *params_;
+
       FunctionDeclarator(ASTDeclarator *declarator, Decls *params, const SourceLoc& loc):
          ASTDeclarator(loc), declarator_(declarator), params_(params) {}
    };

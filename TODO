@@ -15,3 +15,6 @@ SEMANTIC ANALYSIS
 [ ] `long long int` -> `LONG`, not `LONG_LONG`
 [ ] print annotated types
 [ ] type serialization for easy equality check
+[ ] Convert Decl to ASTType
+[ ] rewrite DeclSpecs to return TypeSpecs converted to single TypeSpec.
+[ ] Handle function to function pointer TypeCoercion edge cases.

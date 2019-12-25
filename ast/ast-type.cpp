@@ -30,5 +30,30 @@ namespace zc {
       }
       return lhs; // LONG_LONG
    }
-   
+
+   void BasicType::DumpNode(std::ostream& os) const {
+      os << type_spec();
+   }
+
+   void PointerType::DumpNode(std::ostream& os) const {
+      os << "* ";
+      pointee()->DumpNode(os);      
+   }
+
+   void FunctionType::DumpNode(std::ostream& os) const {
+      os << "(";
+      return_type()->DumpNode(os);
+      os << ")";
+      os << "(";
+      params()->DumpNode(os);
+      os << ")";
+   }
+
+   void Types::DumpNode(std::ostream& os) const {
+      std::for_each(vec_.begin(), vec_.end(),
+                    [&](const ASTType *type) {
+                       type->DumpNode(os);
+                       os << ", ";
+                    });
+   }
 }

@@ -3,26 +3,6 @@
 
 namespace zc {
 
-   Decl::Kind Decl::kind() const {
-      TypeSpec spec_kind = specs()->type_spec();
-      ASTDeclarator::Kind declarator_kind = declarator()->kind();
-
-      switch (declarator_kind) {
-      case ASTDeclarator::Kind::DECLARATOR_BASIC:
-         if (IsIntegral(spec_kind)) {
-            return Kind::DECL_INTEGRAL;
-         } else {
-            return Kind::DECL_VOID;
-         }
-         
-      case ASTDeclarator::Kind::DECLARATOR_POINTER:
-         return Kind::DECL_POINTER;
-         
-      case ASTDeclarator::Kind::DECLARATOR_FUNCTION:
-         return Kind::DECL_FUNCTION;
-      }
-   }
-   
    void FunctionDef::DumpNode(std::ostream& os) const { os << "FunctionDef"; }
    void FunctionDef::DumpChildren(std::ostream& os, int level, bool with_types) const {
       decl()->Dump(os, level, with_types);
@@ -65,53 +45,13 @@ namespace zc {
    }
    
    void DeclSpecs::DumpChildren(std::ostream& os, int level, bool with_types) const {
-      std::visit(visitor([&](TypeSpec spec) { indent(os, level); os << spec << std::endl; },
-                         [&](TypeSpecs *specs) { specs->Dump(os, level, with_types); }
-                         ),
-                 type_spec_variant_);
+      type_specs()->Dump(os, level, with_types);
+   }
+
+   void Decl::DumpType(std::ostream& os) const {
+      Type()->DumpNode(os);
    }
 
    Identifier *Decl::id() const { return declarator_->id(); }
 
-   void Decl::DumpType(std::ostream& os) const {
-      specs()->DumpType(os);
-      os << " ";
-      declarator()->DumpType(os);
-   }
-
-   void DeclSpecs::DumpType(std::ostream& os) const {
-      os << type_spec();
-   }
-
-   void PointerDeclarator::DumpType(std::ostream& os) const {
-      for (int i = 0; i < depth(); ++i) {
-         os << '*';
-      }
-
-      os << ' ';
-      declarator_->DumpType(os);
-   }
-
-   void BasicDeclarator::DumpType(std::ostream& os) const {
-      /* base case -- omit identifier, so nothing to print */
-   }
-
-   void FunctionDeclarator::DumpType(std::ostream& os) const {
-      declarator()->DumpType(os);
-      os << " (*)";
-      params()->DumpType(os);
-   }
-
-   void Decls::DumpType(std::ostream& os) const {
-      os << '(';
-      for (auto i = vec_.size(); i > 0; --i) {
-         vec_[i]->DumpType(os);
-         if (i > 1) {
-            os << ", ";
-         }
-      }
-      os << ')';
-         
-   }
-   
 }
