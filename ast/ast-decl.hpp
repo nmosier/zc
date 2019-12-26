@@ -88,9 +88,9 @@ namespace zc {
 
       virtual void DumpNode(std::ostream& os) const override { os << "Decls"; }
 
-      virtual void TypeCheck(SemantEnv& env) override { TypeCheck(env, false); }
-      void TypeCheck(SemantEnv& env, bool abstract) {
-         ASTNodeVec<Decl,Decls_s>::TypeCheck(env, abstract);
+      virtual void TypeCheck(SemantEnv& env) override { TypeCheck(env, 1); }
+      void TypeCheck(SemantEnv& env, int level) {
+         ASTNodeVec<Decl,Decls_s>::TypeCheck(env, level);
       }
       bool TypeEq(const Decls *other) const;
       bool TypeCoerce(const Decls *from) const;

@@ -80,7 +80,18 @@ namespace zc {
    }
 
    void FunctionType::TypeCheck(SemantEnv& env) {
-      /* NOTE: function's don't need to have complete return types (i.e. they can be 'void'. */
+      /* NOTE: function's don't need to have complete return types (i.e. they can be 'void').
+       * Therefore, we need not type-check the function's return type.
+       */
+
+      /* Functions cannot return functions, only function pointers. Verify this: */
+      if (return_type()->kind() == Kind::TYPE_FUNCTION) {
+         env.error()(g_filename, this) << "functions cannot return other functions, "
+                                       << "only function pointers" << std::endl;
+         /* error recovery: transform return type into function */
+         return_type_ = PointerType::Create(1, return_type(), return_type()->loc());
+      }
+      
       params()->TypeCheck(env);
    }
 
@@ -124,12 +135,12 @@ namespace zc {
    }
 
    void FunctionDeclarator::TypeCheck(SemantEnv& env, int level) {
-      declarator()->TypeCheck(env, level);
-      params()->TypeCheck(env, level);
+      declarator()->TypeCheck(env, level - 1);
+      params()->TypeCheck(env, (level == 2) ? 1 : 0);
    }
 
    void FunctionDef::TypeCheck(SemantEnv& env) {
-      decl()->TypeCheck(env, false); /* not abstract -- enter types in scoped symbol table */
+      decl()->TypeCheck(env, 2);          /* not abstract -- enter types in scoped symbol table */
       env.symtab().EnterScope();          /* push scope for fn body */
       comp_stat()->TypeCheck(env, false); /* function body doesn't get new scope */
       env.symtab().ExitScope();           /* pop scope */
