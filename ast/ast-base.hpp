@@ -51,7 +51,6 @@ namespace zc {
       }
 
       virtual void DumpNode(std::ostream& os) const override { os << name; }
-      
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {
          for (const Node *node : vec_) {
             node->Dump(os, level, with_types);

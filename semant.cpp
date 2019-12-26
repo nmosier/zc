@@ -1,150 +1,149 @@
-#include <optional>
+ #include <optional>
 
-#include "ast.hpp"
-#include "symtab.hpp"
-#include "semant.hpp"
+ #include "ast.hpp"
+ #include "symtab.hpp"
+ #include "semant.hpp"
 
-extern const char *g_filename;
+ extern const char *g_filename;
 
-namespace zc {
+ namespace zc {
 
-   bool g_semant_debug = false;
-   SemantError g_semant_error(std::cerr);
+    bool g_semant_debug = false;
+    SemantError g_semant_error(std::cerr);
 
-   void Semant(TranslationUnit *root) {
-      SemantEnv env(g_semant_error);
-      root->TypeCheck(env);
+    void Semant(TranslationUnit *root) {
+       SemantEnv env(g_semant_error);
+       root->TypeCheck(env);
+    }
+
+    std::ostream& SemantError::operator()(const char *filename, const ASTNode *node) {
+       errors_++;
+       os_ << filename << ":" << node->loc() << ": ";
+       return os_;
+    }
+
+    TypeSpec TypeSpecs::TypeCombine() const {
+       return TypeCombine(nullptr);
+    }
+
+    TypeSpec TypeSpecs::TypeCombine(SemantEnv *env) const {
+       auto specs = specs_;
+    
+       /* check if any specs given */
+       if (specs.size() == 0) {
+          if (env) {
+             env->error()(g_filename, this) << "declaration missing type specifier" << std::endl;
+          }
+          return TypeSpec::TYPE_INT;
+       }
+
+       /* reduce long long -> long_long */
+       if (specs.count(TypeSpec::TYPE_LONG) == 2) {
+          auto p = specs_.equal_range(TypeSpec::TYPE_LONG);
+          specs.erase(p.first, p.second);
+          specs.insert(TypeSpec::TYPE_LONG_LONG);
+       }
+
+       /* remove redundant INT */
+       std::array<TypeSpec,3> int_compat = {TypeSpec::TYPE_SHORT, TypeSpec::TYPE_LONG,
+                                            TypeSpec::TYPE_LONG_LONG};
+       if (specs.find(TypeSpec::TYPE_INT) != specs.end() && specs.size() >= 2 &&
+           std::any_of(int_compat.begin(), int_compat.end(),
+                       [&](TypeSpec spec) {
+                          return specs.find(spec) != specs.end();
+                       })) {
+          specs.erase(specs.find(TypeSpec::TYPE_INT)); /* remove exactly one INT */
+       }
+
+       /* NOTE: There should now only be one type left, any of VOID, CHAR, SHORT, INT, LONG, LL. */
+       /* check for extraneous types */
+       if (specs.size() != 1) {
+          if (env) {
+             env->error()(g_filename, this) << "too many or incompatible type specifiers given"
+                                            << std::endl;
+          }
+       }
+
+       return *specs.begin();
+    }
+
+    /*** TYPE CHECK ***/
+
+    void BasicType::TypeCheck(SemantEnv& env) {
+       if (type_spec() == TypeSpec::TYPE_VOID) {
+          env.error()(g_filename, this) << "incomplete type 'void'" << std::endl;
+       }
+    }
+
+    void PointerType::TypeCheck(SemantEnv& env) {
+       pointee()->TypeCheck(env);
+    }
+
+    void FunctionType::TypeCheck(SemantEnv& env) {
+       /* NOTE: function's don't need to have complete return types (i.e. they can be 'void').
+        * Therefore, we need not type-check the function's return type.
+        */
+
+       /* Functions cannot return functions, only function pointers. Verify this: */
+       if (return_type()->kind() == Kind::TYPE_FUNCTION) {
+          env.error()(g_filename, this) << "functions cannot return other functions, "
+                                        << "only function pointers" << std::endl;
+          /* error recovery: transform return type into function */
+          return_type_ = PointerType::Create(1, return_type(), return_type()->loc());
+       }
+    
+       params()->TypeCheck(env);
+    }
+
+    void Types::TypeCheck(SemantEnv& env) {
+       ASTNodeVec::TypeCheck(env);
+    }
+ 
+    void TranslationUnit::TypeCheck(SemantEnv& env) {
+       env.symtab().EnterScope();
+       decls()->TypeCheck(env);
+    }
+
+    void DeclSpecs::TypeCheck(SemantEnv& env) {
+       type_specs()->TypeCheck(env);
+    }
+
+    void TypeSpecs::TypeCheck(SemantEnv& env) {
+       /* make sure all type specifiers present are compatible */
+       TypeCombine(&env);
+    }
+
+    void Decl::TypeCheck(SemantEnv& env, bool enscope) {
+       specs()->TypeCheck(env);
+       declarator()->TypeCheck(env);
+       
+       if (enscope) {
+          Enscope(env);
+       }
    }
 
-   std::ostream& SemantError::operator()(const char *filename, const ASTNode *node) {
-      errors_++;
-      os_ << filename << ":" << node->loc() << ": ";
-      return os_;
-   }
-
-   TypeSpec TypeSpecs::TypeCombine() const {
-      return TypeCombine(nullptr);
-   }
-
-   TypeSpec TypeSpecs::TypeCombine(SemantEnv *env) const {
-      auto specs = specs_;
-      
-      /* check if any specs given */
-      if (specs.size() == 0) {
-         if (env) {
-            env->error()(g_filename, this) << "declaration missing type specifier" << std::endl;
-         }
-         return TypeSpec::TYPE_INT;
-      }
-
-      /* reduce long long -> long_long */
-      if (specs.count(TypeSpec::TYPE_LONG) == 2) {
-         auto p = specs_.equal_range(TypeSpec::TYPE_LONG);
-         specs.erase(p.first, p.second);
-         specs.insert(TypeSpec::TYPE_LONG_LONG);
-      }
-
-      /* remove redundant INT */
-      std::array<TypeSpec,3> int_compat = {TypeSpec::TYPE_SHORT, TypeSpec::TYPE_LONG,
-                                           TypeSpec::TYPE_LONG_LONG};
-      if (specs.find(TypeSpec::TYPE_INT) != specs.end() && specs.size() >= 2 &&
-          std::any_of(int_compat.begin(), int_compat.end(),
-                      [&](TypeSpec spec) {
-                         return specs.find(spec) != specs.end();
-                      })) {
-         specs.erase(specs.find(TypeSpec::TYPE_INT)); /* remove exactly one INT */
-      }
-
-      /* NOTE: There should now only be one type left, any of VOID, CHAR, SHORT, INT, LONG, LL. */
-      /* check for extraneous types */
-      if (specs.size() != 1) {
-         if (env) {
-            env->error()(g_filename, this) << "too many or incompatible type specifiers given"
-                                           << std::endl;
-         }
-      }
-
-      return *specs.begin();
-   }
-
-   /*** TYPE CHECK ***/
-
-   void BasicType::TypeCheck(SemantEnv& env) {
-      if (type_spec() == TypeSpec::TYPE_VOID) {
-         env.error()(g_filename, this) << "incomplete type 'void'" << std::endl;
-      }
-   }
-
-   void PointerType::TypeCheck(SemantEnv& env) {
-      pointee()->TypeCheck(env);
-   }
-
-   void FunctionType::TypeCheck(SemantEnv& env) {
-      /* NOTE: function's don't need to have complete return types (i.e. they can be 'void').
-       * Therefore, we need not type-check the function's return type.
-       */
-
-      /* Functions cannot return functions, only function pointers. Verify this: */
-      if (return_type()->kind() == Kind::TYPE_FUNCTION) {
-         env.error()(g_filename, this) << "functions cannot return other functions, "
-                                       << "only function pointers" << std::endl;
-         /* error recovery: transform return type into function */
-         return_type_ = PointerType::Create(1, return_type(), return_type()->loc());
-      }
-      
-      params()->TypeCheck(env);
-   }
-
-   void Types::TypeCheck(SemantEnv& env) {
-      ASTNodeVec::TypeCheck(env);
-   }
-   
-   void TranslationUnit::TypeCheck(SemantEnv& env) {
-      env.symtab().EnterScope();
-      decls()->TypeCheck(env);
-   }
-
-   void DeclSpecs::TypeCheck(SemantEnv& env) {
-      type_specs()->TypeCheck(env);
-   }
-
-   void TypeSpecs::TypeCheck(SemantEnv& env) {
-      /* make sure all type specifiers present are compatible */
-      TypeCombine(&env);
-   }
-
-   void Decl::TypeCheck(SemantEnv& env, int level) {
-      specs()->TypeCheck(env);
-      declarator()->TypeCheck(env, level);
-
-      if (level > 0) {
-         /* check for previous declarations in scope */
-         Symbol *sym = id()->id();
-         if (env.symtab().Probe(sym) != nullptr) {
-            /* ERROR: symbol already defined in this scope. */
-            env.error()(g_filename, this) << "redefinition of '" << sym << "'" << std::endl;
-            return;
-         }
-         
-         ASTType *type = Type();
-         type->TypeCheck(env);
-         
-         /* add symbol to scope */
-         env.symtab().AddToScope(sym, type);
-      }
-   }
-
-   void FunctionDeclarator::TypeCheck(SemantEnv& env, int level) {
-      declarator()->TypeCheck(env, level - 1);
-      params()->TypeCheck(env, (level == 2) ? 1 : 0);
-   }
-
-   void FunctionDef::TypeCheck(SemantEnv& env) {
-      decl()->TypeCheck(env, 2);          /* not abstract -- enter types in scoped symbol table */
-      env.symtab().EnterScope();          /* push scope for fn body */
-      comp_stat()->TypeCheck(env, false); /* function body doesn't get new scope */
-      env.symtab().ExitScope();           /* pop scope */
-   }
+    void FunctionDeclarator::TypeCheck(SemantEnv& env) {
+       declarator()->TypeCheck(env);
+       params()->TypeCheck(env);
+    }
+    
+    void FunctionDef::TypeCheck(SemantEnv& env) {
+       /* type check and enscope function declaration */
+       decl()->TypeCheck(env, false);      /* enscope declaration */
+       
+       /* TODO */
+       
+       /* enscope functino parameters */
+       env.symtab().EnterScope();
+       FunctionDeclarator *fn = dynamic_cast<FunctionDeclarator *>(decl()->declarator());
+       Decls *params = fn->params();
+       
+       
+       env.symtab().EnterScope();          /* push scope for fn params */
+       comp_stat()->TypeCheck(env, false); /* function body doesn't get new scope */
+       env.symtab().ExitScope();           /* pop param scope */
+       env.symtab().ExitScope();           /* pop function scope */    
+    }
 
    void CompoundStat::TypeCheck(SemantEnv& env, bool scoped) {
       if (scoped) {
@@ -275,11 +274,6 @@ namespace zc {
       }
    }
 
-
-   
-   
-    /*** DEREFERENCE ***/
-   
 
     /*** EXPRESSION KIND (LVALUE or RVALUE) ***/
     ASTExpr::ExprKind AssignmentExpr::expr_kind() const {
@@ -548,4 +542,29 @@ namespace zc {
       return BasicType::Create(::zc::Max(this->type_spec(), with->type_spec()), loc());
    }
 
+    /*** ENSCOPE ***/
+
+    void Decl::Enscope(SemantEnv& env) const { 
+         /* check for previous declarations in scope */
+         Symbol *sym = id()->id();
+         if (env.symtab().Probe(sym) != nullptr) {
+            /* ERROR: symbol already defined in this scope. */
+            env.error()(g_filename, this) << "redefinition of '" << sym << "'" << std::endl;
+            return;
+         }
+         
+         ASTType *type = Type();
+         type->TypeCheck(env);
+         
+         /* add symbol to scope */
+         env.symtab().AddToScope(sym, type);
+    }
+    
+    void Decls::Enscope(SemantEnv& env) const {
+       for (const Decl *decl : vec_) {
+          decl->Enscope(env);
+       }
+    }
+
+    
 }

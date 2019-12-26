@@ -43,13 +43,12 @@ namespace zc {
       
    };
 
-
    class Decl: public ASTNode {
    public:
       DeclSpecs *specs() const { return specs_; }
       ASTDeclarator *declarator() const { return declarator_; }
       Identifier *id() const;
-
+      
       static Decl *Create(DeclSpecs *specs, ASTDeclarator *declarator, const SourceLoc& loc) {
          return new Decl(specs, declarator, loc);
       }
@@ -65,7 +64,8 @@ namespace zc {
        *        a level of 1 means declare function but not parameters; a level of 2 means
        *        declare function and parameters, etc.
        */
-      void TypeCheck(SemantEnv& env, int level); 
+      void TypeCheck(SemantEnv& env, bool abstract);
+      void Enscope(SemantEnv& env) const;
 
       /** Convert declaration to type.
        */
@@ -89,12 +89,13 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override { os << "Decls"; }
 
       virtual void TypeCheck(SemantEnv& env) override { TypeCheck(env, 1); }
-      void TypeCheck(SemantEnv& env, int level) {
-         ASTNodeVec<Decl,Decls_s>::TypeCheck(env, level);
+      void TypeCheck(SemantEnv& env, bool abstract) {
+         ASTNodeVec<Decl,Decls_s>::TypeCheck(env, abstract);
       }
       bool TypeEq(const Decls *other) const;
       bool TypeCoerce(const Decls *from) const;
       Types *Type() const;
+      void Enscope(SemantEnv& env) const;
 
       void JoinPointers();
       
@@ -158,7 +159,7 @@ namespace zc {
        * @param env semantic environment
        * @param level abstaction level. @see Decl::TypeCheck(Semantic&, int)
        */
-      virtual void TypeCheck(SemantEnv& env, int level) = 0;
+      virtual void TypeCheck(SemantEnv& env) = 0;
 
       /** Unwrap a type during Decl -> Type conversion. */
       virtual void JoinPointers() = 0;      
@@ -181,7 +182,7 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override { os << "BasicDeclarator"; }
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
 
-      virtual void TypeCheck(SemantEnv& env, int level) override {}
+      virtual void TypeCheck(SemantEnv& env) override {}
 
       virtual ASTType *Type(ASTType *init_type) const override;
 
@@ -211,8 +212,8 @@ namespace zc {
          declarator_->Dump(os, level, with_types);
       }
 
-      virtual void TypeCheck(SemantEnv& env, int level) override {
-         declarator()->TypeCheck(env, level);
+      virtual void TypeCheck(SemantEnv& env) override {
+         declarator()->TypeCheck(env);
       }
       
       virtual ASTType *Type(ASTType *init_type) const override;
@@ -242,7 +243,7 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override { os << "FunctionDeclarator"; }
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
 
-      virtual void TypeCheck(SemantEnv& env, int level) override;
+      virtual void TypeCheck(SemantEnv& env) override;
       
       virtual ASTType *Type(ASTType *init_type) const override;
       

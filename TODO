@@ -24,3 +24,6 @@ SEMANTIC ANALYSIS
 AST
 [ ] Add bindings of types to identifiers (TypeID, perhaps?)
 [ ] Transformations of AST at different stages
+[ ] Tagged Type (ASTTaggedType)
+    - current ASTType becomes specialization of ASTTaggedType
+    - ASTBoundType becomes ASTTaggedType<Symbol *>

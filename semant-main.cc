@@ -83,8 +83,11 @@ int main(int argc, char *argv[]) {
   }
 
   // Parse AST dump
-  yyparse();
-
+  if (yyparse()) {
+     std::cout << "parsing failed; terminating..." << std::endl;
+     exit(1);
+  }
+  
   zc::Semant(g_AST_root);
 
   g_AST_root->Dump(std::cout, 0, true); /* dump types as well */
