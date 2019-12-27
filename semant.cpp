@@ -113,7 +113,7 @@
     }
 
     void FunctionDef::TypeCheck(SemantEnv& env) {
-       ExternalDecl::TypeCheck(env);
+       decl()->TypeCheck(env);
        Enscope(env);
        comp_stat()->TypeCheck(env, false); /* function body doesn't get new scope */
        Descope(env);
