@@ -13,6 +13,7 @@ namespace zc {
                        TYPE_POINTER,
                        TYPE_FUNCTION};
       virtual Kind kind() const = 0;
+      virtual const Decl *decl() const { return decl_; }
 
       virtual bool is_integral() const = 0;
 
@@ -24,9 +25,19 @@ namespace zc {
 
       virtual ASTType *Address() = 0;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) = 0;
+
+      void Enscope(SemantEnv& env) const;
       
    protected:
-      ASTType(const SourceLoc& loc): ASTNode(loc) {}
+      /**
+       * Associated declaration.
+       */
+      const Decl *decl_;
+
+      ASTType(const SourceLoc& loc):
+         ASTNode(loc), decl_(nullptr) {}
+      ASTType(const Decl *decl, const SourceLoc& loc):
+         ASTNode(loc), decl_(decl) {}
    };
 
    class BasicType: public ASTType {
@@ -34,9 +45,10 @@ namespace zc {
       TypeSpec type_spec() const { return type_spec_; }
       virtual Kind kind() const override { return Kind::TYPE_BASIC; }
       virtual bool is_integral() const override { return IsIntegral(type_spec()); }
-      
-      static BasicType *Create(TypeSpec type_spec, const SourceLoc& loc) {
-         return new BasicType(type_spec, loc);
+
+      template <typename... Args>
+      static BasicType *Create(Args... args) {
+         return new BasicType(args...);
       }
 
       virtual void DumpNode(std::ostream& os) const override;
@@ -52,14 +64,19 @@ namespace zc {
        
    protected:
       TypeSpec type_spec_;
-      
-      BasicType(TypeSpec type_spec, const SourceLoc& loc): ASTType(loc), type_spec_(type_spec) {}
+
+      template <typename... Args>
+      BasicType(TypeSpec type_spec, Args... args):
+         ASTType(args...), type_spec_(type_spec) {}
    };
 
    const char Types_s[] = "ASTTypes";
    class Types: public ASTNodeVec<ASTType, Types_s> {
-   public:      
-      static Types *Create(Vec vec, const SourceLoc& loc) { return new Types(vec, loc); }
+   public:
+      template <typename... Args>
+      static Types *Create(Args... args) {
+         return new Types(args...);
+      }
 
       virtual void DumpNode(std::ostream& os) const override;
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
@@ -79,8 +96,9 @@ namespace zc {
       int depth() const { return depth_; }
       ASTType *pointee() const { return pointee_; }
 
-      static PointerType *Create(int depth, ASTType *pointee, const SourceLoc& loc) {
-         return new PointerType(depth, pointee, loc);
+      template <typename... Args>
+      static PointerType *Create(Args... args) {
+         return new PointerType(args...);
       }
 
       virtual void DumpNode(std::ostream& os) const override;
@@ -95,9 +113,10 @@ namespace zc {
    protected:
       int depth_;
       ASTType *pointee_;
-      
-      PointerType(int depth, ASTType *pointee, const SourceLoc& loc):
-         ASTType(loc), depth_(depth), pointee_(pointee) {}
+
+      template <typename... Args>
+      PointerType(int depth, ASTType *pointee, Args... args):
+         ASTType(args...), depth_(depth), pointee_(pointee) {}
    };
 
    class FunctionType: public ASTType {
@@ -107,9 +126,9 @@ namespace zc {
       ASTType *return_type() const { return return_type_; }
       Types *params() const { return params_; }
       
-      
-      static FunctionType *Create(ASTType *return_type, Types *params, const SourceLoc& loc) {
-         return new FunctionType(return_type, params, loc);
+      template <typename... Args>
+      static FunctionType *Create(Args... args) {
+         return new FunctionType(args...);
       }
 
       virtual void DumpNode(std::ostream& os) const override;
@@ -125,10 +144,9 @@ namespace zc {
       ASTType *return_type_;
       Types *params_;
 
-
-
-      FunctionType(ASTType *return_type, Types *params, const SourceLoc& loc):
-         ASTType(loc), return_type_(return_type), params_(params) {}
+      template <typename... Args>
+      FunctionType(ASTType *return_type, Types *params, Args... args):
+         ASTType(args...), return_type_(return_type), params_(params) {}
    };
 
 }

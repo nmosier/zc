@@ -24,6 +24,8 @@ namespace zc {
       }
 
       void TypeCheck(SemantEnv& env);
+      void Enscope(SemantEnv& env) const;
+      void Descope(SemantEnv& env) const;
       
    protected:
       ExternalDecls *decls_;

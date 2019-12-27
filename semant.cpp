@@ -13,7 +13,9 @@
 
     void Semant(TranslationUnit *root) {
        SemantEnv env(g_semant_error);
+       root->Enscope(env);
        root->TypeCheck(env);
+       root->Descope(env);
     }
 
     std::ostream& SemantError::operator()(const char *filename, const ASTNode *node) {
@@ -100,8 +102,9 @@
     }
  
     void TranslationUnit::TypeCheck(SemantEnv& env) {
-       env.symtab().EnterScope();
+       Enscope(env);
        decls()->TypeCheck(env);
+       Descope(env);
     }
 
     void DeclSpecs::TypeCheck(SemantEnv& env) {
@@ -113,14 +116,10 @@
        TypeCombine(&env);
     }
 
-    void Decl::TypeCheck(SemantEnv& env, bool enscope) {
+    void Decl::TypeCheck(SemantEnv& env) {
        specs()->TypeCheck(env);
        declarator()->TypeCheck(env);
-       
-       if (enscope) {
-          Enscope(env);
-       }
-   }
+    }
 
     void FunctionDeclarator::TypeCheck(SemantEnv& env) {
        declarator()->TypeCheck(env);
@@ -129,11 +128,12 @@
     
     void FunctionDef::TypeCheck(SemantEnv& env) {
        /* type check and enscope function declaration */
-       decl()->TypeCheck(env, false);      /* enscope declaration */
+        decl()->TypeCheck(env);
+        decl()->Enscope(env);
        
        /* TODO */
        
-       /* enscope functino parameters */
+       /* enscope function parameters */
        env.symtab().EnterScope();
        FunctionDeclarator *fn = dynamic_cast<FunctionDeclarator *>(decl()->declarator());
        Decls *params = fn->params();
@@ -268,7 +268,7 @@
 
    void IdentifierExpr::TypeCheck(SemantEnv& env) {
       if ((type_ = env.symtab().Lookup(id()->id())) == nullptr) {
-         env.error()(g_filename, this) << "use of undeclared identifier '" << id()->id()
+         env.error()(g_filename, this) << "use of undeclared identifier '" << *id()->id()
                                        << "'" << std::endl;
          type_ = BasicType::Create(TypeSpec::TYPE_INT, loc());
       }
@@ -447,6 +447,10 @@
       declarator()->JoinPointers();
    }
 
+    FunctionType *FunctionDef::Type() const {
+       return dynamic_cast<FunctionType *>(decl()->Type());
+    }
+
    ASTType *BasicDeclarator::Type(ASTType *type) const {
       return type;
    }
@@ -456,7 +460,7 @@
       switch (declarator()->kind()) {
       case Kind::DECLARATOR_BASIC:
          /* basic pointer */
-         return PointerType::Create(depth(), declarator()->Type(type), loc());
+         return PointerType::Create(depth(), declarator()->Type(type), type->decl(), loc());
          
       case Kind::DECLARATOR_POINTER:
          /* this shouldn't happen */
@@ -464,7 +468,7 @@
          
       case Kind::DECLARATOR_FUNCTION:
          /* tricky: pointer is actualy part of the return value type */
-         return declarator()->Type(PointerType::Create(depth(), type, loc()));
+         return declarator()->Type(PointerType::Create(depth(), type, type->decl(), loc()));
       }
    }
 
@@ -475,21 +479,21 @@
       /* WHOA -- if this works, it's beautiful. */
       switch (declarator()->kind()) {
       case Kind::DECLARATOR_BASIC:
-         return FunctionType::Create(type, param_types, loc());
+         return FunctionType::Create(type, param_types, type->decl(), loc());
          
       case Kind::DECLARATOR_POINTER:
          /* Actually a function pointer -- but primarily a pointer. */
-         return declarator()->Type(FunctionType::Create(type, param_types, loc()));
+         return declarator()->Type(FunctionType::Create(type, param_types, type->decl(), loc()));
          
       case Kind::DECLARATOR_FUNCTION:
          /* This function is actually the RETURN TYPE of another function declared
           * _declarator()_. */
-         return declarator()->Type(FunctionType::Create(type, param_types, loc()));
+         return declarator()->Type(FunctionType::Create(type, param_types, type->decl(), loc()));
       }
    }
 
    ASTType *Decl::Type() const {
-      ASTType *init_type = BasicType::Create(specs()->type_spec(), loc());
+      ASTType *init_type = BasicType::Create(specs()->type_spec(), this, loc());
       return declarator()->Type(init_type);
    }
 
@@ -502,62 +506,74 @@
       return Types::Create(type_vec, loc());
    }
 
+    /*** ADDRESS OF TYPE ***/
+    ASTType *BasicType::Address() {
+       return PointerType::Create(1, this, loc());
+    }
+    
+    ASTType *PointerType::Address() {
+       return PointerType::Create(depth() + 1, pointee(), loc());
+    }
+    
+    ASTType *FunctionType::Address() {
+       return this;
+    }
 
-   /*** ADDRESS OF TYPE ***/
-   ASTType *BasicType::Address() {
-      return PointerType::Create(1, this, loc());
-   }
-   
-   ASTType *PointerType::Address() {
-      return PointerType::Create(depth() + 1, pointee(), loc());
-   }
-
-   ASTType *FunctionType::Address() {
-      return this;
-   }
-
-   /*** DEREFERENCE TYPE ***/
-   ASTType *BasicType::Dereference(SemantEnv *env) {
+    /*** DEREFERENCE TYPE ***/
+    ASTType *BasicType::Dereference(SemantEnv *env) {
       if (env) {
          env->error()(g_filename, this) << "cannot derereference type" << std::endl;
       }
-
+      
       return nullptr;
-   }
-
-   ASTType *PointerType::Dereference(SemantEnv *env) {
-      if (depth() == 1) {
-         return pointee();
-      } else {
-         return PointerType::Create(depth() - 1, pointee(), loc());
-      }
-   }
-
+    }
+    
+    ASTType *PointerType::Dereference(SemantEnv *env) {
+       if (depth() == 1) {
+          return pointee();
+       } else {
+          return PointerType::Create(depth() - 1, pointee(), loc());
+       }
+    }
+    
    ASTType *FunctionType::Dereference(SemantEnv *env) {
       return this; /* function types are infinitely dereferencable */
    }
-
-   /*** COMBINE ***/
-   BasicType *BasicType::Max(const BasicType *with) const {
-      return BasicType::Create(::zc::Max(this->type_spec(), with->type_spec()), loc());
-   }
-
+    
+    /*** COMBINE ***/
+    BasicType *BasicType::Max(const BasicType *with) const {
+       return BasicType::Create(::zc::Max(this->type_spec(), with->type_spec()), loc());
+    }
+    
     /*** ENSCOPE ***/
+    void TranslationUnit::Enscope(SemantEnv& env) const {
+       env.symtab().EnterScope();
+    }
 
+    void TranslationUnit::Descope(SemantEnv& env) const {
+       env.symtab().ExitScope();
+    }
+    
     void Decl::Enscope(SemantEnv& env) const { 
-         /* check for previous declarations in scope */
-         Symbol *sym = id()->id();
-         if (env.symtab().Probe(sym) != nullptr) {
-            /* ERROR: symbol already defined in this scope. */
-            env.error()(g_filename, this) << "redefinition of '" << sym << "'" << std::endl;
-            return;
-         }
-         
-         ASTType *type = Type();
-         type->TypeCheck(env);
-         
-         /* add symbol to scope */
-         env.symtab().AddToScope(sym, type);
+       /* check for previous declarations in scope */
+       Symbol *sym = id()->id();
+
+       if (sym == nullptr) {
+          env.error()(g_filename, this) << "declaration is missing identifier" << std::endl;
+          return;
+       }
+       
+       if (env.symtab().Probe(sym) != nullptr) {
+          /* ERROR: symbol already defined in this scope. */
+          env.error()(g_filename, this) << "redefinition of '" << *sym << "'" << std::endl;
+          return;
+       }
+       
+       ASTType *type = Type();
+       type->TypeCheck(env);
+       
+       /* add symbol to scope */
+       env.symtab().AddToScope(sym, type);
     }
     
     void Decls::Enscope(SemantEnv& env) const {
@@ -566,5 +582,31 @@
        }
     }
 
+    void FunctionDef::Enscope(SemantEnv& env) const {
+       /* enscope function symbol */
+       decl()->Enscope(env);
+
+       /* add new scope */
+       env.symtab().EnterScope();
+
+       /* enscope parameters */
+       FunctionType *type;
+       if ((type = Type()) == nullptr) {
+          env.error()(g_filename, this) << "function definition missing parameters" << std::endl;
+          return;
+       }
+
+       Types *params = type->params();
+       std::for_each(params->vec().begin(), params->vec().end(),
+                     [&](const ASTType *param) {
+                        param->decl()->Enscope(env);
+                     });
+    }
+
+    void FunctionDef::Descope(SemantEnv& env) const {
+       env.symtab().ExitScope();
+    }
+
+    
     
 }

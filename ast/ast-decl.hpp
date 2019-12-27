@@ -15,8 +15,12 @@ namespace zc {
    public:
 
       virtual void TypeCheck(SemantEnv& env) = 0;
+      virtual void Enscope(SemantEnv& env) const = 0;
+      virtual void Descope(SemantEnv& env) const = 0;
       
    protected:
+
+      
       ExternalDecl(const SourceLoc& loc): ASTNode(loc) {}
    };
 
@@ -33,6 +37,11 @@ namespace zc {
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
 
       virtual void TypeCheck(SemantEnv& env) override;
+
+      virtual void Enscope(SemantEnv& env) const override;
+      virtual void Descope(SemantEnv& env) const override;
+
+      FunctionType *Type() const;
       
    protected:
       Decl *decl_;
@@ -60,11 +69,9 @@ namespace zc {
       /**
        * Perform semantic analysis on a declaration.
        * @param env semantic environment
-       * @param level abstraction level. A level of 0 means declaration is fully abstract;
-       *        a level of 1 means declare function but not parameters; a level of 2 means
-       *        declare function and parameters, etc.
+       * @param enscope whether to declare in scope.
        */
-      void TypeCheck(SemantEnv& env, bool abstract);
+      void TypeCheck(SemantEnv& env);
       void Enscope(SemantEnv& env) const;
 
       /** Convert declaration to type.
@@ -88,14 +95,14 @@ namespace zc {
 
       virtual void DumpNode(std::ostream& os) const override { os << "Decls"; }
 
-      virtual void TypeCheck(SemantEnv& env) override { TypeCheck(env, 1); }
-      void TypeCheck(SemantEnv& env, bool abstract) {
-         ASTNodeVec<Decl,Decls_s>::TypeCheck(env, abstract);
+      virtual void TypeCheck(SemantEnv& env) override {
+         ASTNodeVec<Decl,Decls_s>::TypeCheck(env);
       }
       bool TypeEq(const Decls *other) const;
       bool TypeCoerce(const Decls *from) const;
       Types *Type() const;
-      void Enscope(SemantEnv& env) const;
+      virtual void Enscope(SemantEnv& env) const override;
+      virtual void Descope(SemantEnv& env) const override {}
 
       void JoinPointers();
       

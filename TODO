@@ -22,8 +22,9 @@ SEMANTIC ANALYSIS
 [ ] Introduce declarations as types
 
 AST
-[ ] Add bindings of types to identifiers (TypeID, perhaps?)
+[X] Add bindings of types to identifiers (TypeID, perhaps?)
 [ ] Transformations of AST at different stages
-[ ] Tagged Type (ASTTaggedType)
+[X] Tagged Type (ASTTaggedType)
     - current ASTType becomes specialization of ASTTaggedType
     - ASTBoundType becomes ASTTaggedType<Symbol *>
+[ ] Constructor type functions for converting Declarator to type
