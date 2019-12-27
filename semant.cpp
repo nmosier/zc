@@ -107,6 +107,18 @@
        Descope(env);
     }
 
+    void ExternalDecl::TypeCheck(SemantEnv& env) {
+       decl()->TypeCheck(env);
+       decl()->Enscope(env);
+    }
+
+    void FunctionDef::TypeCheck(SemantEnv& env) {
+       ExternalDecl::TypeCheck(env);
+       Enscope(env);
+       comp_stat()->TypeCheck(env, false); /* function body doesn't get new scope */
+       Descope(env);
+    }
+    
     void DeclSpecs::TypeCheck(SemantEnv& env) {
        type_specs()->TypeCheck(env);
     }
@@ -126,24 +138,6 @@
        params()->TypeCheck(env);
     }
     
-    void FunctionDef::TypeCheck(SemantEnv& env) {
-       /* type check and enscope function declaration */
-        decl()->TypeCheck(env);
-        decl()->Enscope(env);
-       
-       /* TODO */
-       
-       /* enscope function parameters */
-       env.symtab().EnterScope();
-       FunctionDeclarator *fn = dynamic_cast<FunctionDeclarator *>(decl()->declarator());
-       Decls *params = fn->params();
-       
-       
-       env.symtab().EnterScope();          /* push scope for fn params */
-       comp_stat()->TypeCheck(env, false); /* function body doesn't get new scope */
-       env.symtab().ExitScope();           /* pop param scope */
-       env.symtab().ExitScope();           /* pop function scope */    
-    }
 
    void CompoundStat::TypeCheck(SemantEnv& env, bool scoped) {
       if (scoped) {
@@ -553,7 +547,7 @@
     void TranslationUnit::Descope(SemantEnv& env) const {
        env.symtab().ExitScope();
     }
-    
+
     void Decl::Enscope(SemantEnv& env) const { 
        /* check for previous declarations in scope */
        Symbol *sym = id()->id();
@@ -582,9 +576,13 @@
        }
     }
 
+    void ExternalDecl::Enscope(SemantEnv& env) const {
+       decl()->Enscope(env);
+    }
+
     void FunctionDef::Enscope(SemantEnv& env) const {
        /* enscope function symbol */
-       decl()->Enscope(env);
+       ExternalDecl::Enscope(env);
 
        /* add new scope */
        env.symtab().EnterScope();

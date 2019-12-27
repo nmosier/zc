@@ -70,8 +70,7 @@ namespace zc {
          ASTType(args...), type_spec_(type_spec) {}
    };
 
-   const char Types_s[] = "ASTTypes";
-   class Types: public ASTNodeVec<ASTType, Types_s> {
+   class Types: public ASTNodeVec<ASTType> {
    public:
       template <typename... Args>
       static Types *Create(Args... args) {
@@ -85,7 +84,7 @@ namespace zc {
       void TypeCheck(SemantEnv& env);
 
    protected:
-      Types(Vec vec, const SourceLoc& loc): ASTNode(loc), ASTNodeVec<ASTType, Types_s>(vec, loc) {}
+      Types(Vec vec, const SourceLoc& loc): ASTNodeVec<ASTType>(vec, loc) {}
       
    };
 

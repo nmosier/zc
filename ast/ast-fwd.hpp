@@ -12,20 +12,19 @@ namespace zc {
    
    /* forward declarations */
    class ASTNode;
-   template <class Node, const char *name> class ASTNodeVec;
-   template <class Spec, const char *name> class ASTSpecs;
+   template <class Node> class ASTNodeVec;
+   template <class Spec> class ASTSpecs;
    class ASTType;
    
    class TranslationUnit;
    class Decl;
    class Decls;
    class ExternalDecl;
-   const char ExternalDecls_s[] = "ExternalDecls";
-   typedef ASTNodeVec<ExternalDecl,ExternalDecls_s> ExternalDecls;
+   typedef ASTNodeVec<ExternalDecl> ExternalDecls;
+
    class DeclSpecs;
    class ASTDeclarator;
-   const char ASTDeclarators_s[] = "Declarators";
-   typedef ASTNodeVec<ASTDeclarator,ASTDeclarators_s> ASTDeclarators;
+   typedef ASTNodeVec<ASTDeclarator> ASTDeclarators;
    class FunctionDef;
    class CompoundStat;
    class Pointer;

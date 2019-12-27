@@ -10,27 +10,38 @@
 
 namespace zc {
 
-   /* NOTE: ExternalDecl is abstract. */
-   class ExternalDecl: virtual public ASTNode {
+   class ExternalDecl: public ASTNode {
    public:
+      Decl *decl() const { return decl_; }
 
-      virtual void TypeCheck(SemantEnv& env) = 0;
-      virtual void Enscope(SemantEnv& env) const = 0;
-      virtual void Descope(SemantEnv& env) const = 0;
+      template <typename... Args>
+      static ExternalDecl *Create(Args... args) {
+         return new ExternalDecl(args...);
+      }
+
+      virtual void DumpNode(std::ostream& os) const override { os << "ExternalDecl"; }
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
+      
+      virtual void TypeCheck(SemantEnv& env);
+      virtual void Enscope(SemantEnv& env) const;
+      virtual void Descope(SemantEnv& env) const {}
       
    protected:
+      Decl *decl_;
 
-      
-      ExternalDecl(const SourceLoc& loc): ASTNode(loc) {}
+      template <typename... Args>
+      ExternalDecl(Decl *decl, Args... args): ASTNode(args...), decl_(decl) {}
    };
+   
+   template <> const char *ExternalDecls::name() const;
 
    class FunctionDef: public ExternalDecl {
    public:
-      Decl *decl() const { return decl_; }
       CompoundStat *comp_stat() const { return comp_stat_; }
 
-      static FunctionDef *Create(Decl *decl, CompoundStat *comp_stat, const SourceLoc& loc) {
-         return new FunctionDef(decl, comp_stat, loc);
+      template <typename... Args>
+      static FunctionDef *Create(Args... args) {
+         return new FunctionDef(args...);
       }
 
       virtual void DumpNode(std::ostream& os) const override;
@@ -44,11 +55,11 @@ namespace zc {
       FunctionType *Type() const;
       
    protected:
-      Decl *decl_;
       CompoundStat *comp_stat_;
 
-   FunctionDef(Decl *decl, CompoundStat *comp_stat, const SourceLoc& loc):
-      ASTNode(loc), ExternalDecl(loc), decl_(decl), comp_stat_(comp_stat) {}
+      template <typename... Args>
+      FunctionDef(CompoundStat *comp_stat, Args... args):
+         ExternalDecl(args...), comp_stat_(comp_stat) {}
       
    };
 
@@ -88,32 +99,28 @@ namespace zc {
          ASTNode(loc), specs_(specs), declarator_(declarator) {}
    };
 
-   const char Decls_s[] = "Decls";
-   class Decls: public virtual ASTNodeVec<Decl,Decls_s>, public virtual ExternalDecl {
+   class Decls: public ASTNodeVec<Decl> {
    public:
       static Decls *Create(const SourceLoc& loc) { return new Decls(loc); }
 
       virtual void DumpNode(std::ostream& os) const override { os << "Decls"; }
 
-      virtual void TypeCheck(SemantEnv& env) override {
-         ASTNodeVec<Decl,Decls_s>::TypeCheck(env);
+      void TypeCheck(SemantEnv& env) {
+         ASTNodeVec<Decl>::TypeCheck(env);
       }
       bool TypeEq(const Decls *other) const;
       bool TypeCoerce(const Decls *from) const;
       Types *Type() const;
-      virtual void Enscope(SemantEnv& env) const override;
-      virtual void Descope(SemantEnv& env) const override {}
+      void Enscope(SemantEnv& env) const;
 
       void JoinPointers();
       
    protected:
-      Decls(const SourceLoc& loc): ASTNode(loc), ASTNodeVec<Decl,Decls_s>(loc),
-                                   ExternalDecl(loc) {}
+      template <typename... Args> Decls(Args... args): ASTNodeVec<Decl>(args...) {}
    };
 
 
-   const char constexpr TypeSpecs_s[] = "TypeSpecs";   
-   class TypeSpecs: public ASTSpecs<TypeSpec,TypeSpecs_s> {
+   class TypeSpecs: public ASTSpecs<TypeSpec> {
    public:
       static TypeSpecs *Create(const SourceLoc& loc) { return new TypeSpecs(loc); }
       
@@ -123,7 +130,7 @@ namespace zc {
       void TypeCheck(SemantEnv& env);
       
    protected:
-      TypeSpecs(const SourceLoc& loc): ASTSpecs<TypeSpec,TypeSpecs_s>(loc) {}
+      TypeSpecs(const SourceLoc& loc): ASTSpecs<TypeSpec>(loc) {}
    };
 
 

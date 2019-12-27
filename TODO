@@ -28,3 +28,4 @@ AST
     - current ASTType becomes specialization of ASTTaggedType
     - ASTBoundType becomes ASTTaggedType<Symbol *>
 [ ] Constructor type functions for converting Declarator to type
+[ ] Get rid of virtual on ASTNodeVec

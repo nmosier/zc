@@ -34,23 +34,19 @@ namespace zc {
    protected:
       ASTStat(const SourceLoc& loc): ASTNode(loc) {}
    };
-   const char ASTStats_s[] = "Stats";
-   typedef ASTNodeVec<ASTStat,ASTStats_s> ASTStats;
-
 
    
-   template <class Node, const char *name>
-   class ASTNodeVec: virtual public ASTNode {
+   template <class Node>
+   class ASTNodeVec: public ASTNode {
    public:
       typedef std::vector<Node *> Vec;
       Vec& vec() { return vec_; }
 
-      static ASTNodeVec<Node,name> *Create(const SourceLoc& loc) { return new ASTNodeVec(loc); }
-      static ASTNodeVec<Node,name> *Create(Vec vec, const SourceLoc& loc) {
-         return new ASTNodeVec(vec, loc);
+      template <typename... Args> static ASTNodeVec<Node> *Create(Args... args) {
+         return new ASTNodeVec<Node>(args...);
       }
 
-      virtual void DumpNode(std::ostream& os) const override { os << name; }
+      virtual void DumpNode(std::ostream& os) const override { os << name(); }
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {
          for (const Node *node : vec_) {
             node->Dump(os, level, with_types);
@@ -66,22 +62,36 @@ namespace zc {
 
    protected:
       Vec vec_;
-
-      ASTNodeVec(const SourceLoc& loc): ASTNode(loc) {}
-      ASTNodeVec(Vec vec, const SourceLoc& loc): ASTNode(loc), vec_(vec) {}
+      const char *name() const { return "ASTNodeVec"; }
+      
+      template <typename... Args> ASTNodeVec(Vec vec, Args... args): ASTNode(args...), vec_(vec) {}
+      template <typename... Args> ASTNodeVec(Node *node, Args... args):
+         ASTNode(args...), vec_(1, node) {}
+      template <class OtherNode, typename Func, typename... Args>
+      ASTNodeVec(ASTNodeVec<OtherNode> *other, Func func, Args... args): ASTNode(args...) {
+         vec_.resize(other->vec().size());
+         std::transform(other->vec().begin(), other->vec().end(), vec_.begin(), func);
+      }
+      template <typename... Args> ASTNodeVec(Args... args): ASTNode(args...) {}
    };
 
-   template <typename Spec, const char *name>
+   typedef ASTNodeVec<ASTStat> ASTStats;
+   template <> const char *ASTStats::name() const;
+   
+
+   template <typename Spec>
    class ASTSpecs: public ASTNode {
       static_assert(std::is_enum<Spec>::value);
    public:
       typedef std::multiset<Spec> Specs;
       const Specs& specs() const { return specs_; }
 
-      static ASTSpecs *Create(const SourceLoc& loc) { return new ASTSpecs(loc); }
+      template <typename... Args> static ASTSpecs *Create(Args... args) {
+         return new ASTSpecs(args...);
+      }
       
       virtual void DumpNode(std::ostream& os) const override {
-         os << name;
+         os << name();
          for (Spec spec : specs_) {
             os << " " << spec;
          }
@@ -93,6 +103,7 @@ namespace zc {
 
    protected:
       Specs specs_;
+      const char *name() const { return "ASTSpecs"; }
 
       ASTSpecs(const SourceLoc& loc): ASTNode(loc) {}
       

@@ -3,9 +3,15 @@
 
 namespace zc {
 
+   template <> const char *ExternalDecls::name() const { return "ExternalDecls"; }      
+
+   void ExternalDecl::DumpChildren(std::ostream& os, int level, bool with_types) const {
+      decl()->Dump(os, level, with_types);
+   }
+   
    void FunctionDef::DumpNode(std::ostream& os) const { os << "FunctionDef"; }
    void FunctionDef::DumpChildren(std::ostream& os, int level, bool with_types) const {
-      decl()->Dump(os, level, with_types);
+      ExternalDecl::DumpChildren(os, level, with_types);
       comp_stat()->Dump(os, level, with_types);      
    }
 

@@ -32,4 +32,6 @@ const int indent_step = 2;
       type_->DumpNode(os);
    }
 
+   template <> const char *ASTStats::name() const { return "ASTStats"; }
+   
 }
