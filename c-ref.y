@@ -13,13 +13,13 @@ function_definition	: decl_specs declarator decl_list compound_stat
 			| decl_specs declarator		compound_stat
 			|		declarator 	compound_stat
 			;
-decl			: decl_specs init_declarator_list ';'
+decl		: decl_specs init_declarator_list ';'
 			| decl_specs			';'
 			;
-decl_list		: decl
+decl_list	: decl
 			| decl_list decl
 			;
-decl_specs		: storage_class_spec decl_specs
+decl_specs	: storage_class_spec decl_specs
 			| storage_class_spec
 			| type_spec decl_specs
 			| type_spec
@@ -28,7 +28,7 @@ decl_specs		: storage_class_spec decl_specs
 			;
 storage_class_spec	: 'auto' | 'register' | 'static' | 'extern' | 'typedef'
 			;
-type_spec		: 'void' | 'char' | 'short' | 'int' | 'long' | 'float'
+type_spec	: 'void' | 'char' | 'short' | 'int' | 'long' | 'float'
 			| 'double' | 'signed' | 'unsigned'
 			| struct_or_union_spec
 			| enum_spec
