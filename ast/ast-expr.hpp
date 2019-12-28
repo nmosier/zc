@@ -169,7 +169,7 @@ namespace zc {
          /* no children */
       }
 
-      virtual void TypeCheck(SemantEnv& env) override {}
+      virtual void TypeCheck(SemantEnv& env) override;
 
    protected:
       NoExpr(const SourceLoc& loc): ASTExpr(loc) {}

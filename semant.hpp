@@ -72,16 +72,39 @@ namespace zc {
 
    typedef ScopedTable<Symbol *, ASTType> ScopedSymtab;
 
+   class SymbolEnv {
+   public:
+      SymbolEnv(ScopedSymtab& symtab): symtab_(symtab), sym_(nullptr) {}
+
+      void Enter(Symbol *sym) {
+         sym_ = sym;
+      }
+
+      const ASTType *Type() {
+         return symtab_.Lookup(sym_);
+      }
+      
+      void Exit() {
+         sym_ = nullptr;
+      }
+      
+   private:
+      Symbol *sym_;
+      ScopedSymtab& symtab_;
+   };
+   
    class SemantEnv {
    public:
-      SemantEnv(SemantError& error): error_(error) {}
+      SemantEnv(SemantError& error): error_(error), symtab_(), ext_sym_env_(symtab_) {}
       
       SemantError& error() { return error_; }
       ScopedSymtab& symtab() { return symtab_; }
+      SymbolEnv& ext_env() { return ext_sym_env_; }
       
    private:
       SemantError& error_;
-      ScopedSymtab symtab_; 
+      ScopedSymtab symtab_;
+      SymbolEnv ext_sym_env_;
    };   
    
 }

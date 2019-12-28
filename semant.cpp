@@ -152,9 +152,21 @@
       }
    }
 
-   void ExprStat::TypeCheck(SemantEnv& env) {
-      expr()->TypeCheck(env);
-   }
+    void ReturnStat::TypeCheck(SemantEnv& env) {
+       expr()->TypeCheck(env);
+
+       const ASTType *expr_type = expr()->type();
+       const FunctionType *fn_type = dynamic_cast<const FunctionType *>(env.ext_env().Type());
+       const ASTType *ret_type = fn_type->return_type();
+       if (!ret_type->TypeCoerce(expr_type)) {
+          env.error()(g_filename, this) << "value in return statement has incompatible type"
+                                        << std::endl;
+       }
+    }
+
+    void ExprStat::TypeCheck(SemantEnv& env) {
+       expr()->TypeCheck(env);
+    }
 
 
    void AssignmentExpr::TypeCheck(SemantEnv& env) {
@@ -267,6 +279,11 @@
          type_ = BasicType::Create(TypeSpec::TYPE_INT, loc());
       }
    }
+
+    void NoExpr::TypeCheck(SemantEnv& env) {
+       /* set type */
+       type_ = BasicType::Create(TypeSpec::TYPE_VOID, loc());
+    }
 
 
     /*** EXPRESSION KIND (LVALUE or RVALUE) ***/
@@ -578,6 +595,11 @@
 
     void ExternalDecl::Enscope(SemantEnv& env) const {
        decl()->Enscope(env);
+       env.ext_env().Enter(decl()->id()->id());
+    }
+
+    void ExternalDecl::Descope(SemantEnv& env) const {
+       env.ext_env().Exit();
     }
 
     void FunctionDef::Enscope(SemantEnv& env) const {

@@ -49,6 +49,8 @@ E  [Ee][+-]?{D}+
 "int" { return INT; }
 "long" { return LONG; }
 
+"return" { return RETURN; }
+
 {L}({L}|{D})* {
     /* convert yytext to AST identifier */
     yylval.identifier = zc::Identifier::Create(std::string(yytext), g_lineno);
