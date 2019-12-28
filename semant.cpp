@@ -140,11 +140,13 @@
     
 
    void CompoundStat::TypeCheck(SemantEnv& env, bool scoped) {
+      decls()->TypeCheck(env);
+
       if (scoped) {
          env.symtab().EnterScope();
       }
-      
-      decls()->TypeCheck(env);
+
+      decls()->Enscope(env);      
       stats()->TypeCheck(env);
 
       if (scoped) {
@@ -161,6 +163,14 @@
        if (!ret_type->TypeCoerce(expr_type)) {
           env.error()(g_filename, this) << "value in return statement has incompatible type"
                                         << std::endl;
+       }
+    }
+
+    void IfStat::TypeCheck(SemantEnv& env) {
+       cond()->TypeCheck(env);
+       if_body()->TypeCheck(env);
+       if (else_body() != nullptr) {
+          else_body()->TypeCheck(env);
        }
     }
 

@@ -51,6 +51,9 @@ E  [Ee][+-]?{D}+
 
 "return" { return RETURN; }
 
+"if" { return IF; }
+"else" { return ELSE; }
+
 {L}({L}|{D})* {
     /* convert yytext to AST identifier */
     yylval.identifier = zc::Identifier::Create(std::string(yytext), g_lineno);

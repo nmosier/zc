@@ -29,8 +29,8 @@ namespace zc {
       Decls *decls_;
       ASTStats *stats_;
       
-   CompoundStat(Decls *decls, ASTStats *stats, SourceLoc& loc):
-      ASTStat(loc), decls_(decls), stats_(stats) {}
+      CompoundStat(Decls *decls, ASTStats *stats, SourceLoc& loc):
+         ASTStat(loc), decls_(decls), stats_(stats) {}
    };
    
    class ExprStat: public ASTStat {
@@ -80,7 +80,42 @@ namespace zc {
       ReturnStat(ASTExpr *expr, Args... args): JumpStat(args...), expr_(expr) {}
    };
 
+   class SelectionStat: public ASTStat {
+   public:
+   protected:
+      template <typename... Args> SelectionStat(Args... args): ASTStat(args...) {}
+   };
+   
+   class IfStat: public SelectionStat {
+   public:
+      ASTExpr *cond() const { return cond_; }
+      ASTStat *if_body() const { return if_body_; }
+      ASTStat *else_body() const { return else_body_; }
+
+      template <typename... Args> static IfStat *Create(Args... args) {
+         return new IfStat(args...);
+      }
+
+      virtual void DumpNode(std::ostream& os) const override { os << "IfStat"; }
+      virtual void DumpChildren(std::ostream& os, int level, bool with_type) const override {
+         cond()->Dump(os, level, with_type);
+         if_body()->Dump(os, level, with_type);
+         if (else_body() != nullptr) {
+            else_body()->Dump(os, level, with_type);
+         }
+      }
+
+      virtual void TypeCheck(SemantEnv& env) override;
       
+   protected:
+      ASTExpr *cond_;
+      ASTStat *if_body_;
+      ASTStat *else_body_;
+
+      template <typename... Args>
+      IfStat(ASTExpr *cond, ASTStat *if_body, ASTStat *else_body, Args... args):
+         SelectionStat(args...), cond_(cond), if_body_(if_body), else_body_(else_body) {}
+   };
    
 }
 

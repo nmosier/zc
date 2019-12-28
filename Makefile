@@ -5,6 +5,10 @@ AST_HDRS = ast.hpp $(wildcard ast/*.hpp)
 AST_SRCS = $(wildcard ast/*.cpp)
 AST_OBJS = $(AST_SRCS:.cpp=.o)
 
+ASM_HDRS = asm.hpp $(wildcard asm/*.hpp)
+ASM_SRCS = $(wildcard asm/*.cpp)
+ASM_OBJS = $(ASM_SRCS:.cpp=.o)
+
 BISON_FLAGS = -d
 
 BISON_SRC = c.tab.cpp
@@ -22,7 +26,7 @@ CLEAN_SRCS = $(BISON_SRC) $(FLEX_SRC)
 CLEAN_HDRS = $(BISON_HDR)
 
 .PHONY: all
-all: c.tab.o flex lexer-main parser-main semant-main $(AST_OBJS)
+all: c.tab.o flex lexer-main parser-main semant-main $(AST_OBJS) $(ASM_OBJS)
 
 .PHONY: bison
 bison: $(BISON_OBJ)

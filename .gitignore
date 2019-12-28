@@ -5,6 +5,7 @@ cool
 lexer-main
 parser-main
 semant-main
-test.c
+test*.c
 c.tab.cpp
 c.tab.hpp
+tst

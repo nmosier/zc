@@ -12,14 +12,16 @@ PARSER
 [ ] Handle nested pointers properly, e.g. *(*id) -> **id
 
 SEMANTIC ANALYSIS
-[ ] `long long int` -> `LONG`, not `LONG_LONG`
-[ ] print annotated types
-[ ] type serialization for easy equality check
-[ ] Convert Decl to ASTType
-[ ] rewrite DeclSpecs to return TypeSpecs converted to single TypeSpec.
-[ ] Handle function to function pointer TypeCoercion edge cases.
-[ ] Don't add identifiers in function declarations that are not definitions to scope
-[ ] Introduce declarations as types
+[X] `long long int` -> `LONG`, not `LONG_LONG`
+[X] print annotated types
+[X] type serialization for easy equality check
+[X] Convert Decl to ASTType
+[X] rewrite DeclSpecs to return TypeSpecs converted to single TypeSpec.
+[X] Handle function to function pointer TypeCoercion edge cases.
+[X] Don't add identifiers in function declarations that are not definitions to scope
+[X] Introduce declarations as types
+[ ] Return statements present unless void.
+[ ] Type deserialization for easy type construction
 
 AST
 [X] Add bindings of types to identifiers (TypeID, perhaps?)
@@ -28,4 +30,4 @@ AST
     - current ASTType becomes specialization of ASTTaggedType
     - ASTBoundType becomes ASTTaggedType<Symbol *>
 [ ] Constructor type functions for converting Declarator to type
-[ ] Get rid of virtual on ASTNodeVec
+[X] Get rid of virtual on ASTNodeVec
