@@ -12,11 +12,9 @@
 
 namespace zc::z80 {
 
-   class ByteRegister;
-   class MultibyteRegister;
-
-   extern const ByteRegister r_a, r_b, r_c, r_d, r_e, r_f, r_h, r_l, r_ixh, r_ixl, r_iyh, r_iyl;
-   extern const MultibyteRegister r_af, r_bc, r_de, r_hl, r_ix, r_iy;
+   extern const Register<Size::BYTE> r_a, r_b, r_c, r_d, r_e, r_f, r_h, r_l, r_ixh,
+      r_ixl, r_iyh, r_iyl;
+   extern const Register<Size::LONG> r_af, r_bc, r_de, r_hl, r_ix, r_iy;
    
    /*************
     * REGISTERS *
@@ -25,39 +23,39 @@ namespace zc::z80 {
    /**
     * Base class representing a register (single- or multi-byte registers).
     */
-   class Register {
+   class Register_ {
    public:
       const std::string& name() const { return name_; }
-      Size size() const { return size_; }
+      const Size size() const { return size_; }
 
-      Register(const std::string& name, Size size): name_(name), size_(size) {}
+      Register_(const std::string& name, Size size): name_(name), size_(size) {}
       
    protected:
       const std::string name_;
       Size size_;
    };
 
-   class ByteRegister: public Register {
+   template <Size sz>
+   class Register: public Register_ {
    public:
-      template <typename... Args> ByteRegister(Args... args): Register(args..., Size::BYTE) {}
+      template <typename... Args> Register(Args... args): Register_(args..., sz) {}
       
    protected:
    };
 
-   class MultibyteRegister: public Register {
+   template <>
+   class Register<Size::LONG>: public Register_ {
    public:
-      typedef std::array<const ByteRegister *, word_size> ByteRegs;
+      typedef std::array<const Register<Size::BYTE> *, word_size> ByteRegs;
       const ByteRegs& regs() const { return regs_; }
-
+      
       template <typename... Args>
-      MultibyteRegister(const ByteRegs& regs, Args... args):
-         Register(args..., Size::WORD), regs_(regs) {}
+      Register<Size::LONG>(const ByteRegs& regs, Args... args):
+         Register_(args..., Size::LONG), regs_(regs) {}
       
    protected:
       const ByteRegs regs_;
    };
-
-   
 
 }
 

@@ -14,25 +14,22 @@ namespace zc::z80 {
    /**
     * Base class for values during code generation.
     */
+   template <Size sz>
    class Value {
    public:
-      Size size() const { return size_; }
-
-      Value(Size size): size_(size) {}
-      
    protected:
-      Size size_;
    };
 
    /**
     * Class representing immediate value.
     */
-   class ImmediateValue: public Value {
+   template <Size sz>
+   class ImmediateValue: public Value<sz> {
    public:
       const intmax_t& imm() const { return imm_; }
 
       template <typename... Args>
-      ImmediateValue(const intmax_t& imm, Args... args): imm_(imm), Value(args...) {}
+      ImmediateValue(const intmax_t& imm, Args... args): imm_(imm), Value<sz>(args...) {}
       
    protected:
       intmax_t imm_;
@@ -41,7 +38,7 @@ namespace zc::z80 {
    /**
     * Class representing the value of a label (i.e. its address).
     */
-   class LabelValue: public Value {
+   class LabelValue: public Value<Size::LONG> {
    public:
       const Label *label() const { return label_; }
 
@@ -52,56 +49,54 @@ namespace zc::z80 {
       const Label *label_;
    };
 
+   template <Size sz> class Register;
    /**
     * Class representing a value held in a single-byte register.
     */
-   template <class RegType>
-   class RegisterValue: public Value {
+   template <Size sz>
+   class RegisterValue: public Value<sz> {
    public:
-      const RegType *reg() const override { return reg(); }
+      const Register<sz> *reg() const override { return reg(); }
 
       template <typename... Args>
-      RegisterValue(const RegType *reg, Args... args): Value(args...), reg_(reg) {}
+      RegisterValue(const Register<sz> *reg, Args... args): Value<sz>(args...), reg_(reg) {}
       
    protected:
-      const RegType *reg_;
+      const Register<sz> *reg_;
    };
-
-   class ByteRegister;
-   class MultibyteRegister;
-   typedef RegisterValue<ByteRegister> ByteRegValue;
-   typedef RegisterValue<MultibyteRegister> MultibyteRegValue;
-
 
    /**
     * Class representing an indexed register.
     */
-   class IndexedValue: public Value {
+   template <Size sz>
+   class IndexedValue: public Value<sz> {
    public:
-      const MultibyteRegValue *val() const { return val_; }
+      const RegisterValue<Size::LONG> *val() const { return val_; }
       int8_t index() const { return index_; }
 
       template <typename... Args>
-      IndexedValue(const MultibyteRegValue *val, int8_t index, Args... args):
-         Value(args...), val_(val), index_(index) {}
+      IndexedValue(const RegisterValue<Size::LONG> *val, const ImmediateValue<Size::BYTE> *index,
+                   Args... args):
+         Value<sz>(args...), val_(val), index_(index) {}
       
    protected:
-      const MultibyteRegValue *val_;
-      int8_t index_;
+      const RegisterValue<Size::LONG> *val_;
+      const ImmediateValue<Size::BYTE> *index_; 
    };
 
    /**
     * Class representing a value contained in memory.
     */
-   class MemoryValue: public Value {
+   template <Size sz>
+   class MemoryValue: public Value<sz> {
    public:
-      const MemoryLocation *loc() const { return loc_; }
+      const MemoryLocation<sz> *loc() const { return loc_; }
 
       template <typename... Args>
-      MemoryValue(const MemoryLocation *loc, Args... args): Value(args...), loc_(loc) {}
+      MemoryValue(const MemoryLocation<sz> *loc, Args... args): Value<sz>(args...), loc_(loc) {}
       
    protected:
-      const MemoryLocation *loc_;
+      const MemoryLocation<sz> *loc_;
       
    };
    

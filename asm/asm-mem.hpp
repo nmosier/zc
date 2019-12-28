@@ -30,18 +30,19 @@ namespace zc::z80 {
     * MEMORY LOCATION *
     *******************/
 
-   class Value;
+   template <Size sz> class Value;
    /**
     * Base class representing a memory location.
     */
+   template <Size sz>
    class MemoryLocation {
    public:
-      const Value *addr() const { return addr_; }
+      const Value<Size::LONG> *addr() const { return addr_; }
 
-      MemoryLocation(const Value *addr): addr_(addr) {}
+      MemoryLocation(const Value<Size::LONG> *addr): addr_(addr) {}
       
    protected:
-      const Value *addr_;
+      const Value<Size::LONG> *addr_;
    };
    
    
