@@ -6,9 +6,11 @@
 #ifndef __ASM_BASE_HPP
 #define __ASM_BASE_HPP
 
-namespace zc {
+#include "asm/asm-mem.hpp"
 
-   class ASMInstruction {
+namespace zc::z80 {
+
+   class Instruction {
    public:
 
       /** 
@@ -19,6 +21,22 @@ namespace zc {
    protected:
    };
 
+   /***********************
+    * INSTRUCTION CLASSES *
+    ***********************/
+
+   /**
+    * Add instruction class.
+    */
+   #if 0
+   class AddInstruction: public Instruction {
+   public:
+   protected:
+      const Register& dst_;
+      
+      
+   }
+#endif
    
 }
 

@@ -8,6 +8,9 @@
 namespace zc::z80 {
 
    extern bool ez80_mode;
+   int byte_size();
+   int word_size();
+   int long_size();
    
 }
 

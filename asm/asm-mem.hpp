@@ -5,39 +5,43 @@
 #ifndef __ASM_MEM_HPP
 #define __ASM_MEM_HPP
 
+#include <string>
+#include <vector>
+
 namespace zc::z80 {
 
-   extern bool ez80_mode;
-   
-   class Register {
+
+
+   /**********
+    * LABELS *
+    **********/
+
+   class Label {
    public:
       const std::string& name() const { return name_; }
-      virtual int size() const = 0;
 
-      Register(const std::string& name): name_(name) {}
+      Label(const std::string& name): name_(name) {}
       
    protected:
       const std::string name_;
    };
 
-   template <int N>
-   class RegisterX: public Register {
-   public:
-      virtual int size() const override { return N; }
+   /*******************
+    * MEMORY LOCATION *
+    *******************/
 
-      template <typename... Args>
-      RegisterX(Args... args): Register(args...) {}
-
-   protected:
-   };
-
-   typedef RegisterX<1> Register8;
-   typedef RegisterX<2> Register16;
-   typedef RegisterX<3> Register24;
-   
+   class Value;
+   /**
+    * Base class representing a memory location.
+    */
    class MemoryLocation {
    public:
+      const Value *addr() const { return addr_; }
+
+      MemoryLocation(const Value *addr): addr_(addr) {}
+      
    protected:
+      const Value *addr_;
    };
 
    

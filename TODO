@@ -31,3 +31,6 @@ AST
     - ASTBoundType becomes ASTTaggedType<Symbol *>
 [ ] Constructor type functions for converting Declarator to type
 [X] Get rid of virtual on ASTNodeVec
+
+ASM
+[ ] Register attributes: loadable, movable, addable, etc.
