@@ -7,10 +7,23 @@
 
 namespace zc::z80 {
 
-   extern bool ez80_mode;
-   int byte_size();
-   int word_size();
-   int long_size();
+   constexpr bool ez80_mode =
+#ifdef Z80
+      false
+#else
+      true
+#endif
+      ;
+   
+   constexpr int byte_size = 1;
+   constexpr int word_size = 2;
+   constexpr int long_size =
+#ifdef Z80
+      2
+#else
+      3
+#endif
+      ;
    
 }
 

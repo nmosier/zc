@@ -16,16 +16,12 @@ namespace zc::z80 {
     */
    class Value {
    public:
-      enum class Kind {V_BYTE, V_WORD, V_LONG};
-      Kind kind() const { return kind_; }
-      int size() const;
+      Size size() const { return size_; }
 
-      static int size(Kind kind);
-      
-      Value(Kind kind): kind_(kind) {}
+      Value(Size size): size_(size) {}
       
    protected:
-      Kind kind_;
+      Size size_;
    };
 
    /**
@@ -56,23 +52,46 @@ namespace zc::z80 {
       const Label *label_;
    };
 
-   class Register;
    /**
-    * Class representing a value contained in a register.
+    * Class representing a value held in a single-byte register.
     */
+   template <class RegType>
    class RegisterValue: public Value {
    public:
-      const Register *reg() const { return reg_; }
+      const RegType *reg() const override { return reg(); }
 
       template <typename... Args>
-      RegisterValue(const Register *reg, Args... args): Value(args...), reg_(reg) {}
+      RegisterValue(const RegType *reg, Args... args): Value(args...), reg_(reg) {}
       
    protected:
-      const Register *reg_;
+      const RegType *reg_;
+   };
+
+   class ByteRegister;
+   class MultibyteRegister;
+   typedef RegisterValue<ByteRegister> ByteRegValue;
+   typedef RegisterValue<MultibyteRegister> MultibyteRegValue;
+
+
+   /**
+    * Class representing an indexed register.
+    */
+   class IndexedValue: public Value {
+   public:
+      const MultibyteRegValue *val() const { return val_; }
+      int8_t index() const { return index_; }
+
+      template <typename... Args>
+      IndexedValue(const MultibyteRegValue *val, int8_t index, Args... args):
+         Value(args...), val_(val), index_(index) {}
+      
+   protected:
+      const MultibyteRegValue *val_;
+      int8_t index_;
    };
 
    /**
-    * Class represneting a value contained in memory.
+    * Class representing a value contained in memory.
     */
    class MemoryValue: public Value {
    public:
@@ -84,7 +103,7 @@ namespace zc::z80 {
    protected:
       const MemoryLocation *loc_;
       
-   };            
+   };
    
 }
 

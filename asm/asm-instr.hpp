@@ -16,7 +16,7 @@ namespace zc::z80 {
       /** 
        * Number of cycles required to execute the instruction.
        */
-      virtual int cycles() const = 0;
+      // virtual int cycles() const = 0;
 
    protected:
    };
@@ -29,10 +29,12 @@ namespace zc::z80 {
     * Add instruction class.
     */
    #if 0
+   template <
    class AddInstruction: public Instruction {
    public:
    protected:
-      const Register& dst_;
+      const Register *dst_;
+      
       
       
    }

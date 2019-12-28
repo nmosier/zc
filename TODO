@@ -34,3 +34,4 @@ AST
 
 ASM
 [ ] Register attributes: loadable, movable, addable, etc.
+[ ] Separate singleton classes for each register (`a', `hl', etc.)

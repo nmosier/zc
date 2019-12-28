@@ -5,84 +5,60 @@
 #ifndef __ASM_REG_HPP
 #define __ASM_REG_HPP
 
+#include <array>
+
+#include "asm/asm-mode.hpp"
 #include "asm/asm-val.hpp"
 
 namespace zc::z80 {
 
+   class ByteRegister;
+   class MultibyteRegister;
+
+   extern const ByteRegister r_a, r_b, r_c, r_d, r_e, r_f, r_h, r_l, r_ixh, r_ixl, r_iyh, r_iyl;
+   extern const MultibyteRegister r_af, r_bc, r_de, r_hl, r_ix, r_iy;
+   
    /*************
     * REGISTERS *
     *************/
-   
+
    /**
     * Base class representing a register (single- or multi-byte registers).
     */
    class Register {
    public:
-      typedef Value::Kind Kind;
       const std::string& name() const { return name_; }
-      Kind kind() const { return kind_; }
-      int size() const { return Value::size(kind_); }
+      Size size() const { return size_; }
 
-      Register(const std::string& name, Kind kind): name_(name), kind_(kind) {}
+      Register(const std::string& name, Size size): name_(name), size_(size) {}
       
    protected:
       const std::string name_;
-      Kind kind_;
+      Size size_;
    };
 
-
-   /**
-    * Class representing a single-byte register.
-    */
    class ByteRegister: public Register {
    public:
-
-      template <typename... Args>
-      ByteRegister(Args... args): Register(args..., Kind::V_BYTE) {}
-
+      template <typename... Args> ByteRegister(Args... args): Register(args..., Size::BYTE) {}
+      
    protected:
    };
 
-   /**
-    *  Base class representing a multibyte register.
-    */
    class MultibyteRegister: public Register {
    public:
-      typedef std::vector<const ByteRegister *> ByteRegs;
+      typedef std::array<const ByteRegister *, word_size> ByteRegs;
       const ByteRegs& regs() const { return regs_; }
+
+      template <typename... Args>
+      MultibyteRegister(const ByteRegs& regs, Args... args):
+         Register(args..., Size::WORD), regs_(regs) {}
       
-      template <typename... Args>
-      MultibyteRegister(ByteRegs regs_, Args... args);
-      
    protected:
-      ByteRegs regs_;
+      const ByteRegs regs_;
    };
 
-   /**
-    * Multibyte register that holds a word.
-    */
-   class RegisterWord: public MultibyteRegister {
-   public:
-      template <typename... Args>
-      RegisterWord(Args... args): MultibyteRegister(args..., Kind::V_WORD) {}
-
-   protected:
-   };
-
-
-   /**
-    * Multibyte register that holds a long.
-    */
-   class RegisterLong: public MultibyteRegister {
-   public:
-
-      template <typename... Args>
-      RegisterLong(Args... args): Register(args..., Value::Kind::V_LONG) {}
-
-   protected:
-   };
    
-   
+
 }
 
 #endif

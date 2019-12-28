@@ -43,6 +43,9 @@ $(FLEX_SRC): c.l $(HDRS)
 $(FLEX_OBJ): $(FLEX_SRC)
 	c++ -c $(CXXFLAGS) -o $@ $^
 
+asm/%.o: asm/%.cpp $(ASM_HDRS)
+	c++ -DEZ80 -c $(CXXFLAGS) -o $@ $<
+
 %.o: %.cpp $(AST_HDRS)
 	c++ -c $(CXXFLAGS) -o $@ $<
 
