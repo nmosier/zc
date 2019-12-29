@@ -14,7 +14,7 @@ namespace zc::z80 {
 
    extern const Register<Size::BYTE> r_a, r_b, r_c, r_d, r_e, r_f, r_h, r_l, r_ixh,
       r_ixl, r_iyh, r_iyl;
-   extern const Register<Size::LONG> r_af, r_bc, r_de, r_hl, r_ix, r_iy;
+   extern const Register<Size::LONG> r_af, r_bc, r_de, r_hl, r_ix, r_iy, r_sp;
    
    /*************
     * REGISTERS *

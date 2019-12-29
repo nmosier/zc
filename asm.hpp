@@ -18,5 +18,6 @@ namespace zc::z80 {
 #include "asm/asm-reg.hpp"
 #include "asm/asm-val.hpp"
 #include "asm/asm-mode.hpp"
+#include "asm/asm-cond.hpp"
 
 #endif

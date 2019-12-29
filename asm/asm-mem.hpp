@@ -20,6 +20,9 @@ namespace zc::z80 {
    public:
       const std::string& name() const { return name_; }
 
+      void EmitRef(std::ostream& os) const;
+      void EmitDef(std::ostream& os) const;
+
       Label(const std::string& name): name_(name) {}
       
    protected:
@@ -38,6 +41,8 @@ namespace zc::z80 {
    class MemoryLocation {
    public:
       const Value<Size::LONG> *addr() const { return addr_; }
+
+      void Emit(std::ostream& os) const;
 
       MemoryLocation(const Value<Size::LONG> *addr): addr_(addr) {}
       

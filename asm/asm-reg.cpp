@@ -10,6 +10,8 @@ namespace zc::z80 {
       r_de(Register<Size::LONG>::ByteRegs{&r_d, &r_e}, "de"),
       r_hl(Register<Size::LONG>::ByteRegs{&r_h, &r_l}, "hl"),
       r_ix(Register<Size::LONG>::ByteRegs{&r_ixh, &r_ixl}, "ix"),
-      r_iy(Register<Size::LONG>::ByteRegs{&r_iyh, &r_iyl}, "iy");
+      r_iy(Register<Size::LONG>::ByteRegs{&r_iyh, &r_iyl}, "iy"),
+      r_sp(Register<Size::LONG>::ByteRegs{nullptr, nullptr}, "sp");
+   
 
 }

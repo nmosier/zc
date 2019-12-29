@@ -5,6 +5,8 @@
 #ifndef __ASM_VAL_HPP
 #define __ASM_VAL_HPP
 
+#include <ostream>
+
 namespace zc::z80 {
 
    /**********
@@ -17,6 +19,8 @@ namespace zc::z80 {
    template <Size sz>
    class Value {
    public:
+      virtual void Emit(std::ostream& os) const = 0;
+      
    protected:
    };
 
@@ -27,6 +31,8 @@ namespace zc::z80 {
    class ImmediateValue: public Value<sz> {
    public:
       const intmax_t& imm() const { return imm_; }
+
+      virtual void Emit(std::ostream& os) const override;
 
       template <typename... Args>
       ImmediateValue(const intmax_t& imm, Args... args): imm_(imm), Value<sz>(args...) {}
@@ -41,6 +47,8 @@ namespace zc::z80 {
    class LabelValue: public Value<Size::LONG> {
    public:
       const Label *label() const { return label_; }
+
+      virtual void Emit(std::ostream& os) const override;
 
       template <typename... Args>
       LabelValue(const Label *label, Args... args): Value(args...), label_(label) {}
@@ -58,6 +66,8 @@ namespace zc::z80 {
    public:
       const Register<sz> *reg() const override { return reg(); }
 
+      virtual void Emit(std::ostream& os) const override;
+
       template <typename... Args>
       RegisterValue(const Register<sz> *reg, Args... args): Value<sz>(args...), reg_(reg) {}
       
@@ -74,6 +84,8 @@ namespace zc::z80 {
       const RegisterValue<Size::LONG> *val() const { return val_; }
       int8_t index() const { return index_; }
 
+      virtual void Emit(std::ostream& os) const override;
+      
       template <typename... Args>
       IndexedValue(const RegisterValue<Size::LONG> *val, const ImmediateValue<Size::BYTE> *index,
                    Args... args):
@@ -92,12 +104,13 @@ namespace zc::z80 {
    public:
       const MemoryLocation<sz> *loc() const { return loc_; }
 
+      virtual void Emit(std::ostream& os) const override;
+
       template <typename... Args>
       MemoryValue(const MemoryLocation<sz> *loc, Args... args): Value<sz>(args...), loc_(loc) {}
       
    protected:
       const MemoryLocation<sz> *loc_;
-      
    };
    
 }
