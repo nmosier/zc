@@ -195,6 +195,41 @@
       type_ = lhs_->type();
    }
 
+    void CallExpr::TypeCheck(SemantEnv& env) {
+       fn()->TypeCheck(env);
+       params()->TypeCheck(env);
+
+       /* Verify that called expression is of function or function pointer type. */
+       const FunctionType *type;
+       if ((type = fn()->type()->get_callable()) == nullptr) {
+          env.error()(g_filename, this) << "expression is not callable" << std::endl;
+          type_ = BasicType::Create(TypeSpec::TYPE_INT, loc()); /* fallback to int return type */
+          return;
+       }
+
+       type_ = type->return_type();
+       
+       /* verify that argument parameters can be coerced to function parameter types */
+       if (type->params()->vec().size() != params()->vec().size()) {
+          env.error()(g_filename, this) << "incorrect number of arguments given (expected"
+                                        << type->params()->vec().size() << " but got "
+                                        << params()->vec().size() << ")" << std::endl;
+          return;
+       }
+
+       /* coerce types one-by-one */
+       auto type_it = type->params()->vec().begin();
+       auto type_end = type->params()->vec().end();
+       auto arg_it = params()->vec().begin();
+       auto arg_end = params()->vec().end();
+       for (int i = 1; type_it != type_end; ++type_it, ++arg_it, ++i) {
+          const ASTType *arg_type = (*arg_it)->type();
+          if (!(*type_it)->TypeCoerce(arg_type)) {
+             env.error()(g_filename, this) << "cannot coerce type of argument " << i << std::endl;
+          }
+       }
+    }
+
 
    void UnaryExpr::TypeCheck(SemantEnv& env) {
       expr_->TypeCheck(env);

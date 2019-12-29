@@ -11,6 +11,8 @@
 
 namespace zc {
 
+   typedef ASTNodeVec<ASTExpr> ASTExprs;
+
    class AssignmentExpr: public ASTBinaryExpr {
    public:
       virtual ExprKind expr_kind() const override;      
@@ -173,6 +175,32 @@ namespace zc {
 
    protected:
       NoExpr(const SourceLoc& loc): ASTExpr(loc) {}
+   };
+
+   class CallExpr: public ASTExpr {
+   public:
+      virtual ExprKind expr_kind() const override { return ExprKind::EXPR_RVALUE; }
+      ASTExpr *fn() const { return fn_; }
+      ASTExprs *params() const { return params_; }
+
+      template <typename... Args>
+      static CallExpr *Create(Args... args) {
+         return new CallExpr(args...);
+      }
+
+      virtual void DumpNode(std::ostream& os) const override { os << "CallExpr"; }
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
+
+      virtual void TypeCheck(SemantEnv& env) override;
+
+   protected:
+      ASTExpr *fn_;
+      ASTExprs *params_;
+
+      template <typename... Args>
+      CallExpr(ASTExpr *fn, ASTExprs *params, Args... args):
+         ASTExpr(args...), fn_(fn), params_(params) {}
+      
    };
 }
 

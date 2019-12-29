@@ -7,6 +7,8 @@
 
 namespace zc {
 
+   class FunctionType;
+
    class ASTType: public ASTNode {
    public:
       enum class Kind {TYPE_BASIC,
@@ -16,6 +18,8 @@ namespace zc {
       virtual const Decl *decl() const { return decl_; }
 
       virtual bool is_integral() const = 0;
+      bool is_callable() const { return get_callable() != nullptr; }
+      virtual const FunctionType *get_callable() const = 0;
 
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
 
@@ -45,6 +49,7 @@ namespace zc {
       TypeSpec type_spec() const { return type_spec_; }
       virtual Kind kind() const override { return Kind::TYPE_BASIC; }
       virtual bool is_integral() const override { return IsIntegral(type_spec()); }
+      virtual const FunctionType *get_callable() const override { return nullptr; }
 
       template <typename... Args>
       static BasicType *Create(Args... args) {
@@ -91,7 +96,8 @@ namespace zc {
    class PointerType: public ASTType {
    public:
       virtual Kind kind() const override { return Kind::TYPE_POINTER; }
-      virtual bool is_integral() const override { return false; }      
+      virtual bool is_integral() const override { return false; }
+      virtual const FunctionType *get_callable() const override;
       int depth() const { return depth_; }
       ASTType *pointee() const { return pointee_; }
 
@@ -122,6 +128,7 @@ namespace zc {
    public:
       virtual Kind kind() const override { return Kind::TYPE_FUNCTION; }
       virtual bool is_integral() const override { return false; }
+      virtual const FunctionType *get_callable() const override { return this; }
       ASTType *return_type() const { return return_type_; }
       Types *params() const { return params_; }
       

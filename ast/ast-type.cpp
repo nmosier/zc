@@ -56,4 +56,8 @@ namespace zc {
                        os << ", ";
                     });
    }
+
+   const FunctionType *PointerType::get_callable() const {
+         return dynamic_cast<const FunctionType *>(pointee()); /* beautiful */      
+   }
 }

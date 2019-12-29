@@ -55,4 +55,9 @@ namespace zc {
       id_->Dump(os, level, with_types);
    }
 
+   void CallExpr::DumpChildren(std::ostream& os, int level, bool with_types) const {
+      fn()->Dump(os, level, with_types);
+      params()->Dump(os, level, with_types);
+   }
+
 }

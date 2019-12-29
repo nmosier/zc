@@ -22,6 +22,7 @@ SEMANTIC ANALYSIS
 [X] Introduce declarations as types
 [ ] Return statements present unless void.
 [ ] Type deserialization for easy type construction
+[ ] Fix "incomplete type" error when declaring "void *"
 
 AST
 [X] Add bindings of types to identifiers (TypeID, perhaps?)
@@ -35,3 +36,8 @@ AST
 ASM
 [ ] Register attributes: loadable, movable, addable, etc.
 [ ] Separate singleton classes for each register (`a', `hl', etc.)
+
+CGEN
+
+GENERAL
+[ ] Add function calls.

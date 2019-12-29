@@ -13,7 +13,6 @@ namespace zc {
 
    std::ostream& indent(std::ostream& os, int level);
 
-
    class ASTNode {
    public:
       const SourceLoc& loc() const { return loc_; }
@@ -22,6 +21,8 @@ namespace zc {
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const = 0;
       virtual void DumpType(std::ostream& os) const {}
 
+      //      virtual void CodeGen(std::ostream& os, SemantEnv &env) 
+      
    protected:
       SourceLoc loc_;
       ASTNode(const SourceLoc& loc): loc_(loc) {}

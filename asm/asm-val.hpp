@@ -76,24 +76,45 @@ namespace zc::z80 {
    };
 
    /**
-    * Class representing an indexed register.
+    * Class representing an indexed register value.
     */
    template <Size sz>
-   class IndexedValue: public Value<sz> {
+   class IndexedRegisterValue: public Value<sz> {
    public:
       const RegisterValue<Size::LONG> *val() const { return val_; }
       int8_t index() const { return index_; }
-
+      
       virtual void Emit(std::ostream& os) const override;
       
       template <typename... Args>
-      IndexedValue(const RegisterValue<Size::LONG> *val, const ImmediateValue<Size::BYTE> *index,
-                   Args... args):
+      IndexedRegisterValue(const RegisterValue<Size::LONG> *val,
+                           const ImmediateValue<Size::BYTE> *index,
+                           Args... args):
          Value<sz>(args...), val_(val), index_(index) {}
       
    protected:
       const RegisterValue<Size::LONG> *val_;
       const ImmediateValue<Size::BYTE> *index_; 
+   };
+
+   /**
+    * Class representing a value with a fixed added offset.
+    */
+   template <Size sz>
+   class OffsetValue: public Value<sz> {
+   public:
+      const Value<sz> *base() const { return base_; }
+      const intmax_t& offset() const { return offset_; }
+
+      virtual void Emit(std::ostream& os) const override;
+
+      template <typename... Args>
+      OffsetValue(const Value<sz> *base, const intmax_t& offset, Args... args):
+         Value<sz>(args...), base_(base), offset_(offset) {}
+
+   protected:
+      const Value<sz> base_;
+      const intmax_t offset_;
    };
 
    /**
