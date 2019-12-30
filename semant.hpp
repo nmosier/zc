@@ -73,7 +73,7 @@ namespace zc {
 
    class SemantEnv: public Env<ASTType> {
    public:
-      SemantEnv(SemantError& error);
+      SemantEnv(SemantError& error): Env<ASTType>(), error_(error) {}
       SemantError& error() { return error_; }
 
    private:
