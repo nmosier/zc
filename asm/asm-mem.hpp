@@ -7,6 +7,7 @@
 
 #include <string>
 #include <vector>
+#include <variant>
 
 namespace zc::z80 {
 
@@ -49,9 +50,20 @@ namespace zc::z80 {
    protected:
       const Value<Size::LONG> *addr_;
    };
-   
-   
 
+   /**
+    * generic, i.e. of undefined width
+    */
+   typedef std::variant<MemoryLocation<Size::BYTE>, MemoryLocation<Size::LONG>>
+   MemoryLocationVariant;
+   class GenericMemoryLocation: public MemoryLocationVariant {
+   public:
+      template <typename... Args>
+      GenericMemoryLocation(Args... args): MemoryLocationVariant(args...) {}
+      
+   protected:
+   };
+   
 }
 
 #endif
