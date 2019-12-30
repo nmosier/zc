@@ -30,7 +30,7 @@ namespace zc {
       virtual ASTType *Address() = 0;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) = 0;
 
-      void Enscope(SemantEnv& env) const;
+      // void Enscope(SemantEnv& env) const;
       
    protected:
       /**
