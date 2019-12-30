@@ -57,6 +57,9 @@ namespace zc {
    TypeSpec Max(TypeSpec lhs, TypeSpec rhs);
    
    class TypeSpecs;
+
+   class SemantEnv;
+   class CgenEnv;
 }
 
 #endif
