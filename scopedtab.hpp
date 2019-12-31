@@ -61,7 +61,7 @@ namespace zc {
     /**
      * Push new scope onto the stack
      */
-    void EnterScope() { scopes_.emplace_front(); }
+     void EnterScope() { scopes_.emplace_front(); }
 
     /**
      * Pop current scope off the stack

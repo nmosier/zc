@@ -23,8 +23,11 @@ namespace zc {
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
       
       virtual void TypeCheck(SemantEnv& env);
+      ASTType *Type() const;
       virtual void Enscope(SemantEnv& env) const;
       virtual void Descope(SemantEnv& env) const;
+
+      virtual void CodeGen(CgenEnv& env) const;
       
    protected:
       Decl *decl_;
@@ -48,11 +51,8 @@ namespace zc {
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
 
       virtual void TypeCheck(SemantEnv& env) override;
-
       virtual void Enscope(SemantEnv& env) const override;
       virtual void Descope(SemantEnv& env) const override;
-
-      FunctionType *Type() const;
       
    protected:
       CompoundStat *comp_stat_;

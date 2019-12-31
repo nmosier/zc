@@ -45,8 +45,6 @@ namespace zc {
       case TypeSpec::TYPE_INT:       os << "INT"; return os;
       case TypeSpec::TYPE_LONG:      os << "LONG"; return os;
       case TypeSpec::TYPE_LONG_LONG: os << "LONG_LONG"; return os;
-      case TypeSpec::TYPE_POINTER:   os << "POINTER"; return os;
-      case TypeSpec::TYPE_FUNCTION:  os << "FUNCTION"; return os;
       }
    }
    

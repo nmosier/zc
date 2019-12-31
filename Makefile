@@ -18,8 +18,8 @@ BISON_HDR = $(BISON_SRC:.cpp=.hpp)
 FLEX_SRC = lex.yy.c
 FLEX_OBJ = $(FLEX_SRC:.c=.o)
 
-HDRS = $(AST_HDRS) $(BISON_HDR)
-OBJS = $(AST_OBJS) util.o symtab.o semant.o env.o cgen.o
+HDRS = $(AST_HDRS) $(BISON_HDR) cgen.hpp semant.hpp env.hpp
+OBJS = $(AST_OBJS) $(ASM_OBJS) util.o symtab.o semant.o env.o cgen.o
 
 CLEAN_OBJS = $(shell find . -name "*.o")
 CLEAN_SRCS = $(BISON_SRC) $(FLEX_SRC)
@@ -42,6 +42,9 @@ $(FLEX_SRC): c.l $(HDRS)
 
 $(FLEX_OBJ): $(FLEX_SRC)
 	c++ -c $(CXXFLAGS) -o $@ $^
+
+asm/%.o: asm/%.cpp $(ASM_HDRS)
+	c++ -c $(CXXFLAGS) -o $@ $<
 
 %.o: %.cpp $(AST_HDRS)
 	c++ -c $(CXXFLAGS) -o $@ $<

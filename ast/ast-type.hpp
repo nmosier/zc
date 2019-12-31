@@ -5,6 +5,8 @@
 #ifndef __AST_TYPE_HPP
 #define __AST_TYPE_HPP
 
+#include "ast-size.hpp"
+
 namespace zc {
 
    class FunctionType;
@@ -16,6 +18,8 @@ namespace zc {
                        TYPE_FUNCTION};
       virtual Kind kind() const = 0;
       virtual const Decl *decl() const { return decl_; }
+      const Symbol *sym() const;
+      virtual Size size() const = 0;
 
       virtual bool is_integral() const = 0;
       bool is_callable() const { return get_callable() != nullptr; }
@@ -64,6 +68,7 @@ namespace zc {
 
       virtual ASTType *Address() override;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) override;
+      virtual Size size() const override { return ::zc::size(type_spec()); }
 
       BasicType *Max(const BasicType *with) const;
        
@@ -114,6 +119,7 @@ namespace zc {
 
       virtual ASTType *Address() override;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) override;
+      virtual Size size() const override { return Size::SZ_POINTER; }
       
    protected:
       int depth_;
@@ -141,10 +147,13 @@ namespace zc {
 
       virtual bool TypeEq(const ASTType *other) const override;
       virtual bool TypeCoerce(const ASTType *from) const override;
-      virtual void TypeCheck(SemantEnv& env) override;      
+      virtual void TypeCheck(SemantEnv& env) override;
 
       virtual ASTType *Address() override;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) override;
+      virtual Size size() const override {
+         throw std::logic_error("attempted to take size of function");
+      }
       
    protected:
       ASTType *return_type_;

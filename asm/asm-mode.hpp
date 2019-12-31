@@ -5,6 +5,8 @@
 #ifndef __ASM_MODE_HPP
 #define __ASM_MODE_HPP
 
+#include "ast.hpp"
+
 namespace zc::z80 {
 
    constexpr bool ez80_mode =
@@ -24,6 +26,9 @@ namespace zc::z80 {
       3
 #endif
       ;
+
+   int bytes(Size size);
+   int bytes(const ASTType *type);
    
 }
 

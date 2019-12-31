@@ -1,6 +1,8 @@
 #include <cassert>
+#include <stdexcept>
 
 #include "ast.hpp"
+#include "asm.hpp"
 
 namespace zc {
 
@@ -12,8 +14,6 @@ namespace zc {
       case TypeSpec::TYPE_INT:       return true;
       case TypeSpec::TYPE_LONG:      return true;
       case TypeSpec::TYPE_LONG_LONG: return true;
-      case TypeSpec::TYPE_POINTER:   return false;
-      case TypeSpec::TYPE_FUNCTION:  return false;
       }
    }
 
@@ -60,4 +60,7 @@ namespace zc {
    const FunctionType *PointerType::get_callable() const {
          return dynamic_cast<const FunctionType *>(pointee()); /* beautiful */      
    }
-}
+
+   const Symbol *ASTType::sym() const { return decl()->id()->id(); }
+
+ }

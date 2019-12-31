@@ -50,8 +50,6 @@ namespace zc {
                         TYPE_INT,
                         TYPE_LONG,
                         TYPE_LONG_LONG,
-                        TYPE_POINTER,
-                        TYPE_FUNCTION,
    };
    bool IsIntegral(TypeSpec type);
    TypeSpec Max(TypeSpec lhs, TypeSpec rhs);

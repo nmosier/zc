@@ -1,9 +1,12 @@
+#include <stdexcept>
+
 #include "asm.hpp"
 
 namespace zc::z80 {
 
-   template <Size sz>
-   void ImmediateValue<sz>::Emit(std::ostream& os) const {
+   /*** EMIT ***/
+   
+   void ImmediateValue::Emit(std::ostream& os) const {
       os << imm_;
    }
 
@@ -11,30 +14,64 @@ namespace zc::z80 {
       label()->EmitRef(os);
    }
 
-   template <Size sz>
-   void RegisterValue<sz>::Emit(std::ostream& os) const {
+   void RegisterValue::Emit(std::ostream& os) const {
       reg()->Emit(os);
    }
 
-   template <Size sz>
-   void IndexedRegisterValue<sz>::Emit(std::ostream& os) const {
+   void IndexedRegisterValue::Emit(std::ostream& os) const {
       val()->Emit(os);
       os << "+";
-      index()->Emit(os);
+      os << (int) index(); 
    }
 
-   template <Size sz>
-   void OffsetValue<sz>::Emit(std::ostream& os) const {
+   void OffsetValue::Emit(std::ostream& os) const {
       base()->Emit(os);
       os << "+";
-      offset()->Emit(os);
+      os << offset();
    }
 
-   template <Size sz>
-   void MemoryValue<sz>::Emit(std::ostream& os) const {
+   void MemoryValue::Emit(std::ostream& os) const {
       os << "(";
       loc()->Emit(os);
       os << ")";
    }
+
+   /*** ADD ***/
    
+   Value *ImmediateValue::Add(const intmax_t& offset) const {
+      return new ImmediateValue(imm() + offset, size());
+   }
+
+   Value *LabelValue::Add(const intmax_t& offset) const {
+      return new OffsetValue(this, offset, size());
+   }
+
+   Value *RegisterValue::Add(const intmax_t& offset) const {
+      return new IndexedRegisterValue(this, offset, size());
+   }
+
+   Value *IndexedRegisterValue::Add(const intmax_t& offset) const {
+      return new IndexedRegisterValue(val(), index() + offset, size());
+   }
+
+   Value *OffsetValue::Add(const intmax_t& new_offset) const {
+      return new OffsetValue(base(), offset() + new_offset, size());
+   }
+
+   Value *MemoryValue::Add(const intmax_t& offset) const {
+      throw std::logic_error("attempted to offset a memory value");
+   }
+
+   MemoryLocation *MemoryLocation::Advance(const intmax_t& offset) const {
+      return new MemoryLocation(addr()->Add(offset));
+   }
+      
+   MemoryValue *MemoryValue::Next(int next_size) const {
+      return new MemoryValue(loc()->Advance(size()), next_size);
+   }
+
+   MemoryValue *MemoryValue::Prev(int next_size) const {
+      return new MemoryValue(loc()->Advance(-next_size), next_size);
+   }
+
 }

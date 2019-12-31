@@ -9,8 +9,6 @@ namespace zc::z80 {
 #endif
 #endif
 
-   enum class Size {BYTE, WORD, LONG};
-   
 }
 
 #include "asm/asm-instr.hpp"
@@ -19,5 +17,6 @@ namespace zc::z80 {
 #include "asm/asm-val.hpp"
 #include "asm/asm-mode.hpp"
 #include "asm/asm-cond.hpp"
+#include "asm/asm-proto.hpp"
 
 #endif

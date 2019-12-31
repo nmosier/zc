@@ -21,8 +21,6 @@ namespace zc {
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const = 0;
       virtual void DumpType(std::ostream& os) const {}
 
-      //      virtual void CodeGen(std::ostream& os, SemantEnv &env) 
-      
    protected:
       SourceLoc loc_;
       ASTNode(const SourceLoc& loc): loc_(loc) {}
@@ -42,6 +40,7 @@ namespace zc {
    public:
       typedef std::vector<Node *> Vec;
       Vec& vec() { return vec_; }
+      const Vec& vec() const { return vec_; }
 
       template <typename... Args> static ASTNodeVec<Node> *Create(Args... args) {
          return new ASTNodeVec<Node>(args...);
@@ -58,6 +57,13 @@ namespace zc {
       void TypeCheck(SemantEnv& env, Args... args) {
          for (Node *node : vec_) {
             node->TypeCheck(env, args...);
+         }
+      }
+
+      template <typename... Args>
+      void CodeGen(CgenEnv& env, Args... args) {
+         for (const Node *node : vec()) {
+            node->CodeGen(env, args...);
          }
       }
 

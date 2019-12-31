@@ -34,36 +34,22 @@ namespace zc::z80 {
     * MEMORY LOCATION *
     *******************/
 
-   template <Size sz> class Value;
+   class Value;
    /**
     * Base class representing a memory location.
     */
-   template <Size sz>
    class MemoryLocation {
    public:
-      const Value<Size::LONG> *addr() const { return addr_; }
+      const Value *addr() const { return addr_; }
 
+      MemoryLocation *Advance(const intmax_t& offset) const;
       void Emit(std::ostream& os) const;
 
-      MemoryLocation(const Value<Size::LONG> *addr): addr_(addr) {}
+      MemoryLocation(const Value *addr): addr_(addr) {}
       
    protected:
-      const Value<Size::LONG> *addr_;
+      const Value *addr_;
    };
-
-   /**
-    * generic, i.e. of undefined width
-    */
-   typedef std::variant<MemoryLocation<Size::BYTE>, MemoryLocation<Size::LONG>>
-   MemoryLocationVariant;
-   class GenericMemoryLocation: public MemoryLocationVariant {
-   public:
-      template <typename... Args>
-      GenericMemoryLocation(Args... args): MemoryLocationVariant(args...) {}
-      
-   protected:
-   };
-   
 }
 
 #endif

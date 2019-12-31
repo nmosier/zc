@@ -8,8 +8,7 @@ namespace zc::z80 {
       os << "\t" << name() << "\t" << std::endl;
    }
 
-   template <Size sz>
-   void BinaryInstruction<sz>::Emit(std::ostream& os) const {
+   void BinaryInstruction::Emit(std::ostream& os) const {
       os << "\t" << name() << "\t";
       dst()->Emit(os);
       os << ",";
@@ -17,8 +16,7 @@ namespace zc::z80 {
       os << std::endl;
    }
 
-   template <Size sz>
-   void UnaryInstruction<sz>::Emit(std::ostream& os) const {
+   void UnaryInstruction::Emit(std::ostream& os) const {
       os << "\t" << name() << "\t";
       dst()->Emit(os);
       os << std::endl;

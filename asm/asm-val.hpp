@@ -7,6 +7,8 @@
 
 #include <ostream>
 
+#include "asm-reg.hpp"
+
 namespace zc::z80 {
 
    /**********
@@ -16,26 +18,31 @@ namespace zc::z80 {
    /**
     * Base class for values during code generation.
     */
-   template <Size sz>
    class Value {
    public:
+      int size() const { return size_; }
+      
       virtual void Emit(std::ostream& os) const = 0;
+      virtual Value *Add(const intmax_t& offset) const = 0;
       
    protected:
+      int size_;
+
+      Value(int size): size_(size) {}
    };
 
    /**
     * Class representing immediate value.
     */
-   template <Size sz>
-   class ImmediateValue: public Value<sz> {
+   class ImmediateValue: public Value {
    public:
       const intmax_t& imm() const { return imm_; }
-
+      
       virtual void Emit(std::ostream& os) const override;
-
+      virtual Value *Add(const intmax_t& offset) const override;
+      
       template <typename... Args>
-      ImmediateValue(const intmax_t& imm, Args... args): imm_(imm), Value<sz>(args...) {}
+      ImmediateValue(const intmax_t& imm, Args... args): imm_(imm), Value(args...) {}
       
    protected:
       intmax_t imm_;
@@ -44,96 +51,101 @@ namespace zc::z80 {
    /**
     * Class representing the value of a label (i.e. its address).
     */
-   class LabelValue: public Value<Size::LONG> {
+   class LabelValue: public Value {
    public:
       const Label *label() const { return label_; }
 
       virtual void Emit(std::ostream& os) const override;
+      virtual Value *Add(const intmax_t& offset) const override;      
 
       template <typename... Args>
-      LabelValue(const Label *label, Args... args): Value(args...), label_(label) {}
+      LabelValue(const Label *label, Args... args): Value(long_size, args...), label_(label) {}
       
    protected:
       const Label *label_;
    };
 
-   template <Size sz> class Register;
+   class Register;
    /**
     * Class representing a value held in a single-byte register.
     */
-   template <Size sz>
-   class RegisterValue: public Value<sz> {
+   class RegisterValue: public Value {
    public:
-      const Register<sz> *reg() const override { return reg(); }
-
+      const Register *reg() const { return reg(); }
+      
       virtual void Emit(std::ostream& os) const override;
+      virtual Value *Add(const intmax_t& offset) const override;
 
       template <typename... Args>
-      RegisterValue(const Register<sz> *reg, Args... args): Value<sz>(args...), reg_(reg) {}
+      RegisterValue(const Register *reg, Args... args):
+         Value(args..., reg->size()), reg_(reg) {}
       
    protected:
-      const Register<sz> *reg_;
+      const Register *reg_;
    };
-
+   
    /**
     * Class representing an indexed register value.
     */
-   template <Size sz>
-   class IndexedRegisterValue: public Value<sz> {
+   class IndexedRegisterValue: public Value {
    public:
-      const RegisterValue<Size::LONG> *val() const { return val_; }
+      const RegisterValue *val() const { return val_; }
       int8_t index() const { return index_; }
       
       virtual void Emit(std::ostream& os) const override;
+      virtual Value *Add(const intmax_t& offset) const override;
       
       template <typename... Args>
-      IndexedRegisterValue(const RegisterValue<Size::LONG> *val,
-                           const ImmediateValue<Size::BYTE> *index,
+      IndexedRegisterValue(const RegisterValue *val,
+                           int8_t index,
                            Args... args):
-         Value<sz>(args...), val_(val), index_(index) {}
+         Value(args...), val_(val), index_(index) {}
       
    protected:
-      const RegisterValue<Size::LONG> *val_;
-      const ImmediateValue<Size::BYTE> *index_; 
+      const RegisterValue *val_;
+      int8_t index_;
    };
 
    /**
     * Class representing a value with a fixed added offset.
     */
-   template <Size sz>
-   class OffsetValue: public Value<sz> {
+   class OffsetValue: public Value {
    public:
-      const Value<sz> *base() const { return base_; }
+      const Value *base() const { return base_; }
       const intmax_t& offset() const { return offset_; }
 
       virtual void Emit(std::ostream& os) const override;
+      virtual Value *Add(const intmax_t& offset) const override;
 
       template <typename... Args>
-      OffsetValue(const Value<sz> *base, const intmax_t& offset, Args... args):
-         Value<sz>(args...), base_(base), offset_(offset) {}
+      OffsetValue(const Value *base, const intmax_t& offset, Args... args):
+         Value(args...), base_(base), offset_(offset) {}
 
    protected:
-      const Value<sz> base_;
+      const Value *base_;
       const intmax_t offset_;
    };
 
    /**
     * Class representing a value contained in memory.
     */
-   template <Size sz>
-   class MemoryValue: public Value<sz> {
+   class MemoryValue: public Value {
    public:
-      const MemoryLocation<sz> *loc() const { return loc_; }
-
+      const MemoryLocation *loc() const { return loc_; }
+      
       virtual void Emit(std::ostream& os) const override;
+      virtual Value *Add(const intmax_t& offset) const override;
 
+      MemoryValue *Next(int size) const;
+      MemoryValue *Prev(int size) const;
+      
       template <typename... Args>
-      MemoryValue(const MemoryLocation<sz> *loc, Args... args): Value<sz>(args...), loc_(loc) {}
+      MemoryValue(const MemoryLocation *loc, Args... args): Value(args...), loc_(loc) {}
       
    protected:
-      const MemoryLocation<sz> *loc_;
+      const MemoryLocation *loc_;
    };
-   
+
 }
 
 #endif
