@@ -149,7 +149,10 @@ namespace zc::z80 {
 
    /*** EXTERNAL CONSTANTS ***/
    template <intmax_t N>
-   const ImmediateValue imm_b(N, byte_size), imm_l(N, long_size);
+   const ImmediateValue imm_b(N, byte_size);
+
+   template <intmax_t N>
+   const ImmediateValue imm_l(N, long_size);
    
 }
 

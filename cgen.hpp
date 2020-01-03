@@ -11,6 +11,12 @@ namespace zc {
 
    using namespace zc::z80;
 
+   /**
+    * Entry point to code generator.
+    */
+   void Cgen(TranslationUnit *root, std::ostream& os, const char *filename);
+
+   
    class SymInfo {
    public:
       const ASTType *type() const { return type_; }
@@ -19,31 +25,32 @@ namespace zc {
        * The lvalue of this symbol. If it is a variable, it points to its storage location.
        * If it's a function, then it is the address of the function.
        */
-      const Value *val() const { return val_; }
+      const Value *lval() const { return lval_; }
 
-      SymInfo(const ASTType *type, const Value *val): type_(type), val_(val) {}
+      /**
+       * The rvalue of this symbol. If it is a variable, it represents the contents of its storage
+       * location.
+       */
+      const Value *rval() const { return rval_; }
+
+      SymInfo(const ASTType *type, const Value *lval);
       SymInfo(const ExternalDecl *ext_decl);
-      SymInfo(const Decl *decl);
+      // SymInfo(const Decl *decl);
       
    protected:
       const ASTType *type_;
-      const Value *val_;
+      const Value *lval_;
+      const Value *rval_;
    };
 
    class CgenExtEnv {
    public:
       Symbol *sym() const { return sym_env_.sym(); }
 
-      void Enter(Symbol *sym) {
-         sym_env_.Enter(sym);
-      }
+      void Enter(Symbol *sym);
+      void Exit();
 
       const MemoryValue *NewLocal(Size size);
-
-      void Exit() {
-         sym_env_.Exit();
-      }
-      
       
    private:
       SymbolEnv sym_env_;
@@ -136,18 +143,36 @@ namespace zc {
       const LabelValue *addr_;
    };
 
+   class StringConstants {
+      typedef std::unordered_map<std::string, const Label *> Strings;
+   public:
+      void Insert(const std::string& str);
+      LabelValue *Ref(const std::string& str);
+      
+      StringConstants(): counter_(0), strs_() {}
+      
+   private:
+      int counter_;
+      Strings strs_;
+
+      Label *new_label();
+   };
    
    class CgenEnv: public Env<SymInfo,CgenExtEnv> {
    public:
       const MemoryValue *next_local() const { return next_local_; }
+      const StringConstants& strconsts() const { return strconsts_; }
+      StringConstants& strconsts() { return strconsts_; }
       
-      CgenEnv(): Env<SymInfo,CgenExtEnv>(), next_local_(&FP_memval) {}
+      CgenEnv(): Env<SymInfo,CgenExtEnv>(), next_local_(&FP_memval), strconsts_() {}
       
    protected:
       /**
        * Track the memory value of the most recently allocated local.
        */
       const MemoryValue *next_local_;
+
+      StringConstants strconsts_;
    };
 
 
@@ -173,14 +198,18 @@ namespace zc {
 
    /**
     * Generic emission routine for performing binary operation on two integers.
+    * Post condition: lhs in %a or %hl; hs in %b or %de, depending on size.
     */
-   Block *emit_binop(CgenEnv& env, Block *block, Size size,
-                     Block *(*op)(CgenEnv& env, Block *block, Size size));
+   void emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr);
    
    /**
     * Emit instructions that move the contents of the zero flag (ZF) into register %a.
     */
    Block *emit_ld_a_zf(CgenEnv& env, Block *block, bool inverted = false);   
+
+   /*** C RUNTIME ***/
+   const Label crt_l_call("call");
+   const LabelValue crt_lv_call(&crt_l_call);
    
 }
 

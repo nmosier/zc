@@ -7,7 +7,7 @@
 
 namespace zc {
 
-   template class Env<ASTType>;
-   template class Env<SymInfo>;
+   template class Env<ASTType, SymbolEnv>;
+   template class Env<SymInfo, CgenExtEnv>;
    
 }

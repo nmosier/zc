@@ -1,0 +1,12 @@
+Passes
+
+1. Lexer
+2. Parser
+3. Semantic Analysis
+4. Code generation I   -- generate code blocks
+5. Code generation II  -- map code blocks to assembly
+6. Code generation III -- emit assembly
+
+C RUNTIME:
+__call:
+   jp (hl)

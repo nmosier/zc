@@ -8,6 +8,12 @@
 
 namespace zc {
 
+   void Cgen(TranslationUnit *root, std::ostream& os, const char *filename) {
+      CgenEnv env;
+      root->CodeGen(env);
+   }
+   
+
    FunctionImpl::FunctionImpl(const Block *entry): entry_(entry) {
       addr_ = new LabelValue(entry->label());
    }
@@ -19,7 +25,7 @@ namespace zc {
 
    void CgenExtEnv::Enter(Symbol *sym) {
       sym_env_.Enter(sym);
-      next_local_ = &fp_memval;
+      next_local_ = &FP_memval;
    }
 
    void CgenExtEnv::Exit() {
@@ -27,22 +33,46 @@ namespace zc {
       next_local_ = nullptr;
    }
 
-
    SymInfo::SymInfo(const ExternalDecl *ext_decl) {
       type_ = ext_decl->Type();
       Label *label = new Label(std::string("_") + *ext_decl->sym());
       LabelValue *label_val = new LabelValue(label);
 
       if (type_->kind() == ASTType::Kind::TYPE_FUNCTION) {
-         val_ = label_val;
+         /* Functions _always_ behave as lvalues, i.e. they are always treated as addresses. */
+         lval_ = rval_ = label_val;
       } else {
+         lval_ = label_val;
+
          MemoryLocation *mem_loc = new MemoryLocation(label_val);
-         val_ = new MemoryValue(mem_loc, bytes(type_));
+         rval_ = new MemoryValue(mem_loc, bytes(type_));
       }
+   }
+
+   SymInfo::SymInfo(const ASTType *type, const Value *lval): type_(type), lval_(lval) {
+      MemoryLocation *mem_loc = new MemoryLocation(lval);
+      rval_ = new MemoryValue(mem_loc, bytes(type_));
    }
 
    const MemoryValue *CgenExtEnv::NewLocal(Size size) {
       return (next_local_ = next_local_->Prev(bytes(size)));
+   }
+
+   /*** STRING CONSTANTS ***/
+   void StringConstants::Insert(const std::string& str) {
+      if (strs_.find(str) == strs_.end()) {
+         strs_[str] = new_label();
+      }
+   }
+
+   LabelValue *StringConstants::Ref(const std::string& str) {
+      Insert(str);
+
+      return new LabelValue(strs_[str]);
+   }
+
+   Label *StringConstants::new_label() {
+      return new Label(std::string("__") + std::string("strconst_") + std::to_string(counter_++));
    }
 
    /*** CODE GENERATION ***/
@@ -80,7 +110,7 @@ namespace zc {
          argloc = argloc->Advance(long_size);
       }
       
-      Block *start_block = new Block(dynamic_cast<const LabelValue *>(info->val())->label());
+      Block *start_block = new Block(dynamic_cast<const LabelValue *>(info->lval())->label());
       
       Block *end_block = comp_stat()->CodeGen(env, start_block, false);
       
@@ -126,7 +156,7 @@ namespace zc {
 
       /* generate returned expression 
        * For now, assume result will be in %a or %hl. */
-      block = expr()->CodeGen(env, block);
+      block = expr()->CodeGen(env, block, ASTExpr::ExprKind::EXPR_RVALUE);
       
       /* append return transition */
       block->transitions().vec().push_back(new ReturnTransition(Cond::ANY));
@@ -136,12 +166,12 @@ namespace zc {
    }
 
    Block *ExprStat::CodeGen(CgenEnv& env, Block *block) {
-      return expr()->CodeGen(env, block);
+      return expr()->CodeGen(env, block, ASTExpr::ExprKind::EXPR_RVALUE);
    }
 
    Block *IfStat::CodeGen(CgenEnv& env, Block *block) {
       /* Evaluate predicate */
-      block = cond()->CodeGen(env, block);
+      block = cond()->CodeGen(env, block, ASTExpr::ExprKind::EXPR_RVALUE);
 
       /* Test predicate 
        * NOTE: For now, assume result is in %a or %hl. */
@@ -181,16 +211,21 @@ namespace zc {
       assert(mode == ExprKind::EXPR_RVALUE);
 
       /* compute right-hand rvalue */
+      Size sz = rhs()->type()->size();
+      int bs = bytes(sz);
       block = rhs()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
 
       /* save right-hand value */
-      block->instrs().push_back(PushInstruction(new RegisterValue(return_register(size))));
+      block->instrs().push_back
+         (PushInstruction
+          (new RegisterValue
+           (return_register(sz))));
 
       /* compute left-hand lvalue */
       block = lhs()->CodeGen(env, block, ExprKind::EXPR_LVALUE);
 
       /* restore right-hand value */
-      switch (bytes(size)) {
+      switch (bs) {
       case byte_size:
          block->instrs().push_back(PopInstruction(new RegisterValue(&r_af)));
          block->instrs().push_back
@@ -199,7 +234,8 @@ namespace zc {
               (new MemoryLocation
                (new RegisterValue
                 (&r_hl)
-                )
+                ),
+               byte_size
                ),
               new RegisterValue
               (&r_a)
@@ -217,7 +253,8 @@ namespace zc {
               (new MemoryLocation
                (new RegisterValue
                 (&r_hl)
-                )
+                ),
+               long_size
                ),
               new RegisterValue
               (&r_de)
@@ -230,6 +267,7 @@ namespace zc {
    }
 
    Block *UnaryExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
+      int bs = bytes(type()->size());
       switch (kind()) {
       case Kind::UOP_ADDR:
          /* get subexpression as lvalue */
@@ -250,13 +288,13 @@ namespace zc {
          break;
          
       case Kind::UOP_NEGATIVE:
-         switch (bytes(type()->size())) {
+         switch (bs) {
          case byte_size:
             block->instrs().push_back(NegInstruction());
             break;
          case word_size: abort();
          case long_size:
-            block->instrs().push_back(LoadInstruction(&rv_de, &imm_0_l));
+            block->instrs().push_back(LoadInstruction(&rv_de, &imm_l<0>));
             block->instrs().push_back(ExInstruction(&rv_de, &rv_hl));
             block->instrs().push_back(XorInstruction(&rv_a, &rv_a));
             block->instrs().push_back(SbcInstruction(&rv_hl, &rv_de));
@@ -272,7 +310,7 @@ namespace zc {
          case word_size: abort();
          case long_size:
             /* NOTE: this uses the property of 2's complement that it is 1's complement plus 1. */
-            block->instrs().push_back(LoadInstruction(&rv_de, &imm_0_l));
+            block->instrs().push_back(LoadInstruction(&rv_de, &imm_l<0>));
             block->instrs().push_back(ExInstruction(&rv_de, &rv_hl));
             block->instrs().push_back(ScfInstruction());
             block->instrs().push_back(SbcInstruction(&rv_hl, &rv_de));
@@ -289,8 +327,8 @@ namespace zc {
    }
 
    Block *BinaryExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
-      Size size = type()->size();
-      int bytes = bytes(size);
+      Size sz = type()->size();
+      int bs = bytes(sz);
 
       switch (kind()) {
       case Kind::BOP_LOGICAL_AND:
@@ -300,25 +338,25 @@ namespace zc {
          {
             /* evaluate lhs */
             block = lhs()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
-            emit_booleanize(env, block, size);
-            emit_nonzero_test(env, block, size); /* NOTE: This should be optimized 
+            emit_booleanize(env, block, sz);
+            emit_nonzero_test(env, block, sz); /* NOTE: This should be optimized 
                                                   * away in the future. */
 
             /* create transitions */
             const Label *end_label = new_label("BOP_LOGICAL_AND");
             Block *end_block = new Block(end_label);
             BlockTransition *end_transition = new JumpTransition(end_block, Cond::Z);
-            block->transitions().push_back(end_transition);
+            block->transitions().vec().push_back(end_transition);
 
             const Label *cont_label = new_label("BOP_LOGICAL_AND");
             Block *cont_block = new Block(cont_label);
             BlockTransition *cont_transition = new JumpTransition(end_block, Cond::NZ);
-            block->transitions().push_back(cont_transition);
+            block->transitions().vec().push_back(cont_transition);
 
             /* Evaluate rhs */
             cont_block = rhs()->CodeGen(env, cont_block, ExprKind::EXPR_RVALUE);
-            emit_booleanize(env, block, size);
-            cont_block->transitions().push_back(end_transition);
+            emit_booleanize(env, block, sz);
+            cont_block->transitions().vec().push_back(end_transition);
 
             return end_block;
          }
@@ -329,148 +367,316 @@ namespace zc {
          {
             /* evaluate lhs */
             block = lhs()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
-            emit_booleanize(env, block, size);
-            emit_nonzero_test(env, block, size); /* NOTE: This should be optimized 
+            emit_booleanize(env, block, sz);
+            emit_nonzero_test(env, block, sz); /* NOTE: This should be optimized 
                                                   * away in the future. */
 
             /* create transitions */
             const Label *end_label = new_label("BOP_LOGICAL_OR");
             Block *end_block = new Block(end_label);
             BlockTransition *end_transition = new JumpTransition(end_block, Cond::NZ);
-            block->transitions().push_back(end_transition);
+            block->transitions().vec().push_back(end_transition);
             
             const Label *cont_label = new_label("BOP_LOGICAL_AND");
             Block *cont_block = new Block(cont_label);
             BlockTransition *cont_transition = new JumpTransition(end_block, Cond::Z);
-            block->transitions().push_back(cont_transition);
+            block->transitions().vec().push_back(cont_transition);
 
             /* Evaluate rhs */
             cont_block = rhs()->CodeGen(env, cont_block, ExprKind::EXPR_RVALUE);
-            emit_booleanize(env, block, size);
-            cont_block->transitions().push_back(end_transition);
+            emit_booleanize(env, block, sz);
+            cont_block->transitions().vec().push_back(end_transition);
             
             return end_block;            
          }
 
       case Kind::BOP_EQ:
       case Kind::BOP_NEQ:
-         block = emit_binop(env, block, size,
-                            [](CgenEnv& env, Block *block, Size size) -> Block * {
-                               switch (bytes(size)) {
-                               case byte_size:
-                                  block->instrs().push_back(CompInstruction(&rv_a, &rv_b));
-                                  break;
-                               case word_size: abort();
-                               case long_size:
-                                  block->instrs().push_back(XorInstruction(&rv_a, &rv_a));
-                                  block->instrs().push_back(SbcInstruction(&rv_hl, &rv_de));
-                                  break;
-                               }
-                               
-                               return (block = emit_ld_a_zf(env, block, kind() == Kind::BOP_NEQ));
-                            });
+         emit_binop(env, block, this);
+         switch (bs) {
+         case byte_size:
+            block->instrs().push_back(CompInstruction(&rv_a, &rv_b));
+            break;
+         case word_size: abort();
+         case long_size:
+            block->instrs().push_back(XorInstruction(&rv_a, &rv_a));
+            block->instrs().push_back(SbcInstruction(&rv_hl, &rv_de));
+            break;
+         }
+         block = emit_ld_a_zf(env, block, kind() == Kind::BOP_NEQ);
          break;
 
       case Kind::BOP_LT:
-         block = emit_binop(env, block, size,
-                            [](CgenEnv& env, Block *block, Size size) -> Block * {
-                               switch (bytes(size)) {
-                               case byte_size:
-                                  /* cp a,b
-                                   * ld a,0
-                                   * adc a,a
-                                   */
-                                  block->instrs().push_back(CompInstruction(&rv_a, &rv_b));
-                                  block->instrs().push_back(LoadInstruction(&rv_a, &imm_b<0>));
-                                  break;
+         emit_binop(env, block, this);
+         switch (bs) {
+         case byte_size:
+            /* cp a,b
+             * ld a,0
+             * adc a,a
+             */
+            block->instrs().push_back(CompInstruction(&rv_a, &rv_b));
+            block->instrs().push_back(LoadInstruction(&rv_a, &imm_b<0>));
+            break;
                                   
-                               case word_size: abort();
-                               case long_size:
-                                  /* xor a,a
-                                   * sbc hl,de
-                                   * adc a,a
-                                   */
-                                  block->instrs().push_back(XorInstruction(&rv_a, &rv_a));
-                                  block->instrs().push_back(SbcInstruction(&rv_hl, &rv_de));
-                                  break;
-                               }
+         case word_size: abort();
+         case long_size:
+            /* xor a,a
+             * sbc hl,de
+             * adc a,a
+             */
+            block->instrs().push_back(XorInstruction(&rv_a, &rv_a));
+            block->instrs().push_back(SbcInstruction(&rv_hl, &rv_de));
+            break;
+         }
                                
-                               block->instrs().push_back(AdcInstruction(&rv_a, &rv_a));
-                               return block;
-                            });
+         block->instrs().push_back(AdcInstruction(&rv_a, &rv_a));
          break;
 
       case Kind::BOP_LEQ:
-         block = emit_binop(env, block, size,
-                            [](CgenEnv& env, Block *block, Size size) -> Block * {
-                               switch (bytes(size)) {
-                               case byte_size:
-                                  /* scf
-                                   * sbc a,b
-                                   * ld a,0
-                                   * adc a,a
-                                   */
-                                  block->instrs().push_back(ScfInstruction());
-                                  block->instrs().push_back(SbcInstruction(&rv_a, &rv_b));
-                                  block->instrs().push_back(LoadInstruction(&rv_a, &imm_b<0>));
-                                  break;
+         emit_binop(env, block, this);
+         switch (bs) {
+         case byte_size:
+            /* scf
+             * sbc a,b
+             * ld a,0
+             * adc a,a
+             */
+            block->instrs().push_back(ScfInstruction());
+            block->instrs().push_back(SbcInstruction(&rv_a, &rv_b));
+            block->instrs().push_back(LoadInstruction(&rv_a, &imm_b<0>));
+            break;
 
-                               case word_size: abort();
-                               case long_size:
-                                  /* xor a,a
-                                   * scf
-                                   * sbc hl,de
-                                   * adc a,a
-                                   */
-                                  block->instrs().push_back(XorInstruction(&rv_a, &rv_a));
-                                  block->instrs().push_back(ScfInstruction());
-                                  block->instrs().push_back(SbcInstruction(&rv_hl, &rv_de));
-                                  break;
-                               }
+         case word_size: abort();
+         case long_size:
+            /* xor a,a
+             * scf
+             * sbc hl,de
+             * adc a,a
+             */
+            block->instrs().push_back(XorInstruction(&rv_a, &rv_a));
+            block->instrs().push_back(ScfInstruction());
+            block->instrs().push_back(SbcInstruction(&rv_hl, &rv_de));
+            break;
+         }
 
-                               block->instrs().push_back(AdcInstruction(&rv_a, &rv_a));
-                               return block;
-                            });
+         block->instrs().push_back(AdcInstruction(&rv_a, &rv_a));
          break;
 
-      case BOP_GT:
-         block = emit_binop(env, block, size,
-                            [](CgenEnv& env, Block *block, Size size) -> Block * {
-                               switch (bytes(size)) {
-                               case byte_size:
-                                  /* dec a
-                                   * cp a,b
-                                   * ld a,1
-                                   * sbc a,0
-                                   */
-                                  block->instrs().push_back(DecInstruction(&rv_a));
-                                  block->instrs().push_back(CompInstruction(&rv_a, &rv_b));
-                                  block->instrs().push_back(LoadInstruction(&rv_a, &imm_b<1>));
-                                  block->instrs().push_back(SbcInstruction(&rv_a, &imm_b<0>));
-                                  break;
+      case Kind::BOP_GT:
+         emit_binop(env, block, this);
+         switch (bs) {
+         case byte_size:
+            /* dec a
+             * cp a,b
+             * ld a,1
+             * sbc a,0
+             */
+            block->instrs().push_back(DecInstruction(&rv_a));
+            block->instrs().push_back(CompInstruction(&rv_a, &rv_b));
+            block->instrs().push_back(LoadInstruction(&rv_a, &imm_b<1>));
+            block->instrs().push_back(SbcInstruction(&rv_a, &imm_b<0>));
+            break;
 
-                               case word_size: abort();
-                               case long_size:
-                                  /* dec hl
-                                   * xor a,a
-                                   * sbc hl,de
-                                   * sbc a,a
-                                   * inc a
-                                   */
-                                  block->instrs().push_back(DecInstruction(&rv_hl));
-                                  block->instrs().push_back(XorInstruction(&rv_a, &rv_a));
-                                  block->instrs().push_back(SbcInstruction(&rv_hl, &rv_de));
-                                  block->instrs().push_back(SbcInstruction(&rv_a, &rb_a));
-                                  block->instrs().push_back(IncInstruction(&rv_a));
-                                  break;
-                               }
-
-                               return block;
-                            });
+         case word_size: abort();
+         case long_size:
+            /* dec hl
+             * xor a,a
+             * sbc hl,de
+             * sbc a,a
+             * inc a
+             */
+            block->instrs().push_back(DecInstruction(&rv_hl));
+            block->instrs().push_back(XorInstruction(&rv_a, &rv_a));
+            block->instrs().push_back(SbcInstruction(&rv_hl, &rv_de));
+            block->instrs().push_back(SbcInstruction(&rv_a, &rv_a));
+            block->instrs().push_back(IncInstruction(&rv_a));
+            break;
+         }
          break;
 
+      case Kind::BOP_GEQ:
+         emit_binop(env, block, this);
+         switch (bs) {
+         case byte_size:
+            /* cp a,b
+             * ld a,1
+             * sbc a,0
+             */
+            block->instrs().push_back(CompInstruction(&rv_a, &rv_b));
+            break;
+
+         case word_size: abort();
+
+         case long_size:
+            /* xor a,a
+             * sbc hl,de
+             * ld a,1
+             * sbc a,0
+             */
+            block->instrs().push_back(XorInstruction(&rv_a, &rv_a));
+            block->instrs().push_back(SbcInstruction(&rv_hl, &rv_de));
+            break;
+         }
+                               
+         block->instrs().push_back(LoadInstruction(&rv_a, &imm_b<1>));
+         block->instrs().push_back(SbcInstruction(&rv_a, &imm_b<0>));
+         break;
+
+      case Kind::BOP_PLUS:
+         emit_binop(env, block, this);
+         switch (bs) {
+         case byte_size:
+            /* add a,b */
+            block->instrs().push_back(AddInstruction(&rv_a, &rv_b));
+            break;
+         case word_size: abort();
+         case long_size:
+            /* add hl,de */
+            block->instrs().push_back(AddInstruction(&rv_hl, &rv_de));
+            break;
+         }
+         break;
+
+      case Kind::BOP_MINUS:
+         emit_binop(env, block, this);
+         switch (bs) {
+         case byte_size:
+            /* sub a,b */
+            block->instrs().push_back(SubInstruction(&rv_a, &rv_b));
+            break;
+         case word_size: abort();
+         case long_size:
+            /* or a,a
+             * sbc hl,de 
+             */
+            block->instrs().push_back(OrInstruction(&rv_a, &rv_a));
+            block->instrs().push_back(SbcInstruction(&rv_hl, &rv_de));
+            break;
+         }
+         break;
+
+      case Kind::BOP_TIMES:
+         emit_binop(env, block, this);
+         switch (bs) {
+         case byte_size:
+            /* ld c,a
+             * mlt bc
+             * ld a,c
+             */
+            block->instrs().push_back(LoadInstruction(&rv_c, &rv_a));
+            block->instrs().push_back(MultInstruction(&rv_bc));
+            block->instrs().push_back(LoadInstruction(&rv_a, &rv_c));
+            break;
+         case word_size:
+         case long_size:
+            abort();
+         }
+         break;
+
+      case Kind::BOP_DIVIDE:
+      case Kind::BOP_MOD:
+      case Kind::BOP_BITWISE_AND:
+      case Kind::BOP_BITWISE_OR:
+      case Kind::BOP_BITWISE_XOR:
          /* TODO */
+         abort();
       }
+
+      return block;
+   }
+
+   Block *LiteralExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
+      Size sz = type()->size();
+      int bs = bytes(sz);
+      const RegisterValue *rv;
+      switch (bs) {
+      case byte_size:
+         rv = &rv_a;
+         break;
+      case word_size: abort();
+      case long_size:
+         rv = &rv_hl;
+         break;
+      }
+      const ImmediateValue *imm = new ImmediateValue(val(), bs);
+
+      block->instrs().push_back(LoadInstruction(rv, imm));
+      return block;
+   }
+
+   Block *StringExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
+      assert(mode == ExprKind::EXPR_RVALUE); /* string constants aren't assignable */
+      block->instrs().push_back(LoadInstruction(&rv_hl, env.strconsts().Ref(*str())));
+      return block;
+   }
+
+   Block *IdentifierExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
+      const SymInfo *id_info = env.symtab().Lookup(id()->id());
+      Size size = type()->size();      
+      
+      switch (mode) {
+      case ExprKind::EXPR_NONE: abort();
+      case ExprKind::EXPR_LVALUE:
+         {
+            /* obtain address of identifier */
+            const Value *id_lval = id_info->lval();
+            block->instrs().push_back(LeaInstruction(&rv_hl, id_lval));
+         }
+         break;
+         
+      case ExprKind::EXPR_RVALUE:
+         {
+            const Value *id_rval = id_info->rval();
+            const RegisterValue *rv;
+            switch (bytes(size)) {
+            case byte_size:
+               rv = &rv_a;
+               break;
+            case word_size: abort();
+            case long_size:
+               rv = &rv_hl;
+               break;
+            }
+            block->instrs().push_back(LoadInstruction(rv, id_rval));
+         }
+         break;
+      }
+
+      return block;
+   }
+
+   Block *CallExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
+      /* push arguments onto stack (1st arg is highest on stack) */
+
+      /* codegen params */
+      for (ASTExpr *param : params()->vec()) {
+         block = param->CodeGen(env, block, ExprKind::EXPR_RVALUE);
+         const RegisterValue *rv;
+         switch (bytes(param->type()->size())) {
+         case byte_size:
+            rv = &rv_af;
+            break;
+         case word_size:
+         case long_size:
+            rv = &rv_hl;
+            break;
+         }
+         block->instrs().push_back(PushInstruction(rv));
+      }
+
+      /* codegen callee */
+      block = fn()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
+
+      /* call fn */
+      block->instrs().push_back(CallInstruction(&crt_lv_call));
+
+      /* pop off args */
+      for (ASTExpr *param : params()->vec()) {
+         /* TODO: this could be optimized. */
+         block->instrs().push_back(PopInstruction(&rv_de)); /* pop off into scrap register */
+      }
+      
+      return block;
    }
    
    /*** OTHER ***/
@@ -514,10 +720,8 @@ namespace zc {
           */
          instrs.push_back(LoadInstruction(new RegisterValue(&r_de),
                                           new ImmediateValue(0, long_size)));
-         instrs.push_back(XorInstruction(new RegisterValue(&r_a),
-                                         new RegisterValue(&r_a)));
-         instrs.push_back(SbcInstruction(new RegisterValue(&r_hl),
-                                         new RegisterValue(&r_de)));
+         instrs.push_back(XorInstruction(new RegisterValue(&r_a), new RegisterValue(&r_a)));
+         instrs.push_back(SbcInstruction(new RegisterValue(&r_hl), new RegisterValue(&r_de)));
          break;
       }
    }
@@ -525,7 +729,7 @@ namespace zc {
    void emit_logical_not(CgenEnv& env, Block *block, Size size) {
       Block::InstrVec& instrs = block->instrs();
       
-      switch (size) {
+      switch (bytes(size)) {
       case byte_size:
          /* cp a,1   ; CF set iff a == 0
           * ld a,0   ; 
@@ -586,15 +790,16 @@ namespace zc {
       }
    }
 
-   Block *emit_binop(CgenEnv& env, Block *block, Size size,
-                     Block *(*op)(CgenEnv& env, Block *block, Size size)) {
+   void emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr) {
       Block::InstrVec& instrs = block->instrs();
+      Size sz = expr->type()->size();
+      int bs = bytes(sz);
 
       /* evaluate lhs */
-      block = lhs()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
+      block = expr->lhs()->CodeGen(env, block, ASTBinaryExpr::ExprKind::EXPR_RVALUE);
 
       /* save lhs result */
-      switch (bytes(type()->size())) {
+      switch (bs) {
       case byte_size:
          block->instrs().push_back(PushInstruction(&rv_af));
          break;
@@ -605,10 +810,10 @@ namespace zc {
       }
 
       /* evaluate rhs */
-      block = rhs()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
+      block = expr->rhs()->CodeGen(env, block, ASTBinaryExpr::ExprKind::EXPR_RVALUE);
 
       /* restore lhs result */
-      switch (bytes(type()->size())) {
+      switch (bs) {
       case byte_size:
          block->instrs().push_back(PopInstruction(&rv_bc));
          break;
@@ -617,8 +822,6 @@ namespace zc {
          block->instrs().push_back(PopInstruction(&rv_de));
          break;
       }
-      
-      return op(env, block, size);
    }
 
    Block *emit_ld_a_zf(CgenEnv& env, Block *block, bool inverted) {
@@ -633,13 +836,13 @@ namespace zc {
       BlockTransition *cont_transition = new JumpTransition(cont_block,
                                                             inverted ? Cond::NZ : Cond::Z);
       
-      block->transitions().push_back(end_transition);
-      block->transitions().push_back(cont_transition);
-
+      block->transitions().vec().push_back(end_transition);
+      block->transitions().vec().push_back(cont_transition);
+      
       cont_block->instrs().push_back(IncInstruction(&rv_a));
 
       /* join */
-      cont_block->transitions().push_back(new JumpTransition(end_block, Cond::ANY));
+      cont_block->transitions().vec().push_back(new JumpTransition(end_block, Cond::ANY));
 
       return end_block;
    }

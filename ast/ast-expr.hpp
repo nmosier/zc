@@ -116,6 +116,8 @@ namespace zc {
       }
 
       virtual void TypeCheck(SemantEnv& env) override;
+
+      virtual Block *CodeGen(CgenEnv& env, Block *block, ExprKind mode) override;
       
    protected:
       intmax_t val_;
@@ -135,6 +137,8 @@ namespace zc {
       }
 
       virtual void TypeCheck(SemantEnv& env) override;
+
+      virtual Block *CodeGen(CgenEnv& env, Block *block, ExprKind mode) override;
       
    protected:
       const std::string *str_;
@@ -160,6 +164,8 @@ namespace zc {
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
 
       virtual void TypeCheck(SemantEnv& env) override;
+
+      virtual Block *CodeGen(CgenEnv& env, Block *block, ExprKind mode) override;
       
    protected:
       Identifier *id_;
@@ -177,6 +183,10 @@ namespace zc {
       }
 
       virtual void TypeCheck(SemantEnv& env) override;
+
+      virtual Block *CodeGen(CgenEnv& env, Block *block, ExprKind mode) override {
+         abort();
+      }
 
    protected:
       NoExpr(const SourceLoc& loc): ASTExpr(loc) {}
@@ -197,6 +207,8 @@ namespace zc {
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
 
       virtual void TypeCheck(SemantEnv& env) override;
+
+      virtual Block *CodeGen(CgenEnv& env, Block *block, ExprKind mode) override;
 
    protected:
       ASTExpr *fn_;

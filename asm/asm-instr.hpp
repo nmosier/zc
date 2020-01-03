@@ -69,6 +69,16 @@ namespace zc::z80 {
     ***********************/
 
    /**
+    * "ADC" instruction class.
+    */
+   class AdcInstruction: public BinaryInstruction {
+   public:
+      template <typename... Args>
+      AdcInstruction(Args... args): BinaryInstruction(args..., "adc") {}
+   };
+
+   
+   /**
     * "ADD" instruction class.
     */
    class AddInstruction: public BinaryInstruction {
@@ -101,7 +111,16 @@ namespace zc::z80 {
    class CompInstruction: public BinaryInstruction {
    public:
       template <typename... Args>
-      CompInstruction(Args... args): UnaryInstruction(args..., "cp") {}
+      CompInstruction(Args... args): BinaryInstruction(args..., "cp") {}
+   };
+
+   /**
+    * "CPL" instruction
+    */
+   class CplInstruction: public Instruction {
+   public:
+      template <typename... Args>
+      CplInstruction(Args... args): Instruction(args..., "cpl") {}
    };
 
    /**
@@ -183,6 +202,24 @@ namespace zc::z80 {
    public:
       template <typename... Args>
       LeaInstruction(Args... args): BinaryInstruction(args..., "lea") {}
+   };
+
+   /**
+    * "MLT" instruction class
+    */
+   class MultInstruction: public UnaryInstruction {
+   public:
+      template <typename... Args>
+      MultInstruction(Args... args): UnaryInstruction(args..., "mlt") {}
+   };
+
+   /**
+    * "NEG" instruction class
+    */
+   class NegInstruction: public Instruction {
+   public:
+      template <typename... Args>
+      NegInstruction(Args... args): Instruction(args..., "neg") {}
    };
 
    /**
@@ -290,6 +327,15 @@ namespace zc::z80 {
    public:
       template <typename... Args>
       SbcInstruction(Args... args): BinaryInstruction(args..., "sbc") {}
+   };
+
+   /**
+    * "SCF" instruction
+    */
+   class ScfInstruction: public Instruction {
+   public:
+      template <typename... Args>
+      ScfInstruction(Args... args): Instruction(args..., "scf") {}
    };
 
    /**

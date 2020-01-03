@@ -13,6 +13,7 @@ namespace zc::z80 {
 
    class ByteRegister;
    class MultibyteRegister;
+   class RegisterValue;
 
    extern const ByteRegister r_a, r_b, r_c, r_d, r_e, r_f, r_h, r_l, r_ixh,
       r_ixl, r_iyh, r_iyl;
