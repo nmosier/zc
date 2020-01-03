@@ -23,6 +23,8 @@ SEMANTIC ANALYSIS
 [ ] Return statements present unless void.
 [ ] Type deserialization for easy type construction
 [ ] Fix "incomplete type" error when declaring "void *"
+[ ] Add explicit cast expressions whenever needed so that types always match.
+[ ] Always cast down logical expressions to char.
 
 AST
 [X] Add bindings of types to identifiers (TypeID, perhaps?)
@@ -41,3 +43,9 @@ CGEN
 
 GENERAL
 [ ] Add function calls.
+[ ] Add fwd declaration headers.
+
+CODEGEN
+[ ] add `live()' method for blocks to determine if they can be joined.
+[ ] better solution than `return register'
+[ ] Move new_label() mechanism into cgen environment.

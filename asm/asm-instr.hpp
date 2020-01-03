@@ -331,10 +331,10 @@ namespace zc::z80 {
    /**
     * "XOR" instruction class
     */
-   class XorInstruction: public UnaryInstruction {
+   class XorInstruction: public BinaryInstruction {
    public:
       template <typename... Args>
-      XorInstruction(Args... args): UnaryInstruction(args..., "xor") {}
+      XorInstruction(Args... args): BinaryInstruction(args..., "xor") {}
    };
 
    

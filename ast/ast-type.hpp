@@ -18,7 +18,7 @@ namespace zc {
                        TYPE_FUNCTION};
       virtual Kind kind() const = 0;
       virtual const Decl *decl() const { return decl_; }
-      const Symbol *sym() const;
+      Symbol *sym() const;
       virtual Size size() const = 0;
 
       virtual bool is_integral() const = 0;

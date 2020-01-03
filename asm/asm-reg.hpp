@@ -17,6 +17,10 @@ namespace zc::z80 {
    extern const ByteRegister r_a, r_b, r_c, r_d, r_e, r_f, r_h, r_l, r_ixh,
       r_ixl, r_iyh, r_iyl;
    extern const MultibyteRegister r_af, r_bc, r_de, r_hl, r_ix, r_iy, r_sp;
+
+   extern const RegisterValue rv_a, rv_b, rv_c, rv_d, rv_e, rv_f, rv_h, rv_l, rv_ixh,
+      rv_ixl, rv_iyh, rv_iyl;
+   extern const RegisterValue rv_af, rv_bc, rv_de, rv_hl, rv_ix, rv_iy, rv_sp;
    
    /*************
     * REGISTERS *

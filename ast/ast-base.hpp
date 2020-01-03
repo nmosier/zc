@@ -11,6 +11,8 @@
 
 namespace zc {
 
+   class Block;
+
    std::ostream& indent(std::ostream& os, int level);
 
    class ASTNode {
@@ -29,7 +31,8 @@ namespace zc {
    class ASTStat: public ASTNode {
    public:
       virtual void TypeCheck(SemantEnv& env) = 0;
-
+      virtual Block *CodeGen(CgenEnv& env, Block *block) = 0;
+      
    protected:
       ASTStat(const SourceLoc& loc): ASTNode(loc) {}
    };
@@ -60,13 +63,6 @@ namespace zc {
          }
       }
 
-      template <typename... Args>
-      void CodeGen(CgenEnv& env, Args... args) {
-         for (const Node *node : vec()) {
-            node->CodeGen(env, args...);
-         }
-      }
-
    protected:
       Vec vec_;
       const char *name() const { return "ASTNodeVec"; }
@@ -80,6 +76,7 @@ namespace zc {
          std::transform(other->vec().begin(), other->vec().end(), vec_.begin(), func);
       }
       template <typename... Args> ASTNodeVec(Args... args): ASTNode(args...) {}
+      
    };
 
    typedef ASTNodeVec<ASTStat> ASTStats;
@@ -141,10 +138,18 @@ namespace zc {
                         *   of an assignment */
          };
       virtual ExprKind expr_kind() const = 0;
-
+      
       virtual void TypeCheck(SemantEnv& env) = 0;
 
       void DumpType(std::ostream& os) const;
+
+      /**
+       * Abstract code generation function.
+       * @param env code generation environment
+       * @param block current block
+       * @param mode how to evaluate expression (as lvalue or rvalue)
+       */
+      virtual Block *CodeGen(CgenEnv& env, Block *block, ExprKind mode) = 0;
 
    protected:
       /**

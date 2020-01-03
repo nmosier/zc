@@ -24,6 +24,7 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override { os << "AssignmentExpr"; }
 
       virtual void TypeCheck(SemantEnv& env) override;
+      virtual Block *CodeGen(CgenEnv& env, Block *block, ExprKind mode) override;
 
    protected:
       AssignmentExpr(ASTExpr *lhs, ASTExpr *rhs, const SourceLoc& loc):
@@ -50,6 +51,8 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override;
 
       virtual void TypeCheck(SemantEnv& env) override;
+
+      virtual Block *CodeGen(CgenEnv& env, Block *block, ExprKind mode) override;
 
    protected:
       Kind kind_;
@@ -87,6 +90,8 @@ namespace zc {
 
       virtual void DumpNode(std::ostream& os) const override;
       virtual void TypeCheck(SemantEnv& env) override;
+
+      virtual Block *CodeGen(CgenEnv& env, Block *block, ExprKind mode) override;
       
    protected:
       Kind kind_;

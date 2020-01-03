@@ -27,7 +27,7 @@ namespace zc {
       void Enscope(SemantEnv& env) const; void Enscope(CgenEnv& env) const;
       void Descope(SemantEnv& env) const; void Descope(CgenEnv& env) const;
 
-      void CodeGen(CgenEnv& env) const;
+      void CodeGen(CgenEnv& env);
       
    protected:
       ExternalDecls *decls_;

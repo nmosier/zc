@@ -7,6 +7,8 @@
 
 namespace zc {
 
+   class Block;
+
    class CompoundStat: public ASTStat {
    public:
       Decls *decls() const { return decls_; }
@@ -24,6 +26,11 @@ namespace zc {
 
       virtual void TypeCheck(SemantEnv& env) override { return TypeCheck(env, true); }
       void TypeCheck(SemantEnv& env, bool scoped);
+
+      virtual Block *CodeGen(CgenEnv& env, Block *block) override {
+         return CodeGen(env, block, false);
+      }
+      Block *CodeGen(CgenEnv& env, Block *block, bool new_scope);
       
    protected:
       Decls *decls_;
@@ -45,6 +52,7 @@ namespace zc {
       }
 
       virtual void TypeCheck(SemantEnv& env) override;
+      virtual Block *CodeGen(CgenEnv& env, Block *block) override;
       
    protected:
       ASTExpr *expr_;
@@ -52,6 +60,7 @@ namespace zc {
    ExprStat(ASTExpr *expr, SourceLoc& loc): ASTStat(loc), expr_(expr) {}
    };
 
+   /* NOTE: abstract */
    class JumpStat: public ASTStat {
    public:
    protected:
@@ -71,7 +80,9 @@ namespace zc {
          expr_->Dump(os, level, with_types);
       }
 
-      virtual void TypeCheck(SemantEnv& env) override; /* TODO */
+      virtual void TypeCheck(SemantEnv& env) override;
+
+      virtual Block *CodeGen(CgenEnv& env, Block *block) override;
       
    protected:
       ASTExpr *expr_;
@@ -80,12 +91,13 @@ namespace zc {
       ReturnStat(ASTExpr *expr, Args... args): JumpStat(args...), expr_(expr) {}
    };
 
+   /* NOTE: Abstract */
    class SelectionStat: public ASTStat {
    public:
    protected:
       template <typename... Args> SelectionStat(Args... args): ASTStat(args...) {}
    };
-   
+
    class IfStat: public SelectionStat {
    public:
       ASTExpr *cond() const { return cond_; }
@@ -106,6 +118,7 @@ namespace zc {
       }
 
       virtual void TypeCheck(SemantEnv& env) override;
+      virtual Block *CodeGen(CgenEnv& env, Block *block) override;
       
    protected:
       ASTExpr *cond_;

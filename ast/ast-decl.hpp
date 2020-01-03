@@ -10,12 +10,13 @@
 
 namespace zc {
 
-   class ExternalDecl: public ASTNode {
+  class ExternalDecl: public ASTNode {
    public:
-      Decl *decl() const { return decl_; }
-
-      template <typename... Args>
-      static ExternalDecl *Create(Args... args) {
+     Decl *decl() const { return decl_; }
+     Symbol *sym() const;
+     
+     template <typename... Args>
+     static ExternalDecl *Create(Args... args) {
          return new ExternalDecl(args...);
       }
 
@@ -27,7 +28,7 @@ namespace zc {
       virtual void Enscope(SemantEnv& env) const;
       virtual void Descope(SemantEnv& env) const;
 
-      virtual void CodeGen(CgenEnv& env) const;
+      virtual void CodeGen(CgenEnv& env);
       
    protected:
       Decl *decl_;
@@ -53,6 +54,8 @@ namespace zc {
       virtual void TypeCheck(SemantEnv& env) override;
       virtual void Enscope(SemantEnv& env) const override;
       virtual void Descope(SemantEnv& env) const override;
+
+      virtual void CodeGen(CgenEnv& env) override;
       
    protected:
       CompoundStat *comp_stat_;
@@ -68,6 +71,7 @@ namespace zc {
       DeclSpecs *specs() const { return specs_; }
       ASTDeclarator *declarator() const { return declarator_; }
       Identifier *id() const;
+      Symbol *sym() const;
       
       static Decl *Create(DeclSpecs *specs, ASTDeclarator *declarator, const SourceLoc& loc) {
          return new Decl(specs, declarator, loc);
@@ -90,6 +94,8 @@ namespace zc {
       ASTType *Type() const;
 
       void JoinPointers();
+
+      void CodeGen(CgenEnv& env);
 
    protected:
       DeclSpecs *specs_;

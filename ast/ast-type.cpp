@@ -61,6 +61,6 @@ namespace zc {
          return dynamic_cast<const FunctionType *>(pointee()); /* beautiful */      
    }
 
-   const Symbol *ASTType::sym() const { return decl()->id()->id(); }
+   Symbol *ASTType::sym() const { return decl()->id()->id(); }
 
  }

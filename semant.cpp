@@ -158,7 +158,8 @@
        expr()->TypeCheck(env);
 
        const ASTType *expr_type = expr()->type();
-       const FunctionType *fn_type = dynamic_cast<const FunctionType *>(env.ext_env().Type());
+       Symbol *fn_sym = env.ext_env().sym();
+       const FunctionType *fn_type = dynamic_cast<const FunctionType *>(env.symtab().Lookup(fn_sym));
        const ASTType *ret_type = fn_type->return_type();
        if (!ret_type->TypeCoerce(expr_type)) {
           env.error()(g_filename, this) << "value in return statement has incompatible type"
@@ -503,10 +504,10 @@
       declarator()->JoinPointers();
    }
 
-    FunctionType *FunctionDef::Type() const {
-       return dynamic_cast<FunctionType *>(decl()->Type());
+    ASTType *ExternalDecl::Type() const {
+       return decl()->Type();
     }
-
+    
    ASTType *BasicDeclarator::Type(ASTType *type) const {
       return type;
    }
@@ -656,7 +657,7 @@
 
        /* enscope parameters */
        FunctionType *type;
-       if ((type = Type()) == nullptr) {
+       if ((type = dynamic_cast<FunctionType *>(Type())) == nullptr) {
           env.error()(g_filename, this) << "function definition missing parameters" << std::endl;
           return;
        }

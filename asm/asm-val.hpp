@@ -59,7 +59,7 @@ namespace zc::z80 {
       virtual Value *Add(const intmax_t& offset) const override;      
 
       template <typename... Args>
-      LabelValue(const Label *label, Args... args): Value(long_size, args...), label_(label) {}
+      LabelValue(const Label *label, Args... args): Value(args..., long_size), label_(label) {}
       
    protected:
       const Label *label_;
@@ -146,6 +146,11 @@ namespace zc::z80 {
       const MemoryLocation *loc_;
    };
 
+
+   /*** EXTERNAL CONSTANTS ***/
+   template <intmax_t N>
+   const ImmediateValue imm_b(N, byte_size), imm_l(N, long_size);
+   
 }
 
 #endif

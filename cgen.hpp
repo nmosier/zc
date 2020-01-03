@@ -1,72 +1,71 @@
 #ifndef __CGEN_HPP
 #define __CGEN_HPP
 
-#include "ast.hpp"
+#include <vector>
+
 #include "asm.hpp"
+#include "ast.hpp"
 #include "scopedtab.hpp"
 
 namespace zc {
 
-   using namespace z80;
+   using namespace zc::z80;
 
    class SymInfo {
    public:
-      virtual const MemoryLocation *loc() const = 0;
       const ASTType *type() const { return type_; }
 
+      /**
+       * The lvalue of this symbol. If it is a variable, it points to its storage location.
+       * If it's a function, then it is the address of the function.
+       */
+      const Value *val() const { return val_; }
+
+      SymInfo(const ASTType *type, const Value *val): type_(type), val_(val) {}
+      SymInfo(const ExternalDecl *ext_decl);
+      SymInfo(const Decl *decl);
+      
    protected:
       const ASTType *type_;
-
-      SymInfo(const ASTType *type): type_(type) {}
+      const Value *val_;
    };
 
-   class FunctionImpl;
-   class FunctionInfo: public SymInfo {
+   class CgenExtEnv {
    public:
-      typedef std::vector<const MemoryValue> ArgVec;
-      
-      const FunctionImpl *impl() const { return impl_; }
-      virtual const MemoryLocation *loc() const override;
+      Symbol *sym() const { return sym_env_.sym(); }
 
-      template <typename... Args>
-      FunctionInfo(const FunctionImpl *impl, Args... args): SymInfo(args...), impl_(impl) {}
+      void Enter(Symbol *sym) {
+         sym_env_.Enter(sym);
+      }
+
+      const MemoryValue *NewLocal(Size size);
+
+      void Exit() {
+         sym_env_.Exit();
+      }
       
-   protected:
-      const FunctionImpl *impl_;
+      
+   private:
+      SymbolEnv sym_env_;
       const MemoryValue *next_local_;
-      ArgVec argvec_;
    };
 
-   class GlobalVarInfo: public SymInfo {
-   public:
-      const MemoryValue *val() const { return val_; }
-      virtual const MemoryLocation *loc() const override { return val()->loc(); }
-
-      template <typename... Args>
-      GlobalVarInfo(const MemoryValue *val, Args... args): SymInfo(args...), val_(val) {}
-      
-   protected:
-      const MemoryValue *val_;
-   };
-
-   enum class Cond: int
-      {Z = 0x1,
-       NZ = 0x2,
-       C = 0x4,
-       NC = 0x8,
-       ANY = 0xF
-      };
-
+   enum class Cond {Z, NZ, C, NC, ANY};
+   
    class BlockTransition;
    class BlockTransitions {
    public:
-      typedef std::forward_list<const BlockTransition *> TransitionList;
-      const TransitionList& list() const { return list_; }
+      typedef std::vector<BlockTransition *> Transitions;
+      const Transitions& vec() const { return vec_; }
+      Transitions& vec() { return vec_; }
 
-      BlockTransitions(const TransitionList& list);
+      bool live() const;
+      
+      BlockTransitions(const Transitions& vec);
+      BlockTransitions(): vec_() {}
       
    protected:
-      const TransitionList list_;
+      Transitions vec_;
    };
 
    class Block {
@@ -74,7 +73,11 @@ namespace zc {
       typedef std::vector<Instruction> InstrVec;
       const Label *label() const { return label_; }
       const InstrVec& instrs() const { return instrs_; }
+      InstrVec& instrs() { return instrs_; }
       const BlockTransitions& transitions() const { return transitions_; }
+      BlockTransitions& transitions() { return transitions_; }
+
+      bool live() const { return transitions().live(); }
       
       /**
        * Constructor allows direct initialization of instructions vector.
@@ -82,6 +85,9 @@ namespace zc {
       template <typename... Args>
       Block(const Label *label, const BlockTransitions& transitions, Args... args):
          label_(label), transitions_(transitions), instrs_(args...) {}
+
+      template <typename... Args>
+      Block(const Label *label, Args... args): transitions_(args...) {}
       
    protected:
       const Label *label_;
@@ -120,57 +126,62 @@ namespace zc {
    class FunctionImpl {
    public:
       const Block *entry() const { return entry_; }
-      const MemoryLocation *loc() const { return loc_; }
+      const LabelValue *addr() const { return addr_; }
 
+      FunctionImpl(): entry_(nullptr), addr_(nullptr) {}
       FunctionImpl(const Block *entry);
       
    protected:
       const Block *entry_;
-      const MemoryLocation *loc_;
+      const LabelValue *addr_;
    };
 
-   /* map IDs to indices on stack
-    * should provide methods that translate ID to MemoryLocation
-    */
-   class CgenStackFrame {
+   
+   class CgenEnv: public Env<SymInfo,CgenExtEnv> {
    public:
-      typedef std::unordered_map<const Symbol *, const MemoryValue *> SymMap;
-      typedef std::vector<const Symbol *> ArgVec;
-
-      /**
-       * Access variables in stack frame.
-       */
-      const MemoryValue *val(const Symbol *sym) const;
-
-      /**
-       * Access argument value by index.
-       */
-      const MemoryValue *argval(int i) const;
-
-      /**
-       * Add local variable to stack frame.
-       */
-      void AddLocal(const ASTType *type);
-
-      CgenStackFrame(const FunctionType *fn_type);
+      const MemoryValue *next_local() const { return next_local_; }
+      
+      CgenEnv(): Env<SymInfo,CgenExtEnv>(), next_local_(&FP_memval) {}
       
    protected:
-      SymMap symmap_;
-      ArgVec argvec_;
+      /**
+       * Track the memory value of the most recently allocated local.
+       */
       const MemoryValue *next_local_;
    };
+
+
+   const Register *return_register(Size sz);
+   Label *new_label();
+   Label *new_label(const std::string& prefix);
+
+   /**
+    * Check whether expression is nonzero (i.e. evaluates to true as a predicate).
+    * Zero flag (ZF) is set accordingly.
+    */
+   void emit_nonzero_test(CgenEnv& env, Block *block, Size size);
+
+   /**
+    * Emit logical not on expression.
+    */
+   void emit_logical_not(CgenEnv& env, Block *block, Size size);
+
+   /**
+    * Emit code that converts integral value into boolean (0 or 1).
+    */
+   void emit_booleanize(CgenEnv& env, Block *block, Size size);
+
+   /**
+    * Generic emission routine for performing binary operation on two integers.
+    */
+   Block *emit_binop(CgenEnv& env, Block *block, Size size,
+                     Block *(*op)(CgenEnv& env, Block *block, Size size));
    
-   class CgenEnv: public Env<SymInfo> {
-   public:
-      CgenEnv(): Env<SymInfo>() {}
-      
-   protected:
-      
-   };
-
-
-
-
+   /**
+    * Emit instructions that move the contents of the zero flag (ZF) into register %a.
+    */
+   Block *emit_ld_a_zf(CgenEnv& env, Block *block, bool inverted = false);   
+   
 }
 
 #endif
