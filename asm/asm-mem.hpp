@@ -21,6 +21,8 @@ namespace zc::z80 {
    public:
       const std::string& name() const { return name_; }
 
+      Label *Append(const std::string& suffix) const;
+
       void EmitRef(std::ostream& os) const;
       void EmitDef(std::ostream& os) const;
 

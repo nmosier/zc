@@ -130,6 +130,7 @@ int main(int argc, char *argv[]) {
 
   if (out_filename.empty()) {
      g_outpath = std::string("<stdout>");
+     Semant(g_AST_root);
      Cgen(g_AST_root, std::cout, g_outpath.c_str());
      exit(0);
   } 
@@ -142,6 +143,7 @@ int main(int argc, char *argv[]) {
   }
 
   /* code generation: 1st pass (code gen) */
+  Semant(g_AST_root);
   Cgen(g_AST_root, output_stream, out_filename.c_str());
   
   return 0;

@@ -24,13 +24,16 @@ namespace zc {
          stats_->Dump(os, level, with_types);
       }
 
+      /* Semantic Analysis */
       virtual void TypeCheck(SemantEnv& env) override { return TypeCheck(env, true); }
       void TypeCheck(SemantEnv& env, bool scoped);
 
+      /* Code Generation */
       virtual Block *CodeGen(CgenEnv& env, Block *block) override {
          return CodeGen(env, block, false);
       }
       Block *CodeGen(CgenEnv& env, Block *block, bool new_scope);
+      virtual void FrameGen(StackFrame& env) const override;
       
    protected:
       Decls *decls_;
@@ -51,8 +54,12 @@ namespace zc {
          expr_->Dump(os, level, with_types);
       }
 
+      /* Semantic Analysis */
       virtual void TypeCheck(SemantEnv& env) override;
+
+      /* Code Generation */
       virtual Block *CodeGen(CgenEnv& env, Block *block) override;
+      virtual void FrameGen(StackFrame& env) const override {}
       
    protected:
       ASTExpr *expr_;
@@ -80,9 +87,12 @@ namespace zc {
          expr_->Dump(os, level, with_types);
       }
 
+      /* Semantic Analysis */
       virtual void TypeCheck(SemantEnv& env) override;
 
+      /* Code Generation */
       virtual Block *CodeGen(CgenEnv& env, Block *block) override;
+      virtual void FrameGen(StackFrame& env) const override {}    
       
    protected:
       ASTExpr *expr_;
@@ -117,8 +127,12 @@ namespace zc {
          }
       }
 
+      /* Semantic Analysis */
       virtual void TypeCheck(SemantEnv& env) override;
+
+      /* Code Generation */
       virtual Block *CodeGen(CgenEnv& env, Block *block) override;
+      virtual void FrameGen(StackFrame& env) const override;          
       
    protected:
       ASTExpr *cond_;

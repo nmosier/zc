@@ -32,6 +32,7 @@ namespace zc {
    public:
       virtual void TypeCheck(SemantEnv& env) = 0;
       virtual Block *CodeGen(CgenEnv& env, Block *block) = 0;
+      virtual void FrameGen(StackFrame& frame) const = 0;
       
    protected:
       ASTStat(const SourceLoc& loc): ASTNode(loc) {}

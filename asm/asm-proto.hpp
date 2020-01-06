@@ -9,6 +9,7 @@ namespace zc::z80 {
 
    extern const MemoryLocation FP_loc;
    extern const MemoryValue FP_memval;
+   extern const IndexedRegisterValue FP_idxval;
    
 }
 

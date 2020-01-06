@@ -17,4 +17,8 @@ namespace zc::z80 {
       addr()->Emit(os);
    }
 
+   Label *Label::Append(const std::string& suffix) const {
+      return new Label(name() + suffix);
+   }
+
 }

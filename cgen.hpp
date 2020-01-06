@@ -2,6 +2,9 @@
 #define __CGEN_HPP
 
 #include <vector>
+#include <deque>
+#include <unordered_set>
+
 
 #include "asm.hpp"
 #include "ast.hpp"
@@ -22,39 +25,62 @@ namespace zc {
       const ASTType *type() const { return type_; }
 
       /**
-       * The lvalue of this symbol. If it is a variable, it points to its storage location.
-       * If it's a function, then it is the address of the function.
+       * The lvalue and rvalue of this symbol. If it is a variable, it points to its storage
+       * location. If it's a function, then it is the address of the function.
        */
-      const Value *lval() const { return lval_; }
+      const Value *val() const { return val_; }
 
       /**
-       * The rvalue of this symbol. If it is a variable, it represents the contents of its storage
-       * location.
+       * (Optional) The address of this symbol.
        */
-      const Value *rval() const { return rval_; }
+      const Value *addr() const { return addr_; }
 
-      SymInfo(const ASTType *type, const Value *lval);
       SymInfo(const ExternalDecl *ext_decl);
-      // SymInfo(const Decl *decl);
+      SymInfo(const ASTType *type, const Value *val, const Value *addr);
+      SymInfo(const ASTType *type, const Value *addr);
       
    protected:
       const ASTType *type_;
-      const Value *lval_;
-      const Value *rval_;
+      const Value *val_;
+      const Value *addr_;
    };
+
+   class StackFrame {
+   public:
+      int bytes() const;
+      int locals_bytes() const { return locals_bytes_; }
+
+      void add_local(const ASTType *type);
+      void add_local(Size sz);
+      void add_local(int bs) { locals_bytes_ += bs; }
+
+      SymInfo *next_arg(const ASTType *type);
+      SymInfo *next_local(const ASTType *type);
+
+      StackFrame();
+      StackFrame(const Types *params);
+      
+   protected:
+      int base_bytes_;
+      int locals_bytes_;
+      int args_bytes_;
+      const Value *next_local_addr_;
+      const Value *next_arg_addr_;
+   };
+   
 
    class CgenExtEnv {
    public:
       Symbol *sym() const { return sym_env_.sym(); }
+      const StackFrame& frame() const { return frame_; }
+      StackFrame& frame()  { return frame_; }
 
-      void Enter(Symbol *sym);
+      void Enter(Symbol *sym, const Types *args);
       void Exit();
 
-      const MemoryValue *NewLocal(Size size);
-      
    private:
       SymbolEnv sym_env_;
-      const MemoryValue *next_local_;
+      StackFrame frame_;
    };
 
    enum class Cond {Z, NZ, C, NC, ANY};
@@ -67,6 +93,7 @@ namespace zc {
       Transitions& vec() { return vec_; }
 
       bool live() const;
+      void DumpAsm(std::ostream& os, std::unordered_set<const Block *>& emitted_blocks) const;
       
       BlockTransitions(const Transitions& vec);
       BlockTransitions(): vec_() {}
@@ -77,7 +104,7 @@ namespace zc {
 
    class Block {
    public:
-      typedef std::vector<Instruction> InstrVec;
+      typedef std::deque<Instruction *> InstrVec;
       const Label *label() const { return label_; }
       const InstrVec& instrs() const { return instrs_; }
       InstrVec& instrs() { return instrs_; }
@@ -85,6 +112,13 @@ namespace zc {
       BlockTransitions& transitions() { return transitions_; }
 
       bool live() const { return transitions().live(); }
+
+      /**
+       * Emit as assembly.
+       * @param os output stream
+       * @param emitted_blocks set of blocks that have already been emitted (to avoid duplication).
+       */
+      void DumpAsm(std::ostream& os, std::unordered_set<const Block *>& emitted_blocks) const;
       
       /**
        * Constructor allows direct initialization of instructions vector.
@@ -94,17 +128,21 @@ namespace zc {
          label_(label), transitions_(transitions), instrs_(args...) {}
 
       template <typename... Args>
-      Block(const Label *label, Args... args): transitions_(args...) {}
+      Block(const Label *label, Args... args): label_(label), transitions_(args...) {}
       
    protected:
       const Label *label_;
       InstrVec instrs_;
       BlockTransitions transitions_;
+
    };
 
    class BlockTransition {
    public:
       Cond cond() const { return cond_; }
+
+      virtual void DumpAsm(std::ostream& os,
+                           std::unordered_set<const Block *>& to_emit) const = 0;
       
    protected:
       const Cond cond_;
@@ -116,6 +154,9 @@ namespace zc {
    public:
       const Block *dst() const { return dst_; }
 
+      virtual void DumpAsm(std::ostream& os,
+                           std::unordered_set<const Block *>& to_emit) const override;
+
       template <typename... Args>
       JumpTransition(const Block *dst, Args... args): BlockTransition(args...), dst_(dst) {}
       
@@ -125,6 +166,9 @@ namespace zc {
 
    class ReturnTransition: public BlockTransition {
    public:
+      virtual void DumpAsm(std::ostream& os,
+                           std::unordered_set<const Block *>& to_emit) const override;
+      
       template <typename... Args>
       ReturnTransition(Args... args): BlockTransition(args...) {}
    protected:
@@ -134,13 +178,31 @@ namespace zc {
    public:
       const Block *entry() const { return entry_; }
       const LabelValue *addr() const { return addr_; }
-
-      FunctionImpl(): entry_(nullptr), addr_(nullptr) {}
-      FunctionImpl(const Block *entry);
+      
+      void DumpAsm(std::ostream& os) const;
+      
+      FunctionImpl(const CgenEnv& env, const Block *entry, const Block *fin);
       
    protected:
       const Block *entry_;
+      const Block *fin_;
       const LabelValue *addr_;
+      int frame_bytes_;
+   };
+
+   class FunctionImpls {
+      typedef std::vector<FunctionImpl> Impls;
+   public:
+      Impls& impls() { return impls_; }
+      const Impls& impls() const { return impls_; }
+
+      void DumpAsm(std::ostream& os) const;
+      
+      template <typename... Args>
+      FunctionImpls(Args... args): impls_(args...) {}
+      
+   private:
+      Impls impls_;
    };
 
    class StringConstants {
@@ -148,6 +210,7 @@ namespace zc {
    public:
       void Insert(const std::string& str);
       LabelValue *Ref(const std::string& str);
+      void DumpAsm(std::ostream& os) const;
       
       StringConstants(): counter_(0), strs_() {}
       
@@ -157,24 +220,30 @@ namespace zc {
 
       Label *new_label();
    };
+
    
    class CgenEnv: public Env<SymInfo,CgenExtEnv> {
    public:
-      const MemoryValue *next_local() const { return next_local_; }
       const StringConstants& strconsts() const { return strconsts_; }
       StringConstants& strconsts() { return strconsts_; }
-      
-      CgenEnv(): Env<SymInfo,CgenExtEnv>(), next_local_(&FP_memval), strconsts_() {}
+      const FunctionImpls& impls() const { return impls_; }
+      FunctionImpls& impls() { return impls_; }
+
+      CgenEnv(): Env<SymInfo,CgenExtEnv>(), strconsts_(), impls_() {}
+
+      void DumpAsm(std::ostream& os) const;
       
    protected:
       /**
-       * Track the memory value of the most recently allocated local.
+       * String constants.
        */
-      const MemoryValue *next_local_;
-
       StringConstants strconsts_;
-   };
 
+      /**
+       * Function implementations.
+       */
+      FunctionImpls impls_;
+   };
 
    const Register *return_register(Size sz);
    Label *new_label();
@@ -205,8 +274,18 @@ namespace zc {
    /**
     * Emit instructions that move the contents of the zero flag (ZF) into register %a.
     */
-   Block *emit_ld_a_zf(CgenEnv& env, Block *block, bool inverted = false);   
+   Block *emit_ld_a_zf(CgenEnv& env, Block *block, bool inverted = false);
 
+   /**
+    * Emit CRT frameset.
+    */
+   void emit_frameset(CgenEnv& env, Block *block);
+
+   /**
+    * Emit CRT frame unset.
+    */
+   void emit_frameunset(CgenEnv& env, Block *block);
+   
    /*** C RUNTIME ***/
    const Label crt_l_call("call");
    const LabelValue crt_lv_call(&crt_l_call);

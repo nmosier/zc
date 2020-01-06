@@ -49,3 +49,7 @@ CODEGEN
 [ ] add `live()' method for blocks to determine if they can be joined.
 [ ] better solution than `return register'
 [ ] Move new_label() mechanism into cgen environment.
+[ ] Add pass that converts transitions to instructions.
+[ ] use std::deque for instructions in blocks.
+[ ] abstract away instruction and transition access in blocks.
+[ ] functions should have epilogue that `ret' transitions jump to

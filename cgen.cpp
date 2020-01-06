@@ -1,5 +1,6 @@
 #include <numeric>
 #include <string>
+#include <unordered_set>
 
 #include "ast.hpp"
 #include "asm.hpp"
@@ -7,30 +8,29 @@
 #include "cgen.hpp"
 
 namespace zc {
-
+   
    void Cgen(TranslationUnit *root, std::ostream& os, const char *filename) {
       CgenEnv env;
       root->CodeGen(env);
-   }
-   
-
-   FunctionImpl::FunctionImpl(const Block *entry): entry_(entry) {
-      addr_ = new LabelValue(entry->label());
+      
+      env.DumpAsm(os);
    }
 
+   FunctionImpl::FunctionImpl(const CgenEnv& env, const Block *entry, const Block *fin):
+      entry_(entry), fin_(fin), frame_bytes_(env.ext_env().frame().bytes()) {}
+      
    BlockTransitions::BlockTransitions(const Transitions& vec): vec_(vec) {
       /* get mask of conditions */
       /* TODO: this doesn't work. */
    }
-
-   void CgenExtEnv::Enter(Symbol *sym) {
+   
+   void CgenExtEnv::Enter(Symbol *sym, const Types *args) {
       sym_env_.Enter(sym);
-      next_local_ = &FP_memval;
+      frame_ = StackFrame(args);
    }
 
    void CgenExtEnv::Exit() {
       sym_env_.Exit();
-      next_local_ = nullptr;
    }
 
    SymInfo::SymInfo(const ExternalDecl *ext_decl) {
@@ -40,22 +40,25 @@ namespace zc {
 
       if (type_->kind() == ASTType::Kind::TYPE_FUNCTION) {
          /* Functions _always_ behave as lvalues, i.e. they are always treated as addresses. */
-         lval_ = rval_ = label_val;
+         addr_ = val_ = label_val;
       } else {
-         lval_ = label_val;
+         addr_ = label_val;
 
          MemoryLocation *mem_loc = new MemoryLocation(label_val);
-         rval_ = new MemoryValue(mem_loc, bytes(type_));
+         val_ = new MemoryValue(mem_loc, bytes(type_));
       }
    }
 
-   SymInfo::SymInfo(const ASTType *type, const Value *lval): type_(type), lval_(lval) {
-      MemoryLocation *mem_loc = new MemoryLocation(lval);
-      rval_ = new MemoryValue(mem_loc, bytes(type_));
+   SymInfo::SymInfo(const ASTType *type, const Value *val, const Value *addr):
+      type_(type), val_(val), addr_(addr) {
+      assert(dynamic_cast<const MemoryValue *>(addr) == nullptr);
    }
-
-   const MemoryValue *CgenExtEnv::NewLocal(Size size) {
-      return (next_local_ = next_local_->Prev(bytes(size)));
+   
+   SymInfo::SymInfo(const ASTType *type, const Value *addr): type_(type), addr_(addr) {
+      // assert(dynamic_cast<const MemoryValue *>(addr) == nullptr);
+      
+      MemoryLocation *mem_loc = new MemoryLocation(addr);
+      val_ = new MemoryValue(mem_loc, bytes(type));
    }
 
    /*** STRING CONSTANTS ***/
@@ -96,29 +99,39 @@ namespace zc {
    void FunctionDef::CodeGen(CgenEnv& env) {
       /* enter function into global scope */
       SymInfo *info = new SymInfo(this);
+      const Types *args = Type()->get_callable()->params();
       env.symtab().AddToScope(sym(), info);
-      env.ext_env().Enter(sym());
-      
+      env.ext_env().Enter(sym(), args);
+
       /* enter parameters into subscope */
-      env.symtab().EnterScope();
-      
-      const MemoryLocation *argloc = FP_loc.Advance(long_size); /* advance past return address */
-      for (ASTType *type : Type()->get_callable()->params()->vec()) {
-         Value *argval = new MemoryValue(argloc, bytes(type));
-         SymInfo *info = new SymInfo(type, argval);
+      env.symtab().EnterScope();      
+
+      /* initialize stack frame */
+      FrameGen(env.ext_env().frame());
+
+      /* assign argument stack locations */
+      for (const ASTType *type : Type()->get_callable()->params()->vec()) {
+         SymInfo *info = env.ext_env().frame().next_arg(type);
          env.symtab().AddToScope(type->sym(), info);
-         argloc = argloc->Advance(long_size);
       }
       
-      Block *start_block = new Block(dynamic_cast<const LabelValue *>(info->lval())->label());
+      Block *start_block = new Block(dynamic_cast<const LabelValue *>(info->addr())->label());
       
       Block *end_block = comp_stat()->CodeGen(env, start_block, false);
-      
-      FunctionImpl impl(start_block);
 
+      /* TODO: check if unconditional return is already present before doing this? */      
+      end_block->transitions().vec().push_back(new ReturnTransition(Cond::ANY)); 
 
-      env.symtab().ExitScope();
+      Block *frameunset_block = new Block(start_block->label()->Append("_frameunset"));
+
+      /* emit prologue and epilogue */
+      emit_frameset(env, start_block);
+      emit_frameunset(env, frameunset_block);
+
+      env.impls().impls().push_back(FunctionImpl(env, start_block, frameunset_block));
+
       env.ext_env().Exit();
+      env.symtab().ExitScope();
    }
 
    Block *CompoundStat::CodeGen(CgenEnv& env, Block *block, bool new_scope) {
@@ -142,27 +155,24 @@ namespace zc {
    }
 
    void Decl::CodeGen(CgenEnv& env) {
-      const MemoryValue *val = env.ext_env().NewLocal(Type()->size());
+      SymInfo *info = env.ext_env().frame().next_local(Type());
 
       /* add decl to scope */
-      SymInfo *info = new SymInfo(Type(), val);
       env.symtab().AddToScope(sym(), info);
    }
 
    Block *ReturnStat::CodeGen(CgenEnv& env, Block *block) {
-      // const ASTType *type = env.ext_env().Type();
-      // Size size = type->size();
-      // const Register *reg = return_register(sz);
-
       /* generate returned expression 
        * For now, assume result will be in %a or %hl. */
       block = expr()->CodeGen(env, block, ASTExpr::ExprKind::EXPR_RVALUE);
       
       /* append return transition */
       block->transitions().vec().push_back(new ReturnTransition(Cond::ANY));
-      // block->instrs().push_back(RetInstruction());
 
-      return nullptr; /* nullptr signifies that this block has no outgoing transisitons */
+      /* create new dummy block (this should be removed as dead code with optimization) */
+      Block *dead_block = new Block(new_label());
+      block->transitions().vec().push_back(new JumpTransition(dead_block, Cond::ANY));
+      return dead_block;
    }
 
    Block *ExprStat::CodeGen(CgenEnv& env, Block *block) {
@@ -217,7 +227,7 @@ namespace zc {
 
       /* save right-hand value */
       block->instrs().push_back
-         (PushInstruction
+         (new PushInstruction
           (new RegisterValue
            (return_register(sz))));
 
@@ -227,9 +237,9 @@ namespace zc {
       /* restore right-hand value */
       switch (bs) {
       case byte_size:
-         block->instrs().push_back(PopInstruction(new RegisterValue(&r_af)));
+         block->instrs().push_back(new PopInstruction(new RegisterValue(&r_af)));
          block->instrs().push_back
-            (LoadInstruction
+            (new LoadInstruction
              (new MemoryValue
               (new MemoryLocation
                (new RegisterValue
@@ -246,9 +256,9 @@ namespace zc {
       case word_size: throw std::logic_error("not implemented");
          
       case long_size:
-         block->instrs().push_back(PopInstruction(new RegisterValue(&r_de)));
+         block->instrs().push_back(new PopInstruction(new RegisterValue(&r_de)));
          block->instrs().push_back
-            (LoadInstruction
+            (new LoadInstruction
              (new MemoryValue
               (new MemoryLocation
                (new RegisterValue
@@ -279,7 +289,7 @@ namespace zc {
          block = expr()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
 
          /* load pointer from resulting address */
-         block->instrs().push_back(LoadInstruction(&rv_hl, &rv_hl));
+         block->instrs().push_back(new LoadInstruction(&rv_hl, &rv_hl));
          
          break;
          
@@ -290,14 +300,14 @@ namespace zc {
       case Kind::UOP_NEGATIVE:
          switch (bs) {
          case byte_size:
-            block->instrs().push_back(NegInstruction());
+            block->instrs().push_back(new NegInstruction());
             break;
          case word_size: abort();
          case long_size:
-            block->instrs().push_back(LoadInstruction(&rv_de, &imm_l<0>));
-            block->instrs().push_back(ExInstruction(&rv_de, &rv_hl));
-            block->instrs().push_back(XorInstruction(&rv_a, &rv_a));
-            block->instrs().push_back(SbcInstruction(&rv_hl, &rv_de));
+            block->instrs().push_back(new LoadInstruction(&rv_de, &imm_l<0>));
+            block->instrs().push_back(new ExInstruction(&rv_de, &rv_hl));
+            block->instrs().push_back(new XorInstruction(&rv_a, &rv_a));
+            block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_de));
             break;
          }
          break;
@@ -305,15 +315,15 @@ namespace zc {
       case Kind::UOP_BITWISE_NOT:
          switch (bytes(type()->size())) {
          case byte_size:
-            block->instrs().push_back(CplInstruction());
+            block->instrs().push_back(new CplInstruction());
             break;
          case word_size: abort();
          case long_size:
             /* NOTE: this uses the property of 2's complement that it is 1's complement plus 1. */
-            block->instrs().push_back(LoadInstruction(&rv_de, &imm_l<0>));
-            block->instrs().push_back(ExInstruction(&rv_de, &rv_hl));
-            block->instrs().push_back(ScfInstruction());
-            block->instrs().push_back(SbcInstruction(&rv_hl, &rv_de));
+            block->instrs().push_back(new LoadInstruction(&rv_de, &imm_l<0>));
+            block->instrs().push_back(new ExInstruction(&rv_de, &rv_hl));
+            block->instrs().push_back(new ScfInstruction());
+            block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_de));
             break;
          }
          break;
@@ -395,12 +405,12 @@ namespace zc {
          emit_binop(env, block, this);
          switch (bs) {
          case byte_size:
-            block->instrs().push_back(CompInstruction(&rv_a, &rv_b));
+            block->instrs().push_back(new CompInstruction(&rv_a, &rv_b));
             break;
          case word_size: abort();
          case long_size:
-            block->instrs().push_back(XorInstruction(&rv_a, &rv_a));
-            block->instrs().push_back(SbcInstruction(&rv_hl, &rv_de));
+            block->instrs().push_back(new XorInstruction(&rv_a, &rv_a));
+            block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_de));
             break;
          }
          block = emit_ld_a_zf(env, block, kind() == Kind::BOP_NEQ);
@@ -414,8 +424,8 @@ namespace zc {
              * ld a,0
              * adc a,a
              */
-            block->instrs().push_back(CompInstruction(&rv_a, &rv_b));
-            block->instrs().push_back(LoadInstruction(&rv_a, &imm_b<0>));
+            block->instrs().push_back(new CompInstruction(&rv_a, &rv_b));
+            block->instrs().push_back(new LoadInstruction(&rv_a, &imm_b<0>));
             break;
                                   
          case word_size: abort();
@@ -424,12 +434,12 @@ namespace zc {
              * sbc hl,de
              * adc a,a
              */
-            block->instrs().push_back(XorInstruction(&rv_a, &rv_a));
-            block->instrs().push_back(SbcInstruction(&rv_hl, &rv_de));
+            block->instrs().push_back(new XorInstruction(&rv_a, &rv_a));
+            block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_de));
             break;
          }
                                
-         block->instrs().push_back(AdcInstruction(&rv_a, &rv_a));
+         block->instrs().push_back(new AdcInstruction(&rv_a, &rv_a));
          break;
 
       case Kind::BOP_LEQ:
@@ -441,9 +451,9 @@ namespace zc {
              * ld a,0
              * adc a,a
              */
-            block->instrs().push_back(ScfInstruction());
-            block->instrs().push_back(SbcInstruction(&rv_a, &rv_b));
-            block->instrs().push_back(LoadInstruction(&rv_a, &imm_b<0>));
+            block->instrs().push_back(new ScfInstruction());
+            block->instrs().push_back(new SbcInstruction(&rv_a, &rv_b));
+            block->instrs().push_back(new LoadInstruction(&rv_a, &imm_b<0>));
             break;
 
          case word_size: abort();
@@ -453,13 +463,13 @@ namespace zc {
              * sbc hl,de
              * adc a,a
              */
-            block->instrs().push_back(XorInstruction(&rv_a, &rv_a));
-            block->instrs().push_back(ScfInstruction());
-            block->instrs().push_back(SbcInstruction(&rv_hl, &rv_de));
+            block->instrs().push_back(new XorInstruction(&rv_a, &rv_a));
+            block->instrs().push_back(new ScfInstruction());
+            block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_de));
             break;
          }
 
-         block->instrs().push_back(AdcInstruction(&rv_a, &rv_a));
+         block->instrs().push_back(new AdcInstruction(&rv_a, &rv_a));
          break;
 
       case Kind::BOP_GT:
@@ -471,10 +481,10 @@ namespace zc {
              * ld a,1
              * sbc a,0
              */
-            block->instrs().push_back(DecInstruction(&rv_a));
-            block->instrs().push_back(CompInstruction(&rv_a, &rv_b));
-            block->instrs().push_back(LoadInstruction(&rv_a, &imm_b<1>));
-            block->instrs().push_back(SbcInstruction(&rv_a, &imm_b<0>));
+            block->instrs().push_back(new DecInstruction(&rv_a));
+            block->instrs().push_back(new CompInstruction(&rv_a, &rv_b));
+            block->instrs().push_back(new LoadInstruction(&rv_a, &imm_b<1>));
+            block->instrs().push_back(new SbcInstruction(&rv_a, &imm_b<0>));
             break;
 
          case word_size: abort();
@@ -485,11 +495,11 @@ namespace zc {
              * sbc a,a
              * inc a
              */
-            block->instrs().push_back(DecInstruction(&rv_hl));
-            block->instrs().push_back(XorInstruction(&rv_a, &rv_a));
-            block->instrs().push_back(SbcInstruction(&rv_hl, &rv_de));
-            block->instrs().push_back(SbcInstruction(&rv_a, &rv_a));
-            block->instrs().push_back(IncInstruction(&rv_a));
+            block->instrs().push_back(new DecInstruction(&rv_hl));
+            block->instrs().push_back(new XorInstruction(&rv_a, &rv_a));
+            block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_de));
+            block->instrs().push_back(new SbcInstruction(&rv_a, &rv_a));
+            block->instrs().push_back(new IncInstruction(&rv_a));
             break;
          }
          break;
@@ -502,7 +512,7 @@ namespace zc {
              * ld a,1
              * sbc a,0
              */
-            block->instrs().push_back(CompInstruction(&rv_a, &rv_b));
+            block->instrs().push_back(new CompInstruction(&rv_a, &rv_b));
             break;
 
          case word_size: abort();
@@ -513,13 +523,13 @@ namespace zc {
              * ld a,1
              * sbc a,0
              */
-            block->instrs().push_back(XorInstruction(&rv_a, &rv_a));
-            block->instrs().push_back(SbcInstruction(&rv_hl, &rv_de));
+            block->instrs().push_back(new XorInstruction(&rv_a, &rv_a));
+            block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_de));
             break;
          }
                                
-         block->instrs().push_back(LoadInstruction(&rv_a, &imm_b<1>));
-         block->instrs().push_back(SbcInstruction(&rv_a, &imm_b<0>));
+         block->instrs().push_back(new LoadInstruction(&rv_a, &imm_b<1>));
+         block->instrs().push_back(new SbcInstruction(&rv_a, &imm_b<0>));
          break;
 
       case Kind::BOP_PLUS:
@@ -527,12 +537,12 @@ namespace zc {
          switch (bs) {
          case byte_size:
             /* add a,b */
-            block->instrs().push_back(AddInstruction(&rv_a, &rv_b));
+            block->instrs().push_back(new AddInstruction(&rv_a, &rv_b));
             break;
          case word_size: abort();
          case long_size:
             /* add hl,de */
-            block->instrs().push_back(AddInstruction(&rv_hl, &rv_de));
+            block->instrs().push_back(new AddInstruction(&rv_hl, &rv_de));
             break;
          }
          break;
@@ -542,15 +552,15 @@ namespace zc {
          switch (bs) {
          case byte_size:
             /* sub a,b */
-            block->instrs().push_back(SubInstruction(&rv_a, &rv_b));
+            block->instrs().push_back(new SubInstruction(&rv_a, &rv_b));
             break;
          case word_size: abort();
          case long_size:
             /* or a,a
              * sbc hl,de 
              */
-            block->instrs().push_back(OrInstruction(&rv_a, &rv_a));
-            block->instrs().push_back(SbcInstruction(&rv_hl, &rv_de));
+            block->instrs().push_back(new OrInstruction(&rv_a, &rv_a));
+            block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_de));
             break;
          }
          break;
@@ -563,9 +573,9 @@ namespace zc {
              * mlt bc
              * ld a,c
              */
-            block->instrs().push_back(LoadInstruction(&rv_c, &rv_a));
-            block->instrs().push_back(MultInstruction(&rv_bc));
-            block->instrs().push_back(LoadInstruction(&rv_a, &rv_c));
+            block->instrs().push_back(new LoadInstruction(&rv_c, &rv_a));
+            block->instrs().push_back(new MultInstruction(&rv_bc));
+            block->instrs().push_back(new LoadInstruction(&rv_a, &rv_c));
             break;
          case word_size:
          case long_size:
@@ -600,13 +610,13 @@ namespace zc {
       }
       const ImmediateValue *imm = new ImmediateValue(val(), bs);
 
-      block->instrs().push_back(LoadInstruction(rv, imm));
+      block->instrs().push_back(new LoadInstruction(rv, imm));
       return block;
    }
-
+   
    Block *StringExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
       assert(mode == ExprKind::EXPR_RVALUE); /* string constants aren't assignable */
-      block->instrs().push_back(LoadInstruction(&rv_hl, env.strconsts().Ref(*str())));
+      block->instrs().push_back(new LoadInstruction(&rv_hl, env.strconsts().Ref(*str())));
       return block;
    }
 
@@ -619,14 +629,14 @@ namespace zc {
       case ExprKind::EXPR_LVALUE:
          {
             /* obtain address of identifier */
-            const Value *id_lval = id_info->lval();
-            block->instrs().push_back(LeaInstruction(&rv_hl, id_lval));
+            const Value *id_addr = id_info->addr();
+            block->instrs().push_back(new LeaInstruction(&rv_hl, id_addr));
          }
          break;
          
       case ExprKind::EXPR_RVALUE:
          {
-            const Value *id_rval = id_info->rval();
+            const Value *id_rval = id_info->val();
             const RegisterValue *rv;
             switch (bytes(size)) {
             case byte_size:
@@ -637,7 +647,7 @@ namespace zc {
                rv = &rv_hl;
                break;
             }
-            block->instrs().push_back(LoadInstruction(rv, id_rval));
+            block->instrs().push_back(new LoadInstruction(rv, id_rval));
          }
          break;
       }
@@ -661,19 +671,19 @@ namespace zc {
             rv = &rv_hl;
             break;
          }
-         block->instrs().push_back(PushInstruction(rv));
+         block->instrs().push_back(new PushInstruction(rv));
       }
 
       /* codegen callee */
       block = fn()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
 
       /* call fn */
-      block->instrs().push_back(CallInstruction(&crt_lv_call));
+      block->instrs().push_back(new CallInstruction(&crt_lv_call));
 
       /* pop off args */
       for (ASTExpr *param : params()->vec()) {
          /* TODO: this could be optimized. */
-         block->instrs().push_back(PopInstruction(&rv_de)); /* pop off into scrap register */
+         block->instrs().push_back(new PopInstruction(&rv_de)); /* pop off into scrap register */
       }
       
       return block;
@@ -708,8 +718,8 @@ namespace zc {
       switch (bytes(size)) {
       case byte_size:
          /* or a,a */
-         instrs.push_back(OrInstruction(new RegisterValue(&r_a),
-                                        new RegisterValue(&r_a)));
+         instrs.push_back(new OrInstruction(new RegisterValue(&r_a),
+                                            new RegisterValue(&r_a)));
          break;
          
       case word_size:
@@ -718,10 +728,10 @@ namespace zc {
           * xor a,a
           * sbc hl,de
           */
-         instrs.push_back(LoadInstruction(new RegisterValue(&r_de),
-                                          new ImmediateValue(0, long_size)));
-         instrs.push_back(XorInstruction(new RegisterValue(&r_a), new RegisterValue(&r_a)));
-         instrs.push_back(SbcInstruction(new RegisterValue(&r_hl), new RegisterValue(&r_de)));
+         instrs.push_back(new LoadInstruction(new RegisterValue(&r_de),
+                                              new ImmediateValue(0, long_size)));
+         instrs.push_back(new XorInstruction(new RegisterValue(&r_a), new RegisterValue(&r_a)));
+         instrs.push_back(new SbcInstruction(new RegisterValue(&r_hl), new RegisterValue(&r_de)));
          break;
       }
    }
@@ -735,9 +745,9 @@ namespace zc {
           * ld a,0   ; 
           * adc a,a  ; a <- 1 if CF set; a <- 0 if CF reset
           */
-         instrs.push_back(CompInstruction(&rv_a, &imm_b<1>));
-         instrs.push_back(LoadInstruction(&rv_a, &imm_b<0>));
-         instrs.push_back(AdcInstruction(&rv_a, &rv_a)); /* save one byte */
+         instrs.push_back(new CompInstruction(&rv_a, &imm_b<1>));
+         instrs.push_back(new LoadInstruction(&rv_a, &imm_b<0>));
+         instrs.push_back(new AdcInstruction(&rv_a, &rv_a)); /* save one byte */
          break;
 
       case word_size: abort();
@@ -749,11 +759,11 @@ namespace zc {
           * ex de,hl
           * adc hl,hl
           */
-         instrs.push_back(LoadInstruction(&rv_de, &imm_l<0>));
-         instrs.push_back(ScfInstruction());
-         instrs.push_back(SbcInstruction(&rv_hl, &rv_de));
-         instrs.push_back(ExInstruction(&rv_de, &rv_hl));
-         instrs.push_back(AdcInstruction(&rv_hl, &rv_hl));
+         instrs.push_back(new LoadInstruction(&rv_de, &imm_l<0>));
+         instrs.push_back(new ScfInstruction());
+         instrs.push_back(new SbcInstruction(&rv_hl, &rv_de));
+         instrs.push_back(new ExInstruction(&rv_de, &rv_hl));
+         instrs.push_back(new AdcInstruction(&rv_hl, &rv_hl));
          break;
       }
    }
@@ -767,9 +777,9 @@ namespace zc {
           * ld a,0
           * adc a,a
           */
-         instrs.push_back(NegInstruction());
-         instrs.push_back(LoadInstruction(&rv_a, &imm_b<0>));
-         instrs.push_back(AdcInstruction(&rv_a, &rv_a));
+         instrs.push_back(new NegInstruction());
+         instrs.push_back(new LoadInstruction(&rv_a, &imm_b<0>));
+         instrs.push_back(new AdcInstruction(&rv_a, &rv_a));
          break;
          
       case word_size: abort();
@@ -781,11 +791,11 @@ namespace zc {
           * sbc hl,de
           * adc a,a
           */
-         instrs.push_back(ExInstruction(&rv_de, &rv_hl));
-         instrs.push_back(LoadInstruction(&rv_hl, &imm_l<0>));
-         instrs.push_back(XorInstruction(&rv_a, &rv_a));
-         instrs.push_back(SbcInstruction(&rv_hl, &rv_de));
-         instrs.push_back(AdcInstruction(&rv_a, &rv_a));
+         instrs.push_back(new ExInstruction(&rv_de, &rv_hl));
+         instrs.push_back(new LoadInstruction(&rv_hl, &imm_l<0>));
+         instrs.push_back(new XorInstruction(&rv_a, &rv_a));
+         instrs.push_back(new SbcInstruction(&rv_hl, &rv_de));
+         instrs.push_back(new AdcInstruction(&rv_a, &rv_a));
          break;
       }
    }
@@ -801,11 +811,11 @@ namespace zc {
       /* save lhs result */
       switch (bs) {
       case byte_size:
-         block->instrs().push_back(PushInstruction(&rv_af));
+         block->instrs().push_back(new PushInstruction(&rv_af));
          break;
       case word_size: abort();
       case long_size:
-         block->instrs().push_back(PushInstruction(&rv_hl));
+         block->instrs().push_back(new PushInstruction(&rv_hl));
          break;
       }
 
@@ -815,17 +825,17 @@ namespace zc {
       /* restore lhs result */
       switch (bs) {
       case byte_size:
-         block->instrs().push_back(PopInstruction(&rv_bc));
+         block->instrs().push_back(new PopInstruction(&rv_bc));
          break;
       case word_size: abort();
       case long_size:
-         block->instrs().push_back(PopInstruction(&rv_de));
+         block->instrs().push_back(new PopInstruction(&rv_de));
          break;
       }
    }
 
    Block *emit_ld_a_zf(CgenEnv& env, Block *block, bool inverted) {
-      block->instrs().push_back(LoadInstruction(&rv_a, &imm_b<0>));
+      block->instrs().push_back(new LoadInstruction(&rv_a, &imm_b<0>));
       
       const Label *end_label = new_label();
       Block *end_block = new Block(end_label);
@@ -839,12 +849,205 @@ namespace zc {
       block->transitions().vec().push_back(end_transition);
       block->transitions().vec().push_back(cont_transition);
       
-      cont_block->instrs().push_back(IncInstruction(&rv_a));
+      cont_block->instrs().push_back(new IncInstruction(&rv_a));
 
       /* join */
       cont_block->transitions().vec().push_back(new JumpTransition(end_block, Cond::ANY));
 
       return end_block;
    }
+
+   void emit_frameset(CgenEnv& env, Block *block) {
+      /* push ix
+       * ld ix,-<locals>
+       * add ix,sp
+       * ld sp,ix
+       */
+      int locals_bytes = env.ext_env().frame().locals_bytes();
+      std::vector<Instruction *> frameset
+         {new PushInstruction(&rv_ix),
+          new LoadInstruction(&rv_ix, new ImmediateValue(-locals_bytes, long_size)),
+          new AddInstruction(&rv_ix, &rv_sp),
+          new LoadInstruction(&rv_sp, &rv_ix),
+         };
+      block->instrs().insert(block->instrs().begin(), frameset.begin(), frameset.end());
+   }
+
+   void emit_frameunset(CgenEnv& env, Block *block) {
+      /* ld ix,<locals>
+       * add ix,sp
+       * ld sp,ix
+       * pop ix
+       */
+      
+      // TODO block->instrs().push_back(new LeaInstruction
+   }
    
+   /*** ASM DUMPS ***/
+   void CgenEnv::DumpAsm(std::ostream& os) const {
+      /* dump function implementations */
+      impls().DumpAsm(os);
+
+      /* dump string constants */
+      strconsts().DumpAsm(os);
+   }
+
+   void FunctionImpls::DumpAsm(std::ostream& os) const {
+      for (const FunctionImpl& impl : impls()) {
+         impl.DumpAsm(os);
+      }
+   }
+
+   void StringConstants::DumpAsm(std::ostream& os) const {
+      for (auto it : strs_) {
+         /* emit label */
+         it.second->EmitDef(os);
+
+         /* emit string */
+         os << "\t.db\t\"" << it.first << "\",0" << std::endl;
+      }
+   }
+
+   void FunctionImpl::DumpAsm(std::ostream& os) const {
+      std::unordered_set<const Block *> emitted_blocks;
+      entry()->DumpAsm(os, emitted_blocks);
+   }
+   
+   void Block::DumpAsm(std::ostream& os, std::unordered_set<const Block *>& emitted_blocks) const {
+      /* check if already emitted */
+      if (emitted_blocks.find(this) != emitted_blocks.end()) {
+         return;
+      } else {
+         emitted_blocks.insert(this);
+      }
+      
+      label()->EmitDef(os);
+
+      for (const Instruction *instr : instrs()) {
+         instr->Emit(os);
+      }
+
+      /* emit transitions */
+      std::unordered_set<const Block *> dsts;
+      transitions().DumpAsm(os, dsts);
+
+      /* emit destination blocks */
+      for (const Block *block : dsts) {
+         block->DumpAsm(os, emitted_blocks);
+      }
+   }
+
+   void BlockTransitions::DumpAsm(std::ostream& os,
+                                  std::unordered_set<const Block *>& to_emit) const {
+      for (const BlockTransition *trans : vec()) {
+         trans->DumpAsm(os, to_emit);
+      }
+   }
+
+   void JumpTransition::DumpAsm(std::ostream& os,
+                                std::unordered_set<const Block *>& to_emit) const {
+      os << "\tjp\t";
+      switch (cond()) {
+      case Cond::Z:
+         os << "z,";
+         break;
+      case Cond::NZ:
+         os << "nz,";
+         break;
+      case Cond::C:
+         os << "c,";
+         break;
+      case Cond::NC:
+         os << "nc,";
+         break;
+      case Cond::ANY:
+         break;
+      }
+
+      dst()->label()->EmitRef(os);
+
+      os << std::endl;
+
+      to_emit.insert(dst());
+   }
+
+   void ReturnTransition::DumpAsm(std::ostream& os,
+                                  std::unordered_set<const Block *>& to_emit) const {
+      os << "\tret";
+      switch (cond()) {
+      case Cond::Z:
+         os << "\tz";
+         break;
+      case Cond::NZ:
+         os << "\tnz";
+         break;
+      case Cond::C:
+         os << "\tc";
+         break;
+      case Cond::NC:
+         os << "\tnc";
+         break;
+      case Cond::ANY:
+         break;
+      }
+
+      os << std::endl;
+   }
+
+   /*** FRAME GEN & STACK FRAME ***/
+
+   StackFrame::StackFrame(): base_bytes_(long_size * 2), locals_bytes_(0), args_bytes_(0) {}
+   
+   StackFrame::StackFrame(const Types *params):
+      base_bytes_(long_size * 2), locals_bytes_(0), args_bytes_(0), next_local_addr_(nullptr),
+      next_arg_addr_(nullptr) /* saved FP, RA */ {
+      /* add size for each param */
+      args_bytes_ = params->vec().size() * long_size;
+   }
+
+   int StackFrame::bytes() const { return base_bytes_ + locals_bytes_ + args_bytes_; }
+   
+   void StackFrame::add_local(Size sz) { add_local(::zc::bytes(sz)); }
+   void StackFrame::add_local(const ASTType *type) { add_local(type->size()); }
+
+   SymInfo *StackFrame::next_arg(const ASTType *type) {
+      if (next_arg_addr_ == nullptr) {
+         next_arg_addr_ = FP_idxval.Add(locals_bytes_ + base_bytes_);
+      }
+      SymInfo *info = new SymInfo(type, next_arg_addr_);
+      next_arg_addr_ = next_arg_addr_->Add(long_size);
+      return info;
+   }
+
+   SymInfo *StackFrame::next_local(const ASTType *type) {
+      if (next_local_addr_ == nullptr) {
+         next_local_addr_ = &FP_idxval;
+      }
+      SymInfo *info = new SymInfo(type, next_local_addr_);
+      next_local_addr_ = next_local_addr_->Add(type->size());
+      return info;
+   }
+   
+   void FunctionDef::FrameGen(StackFrame& frame) const {
+      comp_stat()->FrameGen(frame);
+   }
+
+   void CompoundStat::FrameGen(StackFrame& frame) const {
+      for (const Decl *decl : decls()->vec()) {
+         decl->FrameGen(frame);
+      }
+      for (const ASTStat *stat : stats()->vec()) {
+         stat->FrameGen(frame);
+      }
+   }
+
+   void IfStat::FrameGen(StackFrame& frame) const {
+      if_body()->FrameGen(frame);
+      else_body()->FrameGen(frame);
+   }
+
+   void Decl::FrameGen(StackFrame& frame) const {
+      frame.add_local(Type());
+   }
+
 }

@@ -58,6 +58,7 @@ namespace zc {
 
    class SemantEnv;
    class CgenEnv;
+   class StackFrame;
 }
 
 #endif

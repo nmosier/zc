@@ -47,11 +47,11 @@ namespace zc::z80 {
    }
 
    Value *RegisterValue::Add(const intmax_t& offset) const {
-      return new IndexedRegisterValue(this, offset, size());
+      return new IndexedRegisterValue(this, offset);
    }
 
    Value *IndexedRegisterValue::Add(const intmax_t& offset) const {
-      return new IndexedRegisterValue(val(), index() + offset, size());
+      return new IndexedRegisterValue(val(), index() + offset);
    }
 
    Value *OffsetValue::Add(const intmax_t& new_offset) const {

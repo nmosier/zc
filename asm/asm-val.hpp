@@ -24,6 +24,7 @@ namespace zc::z80 {
       
       virtual void Emit(std::ostream& os) const = 0;
       virtual Value *Add(const intmax_t& offset) const = 0;
+      Value *Add(Size sz) const { return Add(bytes(sz)); }
       
    protected:
       int size_;
@@ -71,7 +72,7 @@ namespace zc::z80 {
     */
    class RegisterValue: public Value {
    public:
-      const Register *reg() const { return reg(); }
+      const Register *reg() const { return reg_; }
       
       virtual void Emit(std::ostream& os) const override;
       virtual Value *Add(const intmax_t& offset) const override;
@@ -99,7 +100,7 @@ namespace zc::z80 {
       IndexedRegisterValue(const RegisterValue *val,
                            int8_t index,
                            Args... args):
-         Value(args...), val_(val), index_(index) {}
+         Value(args..., val->size()), val_(val), index_(index) {}
       
    protected:
       const RegisterValue *val_;

@@ -22,12 +22,14 @@ namespace zc {
 
       virtual void DumpNode(std::ostream& os) const override { os << "ExternalDecl"; }
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
-      
+
+     /* Semantic Analysis */
       virtual void TypeCheck(SemantEnv& env);
       ASTType *Type() const;
       virtual void Enscope(SemantEnv& env) const;
       virtual void Descope(SemantEnv& env) const;
 
+     /* Code Generation */
       virtual void CodeGen(CgenEnv& env);
       
    protected:
@@ -56,6 +58,7 @@ namespace zc {
       virtual void Descope(SemantEnv& env) const override;
 
       virtual void CodeGen(CgenEnv& env) override;
+      void FrameGen(StackFrame& frame) const;
       
    protected:
       CompoundStat *comp_stat_;
@@ -81,6 +84,8 @@ namespace zc {
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
       virtual void DumpType(std::ostream& os) const override;
 
+      /* Semantic Analysis */
+      
       /**
        * Perform semantic analysis on a declaration.
        * @param env semantic environment
@@ -95,7 +100,9 @@ namespace zc {
 
       void JoinPointers();
 
+      /* Code Generation */
       void CodeGen(CgenEnv& env);
+      void FrameGen(StackFrame& frame) const;
 
    protected:
       DeclSpecs *specs_;

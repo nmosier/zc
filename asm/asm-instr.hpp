@@ -20,20 +20,19 @@ namespace zc::z80 {
        */
       const char *name() const { return name_; }
 
-      /**
-       * Dump assembly for instruction. 
-       */
-      virtual void Emit(std::ostream& os) const;
       
       /** 
        * Number of cycles required to execute the instruction.
        */
       // virtual int cycles() const = 0;
 
+      virtual void Emit(std::ostream& os) const;
+      
       Instruction(const char *name): name_(name) {}
 
    protected:
       const char *name_;
+      
    };
 
    class BinaryInstruction: public Instruction {
@@ -255,7 +254,7 @@ namespace zc::z80 {
    class PushInstruction: public UnaryInstruction {
    public:
       template <typename... Args>
-      PushInstruction(Args... args): UnaryInstruction(args..., "pop") {}
+      PushInstruction(Args... args): UnaryInstruction(args..., "push") {}
    };
 
    /**
