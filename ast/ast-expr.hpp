@@ -81,6 +81,7 @@ namespace zc {
                        BOP_MOD
       };
       Kind kind() const { return kind_; }
+      bool is_logical() const;
       
       static BinaryExpr *Create(Kind kind, ASTExpr *lhs, ASTExpr *rhs, const SourceLoc& loc)
       { return new BinaryExpr(kind, lhs, rhs, loc); }

@@ -93,7 +93,9 @@ namespace zc {
       Transitions& vec() { return vec_; }
 
       bool live() const;
-      void DumpAsm(std::ostream& os, std::unordered_set<const Block *>& emitted_blocks) const;
+      void DumpAsm(std::ostream& os,
+                   std::unordered_set<const Block *>& emitted_blocks,
+                   const FunctionImpl *impl) const;
       
       BlockTransitions(const Transitions& vec);
       BlockTransitions(): vec_() {}
@@ -118,7 +120,9 @@ namespace zc {
        * @param os output stream
        * @param emitted_blocks set of blocks that have already been emitted (to avoid duplication).
        */
-      void DumpAsm(std::ostream& os, std::unordered_set<const Block *>& emitted_blocks) const;
+      void DumpAsm(std::ostream& os,
+                   std::unordered_set<const Block *>& emitted_blocks,
+                   const FunctionImpl *impl) const;
       
       /**
        * Constructor allows direct initialization of instructions vector.
@@ -142,7 +146,8 @@ namespace zc {
       Cond cond() const { return cond_; }
 
       virtual void DumpAsm(std::ostream& os,
-                           std::unordered_set<const Block *>& to_emit) const = 0;
+                           std::unordered_set<const Block *>& to_emit,
+                           const FunctionImpl *impl) const = 0;
       
    protected:
       const Cond cond_;
@@ -155,7 +160,8 @@ namespace zc {
       const Block *dst() const { return dst_; }
 
       virtual void DumpAsm(std::ostream& os,
-                           std::unordered_set<const Block *>& to_emit) const override;
+                           std::unordered_set<const Block *>& to_emit,
+                           const FunctionImpl *impl) const override;
 
       template <typename... Args>
       JumpTransition(const Block *dst, Args... args): BlockTransition(args...), dst_(dst) {}
@@ -167,7 +173,8 @@ namespace zc {
    class ReturnTransition: public BlockTransition {
    public:
       virtual void DumpAsm(std::ostream& os,
-                           std::unordered_set<const Block *>& to_emit) const override;
+                           std::unordered_set<const Block *>& to_emit,
+                           const FunctionImpl *impl) const override;
       
       template <typename... Args>
       ReturnTransition(Args... args): BlockTransition(args...) {}
@@ -177,6 +184,7 @@ namespace zc {
    class FunctionImpl {
    public:
       const Block *entry() const { return entry_; }
+      const Block *fin() const { return fin_; }
       const LabelValue *addr() const { return addr_; }
       
       void DumpAsm(std::ostream& os) const;
@@ -282,13 +290,13 @@ namespace zc {
    void emit_frameset(CgenEnv& env, Block *block);
 
    /**
-    * Emit CRT frame unset.
+    * Emit CRT frameunset.
     */
    void emit_frameunset(CgenEnv& env, Block *block);
    
    /*** C RUNTIME ***/
-   const Label crt_l_call("call");
-   const LabelValue crt_lv_call(&crt_l_call);
+   const Label crt_l_indcall("__indcall");
+   const LabelValue crt_lv_indcall(&crt_l_indcall);
    
 }
 

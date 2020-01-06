@@ -21,4 +21,9 @@ namespace zc::z80 {
       return new Label(name() + suffix);
    }
 
+   Label *Label::Prepend(const std::string& prefix) const {
+      return new Label(prefix + name());
+   }
+                         
+
 }

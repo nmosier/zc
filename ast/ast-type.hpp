@@ -152,7 +152,7 @@ namespace zc {
       virtual ASTType *Address() override;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) override;
       virtual Size size() const override {
-         throw std::logic_error("attempted to take size of function");
+         return Size::SZ_POINTER;
       }
       
    protected:

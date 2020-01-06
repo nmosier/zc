@@ -105,6 +105,15 @@ namespace zc::z80 {
    };
 
    /**
+    * "CCF" instruction
+    */
+   class CcfInstruction: public Instruction {
+   public:
+      template <typename... Args>
+      CcfInstruction(Args... args): Instruction(args..., "ccf") {}
+   };   
+
+   /**
     * "CP" instruction class
     */
    class CompInstruction: public BinaryInstruction {

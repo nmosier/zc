@@ -116,19 +116,19 @@ namespace zc {
       }
       
       Block *start_block = new Block(dynamic_cast<const LabelValue *>(info->addr())->label());
+      Block *ret_block = new Block(start_block->label()->Prepend("__frameunset"));
+
+      /* emit prologue and epilogue */
+      emit_frameset(env, start_block);
+      emit_frameunset(env, ret_block);
       
       Block *end_block = comp_stat()->CodeGen(env, start_block, false);
 
       /* TODO: check if unconditional return is already present before doing this? */      
       end_block->transitions().vec().push_back(new ReturnTransition(Cond::ANY)); 
 
-      Block *frameunset_block = new Block(start_block->label()->Append("_frameunset"));
 
-      /* emit prologue and epilogue */
-      emit_frameset(env, start_block);
-      emit_frameunset(env, frameunset_block);
-
-      env.impls().impls().push_back(FunctionImpl(env, start_block, frameunset_block));
+      env.impls().impls().push_back(FunctionImpl(env, start_block, ret_block));
 
       env.ext_env().Exit();
       env.symtab().ExitScope();
@@ -340,6 +340,11 @@ namespace zc {
       Size sz = type()->size();
       int bs = bytes(sz);
 
+      /* TODO: this assertion should be removed later once casts are included. */
+      // assert(lhs()->type()->size() == rhs()->type()->size());
+      Size op_sz = lhs()->type()->size();
+      int op_bs = bytes(op_sz);
+      
       switch (kind()) {
       case Kind::BOP_LOGICAL_AND:
          /* Short-circuit evaluation dictates that evaluation stops if the first operand 
@@ -377,7 +382,7 @@ namespace zc {
          {
             /* evaluate lhs */
             block = lhs()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
-            emit_booleanize(env, block, sz);
+            emit_booleanize(env, block, op_sz);
             emit_nonzero_test(env, block, sz); /* NOTE: This should be optimized 
                                                   * away in the future. */
 
@@ -394,7 +399,7 @@ namespace zc {
 
             /* Evaluate rhs */
             cont_block = rhs()->CodeGen(env, cont_block, ExprKind::EXPR_RVALUE);
-            emit_booleanize(env, block, sz);
+            emit_booleanize(env, block, op_sz);
             cont_block->transitions().vec().push_back(end_transition);
             
             return end_block;            
@@ -403,7 +408,7 @@ namespace zc {
       case Kind::BOP_EQ:
       case Kind::BOP_NEQ:
          emit_binop(env, block, this);
-         switch (bs) {
+         switch (op_bs) {
          case byte_size:
             block->instrs().push_back(new CompInstruction(&rv_a, &rv_b));
             break;
@@ -418,7 +423,7 @@ namespace zc {
 
       case Kind::BOP_LT:
          emit_binop(env, block, this);
-         switch (bs) {
+         switch (op_bs) {
          case byte_size:
             /* cp a,b
              * ld a,0
@@ -444,7 +449,7 @@ namespace zc {
 
       case Kind::BOP_LEQ:
          emit_binop(env, block, this);
-         switch (bs) {
+         switch (op_bs) {
          case byte_size:
             /* scf
              * sbc a,b
@@ -474,7 +479,7 @@ namespace zc {
 
       case Kind::BOP_GT:
          emit_binop(env, block, this);
-         switch (bs) {
+         switch (op_bs) {
          case byte_size:
             /* dec a
              * cp a,b
@@ -506,7 +511,7 @@ namespace zc {
 
       case Kind::BOP_GEQ:
          emit_binop(env, block, this);
-         switch (bs) {
+         switch (op_bs) {
          case byte_size:
             /* cp a,b
              * ld a,1
@@ -676,9 +681,11 @@ namespace zc {
 
       /* codegen callee */
       block = fn()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
-
+      
       /* call fn */
-      block->instrs().push_back(new CallInstruction(&crt_lv_call));
+      block->instrs().push_back(new PushInstruction(&rv_hl));
+      block->instrs().push_back(new PopInstruction(&rv_iy));
+      block->instrs().push_back(new CallInstruction(&crt_lv_indcall));
 
       /* pop off args */
       for (ASTExpr *param : params()->vec()) {
@@ -804,12 +811,14 @@ namespace zc {
       Block::InstrVec& instrs = block->instrs();
       Size sz = expr->type()->size();
       int bs = bytes(sz);
+      Size op_sz = expr->lhs()->type()->size();
+      int op_bs = bytes(op_sz);
 
-      /* evaluate lhs */
-      block = expr->lhs()->CodeGen(env, block, ASTBinaryExpr::ExprKind::EXPR_RVALUE);
+      /* evaluate rhs first */
+      block = expr->rhs()->CodeGen(env, block, ASTBinaryExpr::ExprKind::EXPR_RVALUE);
 
-      /* save lhs result */
-      switch (bs) {
+      /* save rhs result */
+      switch (op_bs) {
       case byte_size:
          block->instrs().push_back(new PushInstruction(&rv_af));
          break;
@@ -819,11 +828,11 @@ namespace zc {
          break;
       }
 
-      /* evaluate rhs */
-      block = expr->rhs()->CodeGen(env, block, ASTBinaryExpr::ExprKind::EXPR_RVALUE);
+      /* evaluate lhs */
+      block = expr->lhs()->CodeGen(env, block, ASTBinaryExpr::ExprKind::EXPR_RVALUE);
 
-      /* restore lhs result */
-      switch (bs) {
+      /* restore rhs result */
+      switch (op_bs) {
       case byte_size:
          block->instrs().push_back(new PopInstruction(&rv_bc));
          break;
@@ -874,13 +883,17 @@ namespace zc {
    }
 
    void emit_frameunset(CgenEnv& env, Block *block) {
-      /* ld ix,<locals>
-       * add ix,sp
-       * ld sp,ix
+      /* lea ix,ix+locals_bytes
        * pop ix
+       * ret
        */
-      
-      // TODO block->instrs().push_back(new LeaInstruction
+      block->instrs().push_back
+         (new LeaInstruction
+          (&rv_ix, new IndexedRegisterValue
+           (&rv_ix, env.ext_env().frame().locals_bytes())));
+      block->instrs().push_back(new LoadInstruction(&rv_sp, &rv_ix));
+      block->instrs().push_back(new PopInstruction(&rv_ix));
+      block->instrs().push_back(new RetInstruction());
    }
    
    /*** ASM DUMPS ***/
@@ -910,10 +923,13 @@ namespace zc {
 
    void FunctionImpl::DumpAsm(std::ostream& os) const {
       std::unordered_set<const Block *> emitted_blocks;
-      entry()->DumpAsm(os, emitted_blocks);
+      entry()->DumpAsm(os, emitted_blocks, this);
+      fin()->DumpAsm(os, emitted_blocks, this);
    }
    
-   void Block::DumpAsm(std::ostream& os, std::unordered_set<const Block *>& emitted_blocks) const {
+   void Block::DumpAsm(std::ostream& os,
+                       std::unordered_set<const Block *>& emitted_blocks,
+                       const FunctionImpl *impl) const {
       /* check if already emitted */
       if (emitted_blocks.find(this) != emitted_blocks.end()) {
          return;
@@ -929,23 +945,25 @@ namespace zc {
 
       /* emit transitions */
       std::unordered_set<const Block *> dsts;
-      transitions().DumpAsm(os, dsts);
+      transitions().DumpAsm(os, dsts, impl);
 
       /* emit destination blocks */
       for (const Block *block : dsts) {
-         block->DumpAsm(os, emitted_blocks);
+         block->DumpAsm(os, emitted_blocks, impl);
       }
    }
 
    void BlockTransitions::DumpAsm(std::ostream& os,
-                                  std::unordered_set<const Block *>& to_emit) const {
+                                  std::unordered_set<const Block *>& to_emit,
+                                  const FunctionImpl *impl) const {
       for (const BlockTransition *trans : vec()) {
-         trans->DumpAsm(os, to_emit);
+         trans->DumpAsm(os, to_emit, impl);
       }
    }
 
    void JumpTransition::DumpAsm(std::ostream& os,
-                                std::unordered_set<const Block *>& to_emit) const {
+                                std::unordered_set<const Block *>& to_emit,
+                                const FunctionImpl *impl) const {
       os << "\tjp\t";
       switch (cond()) {
       case Cond::Z:
@@ -972,27 +990,31 @@ namespace zc {
    }
 
    void ReturnTransition::DumpAsm(std::ostream& os,
-                                  std::unordered_set<const Block *>& to_emit) const {
-      os << "\tret";
+                                  std::unordered_set<const Block *>& to_emit,
+                                  const FunctionImpl *impl) const {
+      os << "\tjp\t";
       switch (cond()) {
       case Cond::Z:
-         os << "\tz";
+         os << "z,";
          break;
       case Cond::NZ:
-         os << "\tnz";
+         os << "nz,";
          break;
       case Cond::C:
-         os << "\tc";
+         os << "c,";
          break;
       case Cond::NC:
-         os << "\tnc";
+         os << "nc,";
          break;
       case Cond::ANY:
          break;
       }
 
+      impl->fin()->label()->EmitRef(os);
+
       os << std::endl;
-   }
+   }   
+   
 
    /*** FRAME GEN & STACK FRAME ***/
 

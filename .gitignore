@@ -9,3 +9,5 @@ test*.c
 c.tab.cpp
 c.tab.hpp
 tst
+.DS_Store
+cgen-main*

@@ -60,4 +60,21 @@ namespace zc {
       params()->Dump(os, level, with_types);
    }
 
+
+   bool BinaryExpr::is_logical() const {
+      switch (kind()) {
+      case Kind::BOP_LOGICAL_AND:
+      case Kind::BOP_LOGICAL_OR:
+      case Kind::BOP_EQ:
+      case Kind::BOP_NEQ:
+      case Kind::BOP_LT:
+      case Kind::BOP_LEQ:
+      case Kind::BOP_GT:
+      case Kind::BOP_GEQ:
+         return true;
+      default:
+         return false;
+      }
+   }
+   
 }

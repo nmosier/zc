@@ -306,6 +306,10 @@
                }
                type_ = lhs_->type();
             }
+
+            if (is_logical()) {
+               type_ = BasicType::Create(TypeSpec::TYPE_CHAR, this->loc());
+            }
          }
       }
    }
@@ -673,6 +677,5 @@
        env.symtab().ExitScope();
     }
 
-    
-    
+
 }
