@@ -15,7 +15,8 @@ namespace zc {
    public:
       enum class Kind {TYPE_BASIC,
                        TYPE_POINTER,
-                       TYPE_FUNCTION};
+                       TYPE_FUNCTION,
+                       TYPE_STRUCT};
       virtual Kind kind() const = 0;
       virtual const Decl *decl() const { return decl_; }
       Symbol *sym() const;
@@ -162,6 +163,38 @@ namespace zc {
       template <typename... Args>
       FunctionType(ASTType *return_type, Types *params, Args... args):
          ASTType(args...), return_type_(return_type), params_(params) {}
+   };
+
+   class StructType: public ASTType {
+   public:
+      virtual Kind kind() const override { return Kind::TYPE_STRUCT; }
+      virtual bool is_integral() const override { return false; }
+      virtual const FunctionType *get_callable() const override { return nullptr; }
+      Identifier *id() const { return id_; }
+      Types *membs() const { return membs_; }
+
+      template <typename... Args>
+      static StructType *Create(Args... args) { return new StructType(args...); }
+
+      virtual void DumpNode(std::ostream& os) const override;
+
+      virtual bool TypeEq(const ASTType *other) const override;
+      virtual bool TypeCoerce(const ASTType *from) const override;
+      virtual void TypeCheck(SemantEnv& env) override;
+
+      virtual ASTType *Address() override;
+      virtual ASTType *Dereference(SemantEnv *env = nullptr) override;
+      virtual Size size() const override {
+         throw std::logic_error("attempted to to get size enum of struct");
+      }
+      
+   protected:
+      Identifier *id_;
+      Types *membs_;
+
+      template <typename... Args>
+      StructType(Identifier *id, Types *membs, Args... args):
+         ASTType(args...), id_(id), membs_(membs) {}
    };
 
 }

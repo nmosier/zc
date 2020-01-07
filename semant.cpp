@@ -98,6 +98,12 @@
        params()->TypeCheck(env);
     }
 
+    void StructType::TypeCheck(SemantEnv& env) {
+       /* TODO: make sure struct is not redefined. */
+
+       membs()->TypeCheck(env);
+    }
+
     void Types::TypeCheck(SemantEnv& env) {
        ASTNodeVec::TypeCheck(env);
     }
@@ -443,6 +449,16 @@
        }
     }
 
+    bool StructType::TypeEq(const ASTType *other) const {
+       const StructType *st_other = dynamic_cast<const StructType *>(other);
+       if (st_other == nullptr) {
+          return false;
+       } else {
+          return this->id() != nullptr && st_other->id() != nullptr &&
+             this->id()->id() == st_other->id()->id();
+       }
+    }
+
     bool Types::TypeEq(const Types *others) const {
        if (this->vec_.size() != others->vec_.size()) {
           return false;
@@ -501,6 +517,10 @@
       return TypeEq(from);
    }
 
+    bool StructType::TypeCoerce(const ASTType *from) const {
+       return TypeEq(from);
+    }
+    
    /*** JOIN POINTERS ***/
 
    void PointerDeclarator::JoinPointers() {
@@ -602,6 +622,10 @@
        return this;
     }
 
+    ASTType *StructType::Address() {
+       return PointerType::Create(1, this, loc());
+    }
+    
     /*** DEREFERENCE TYPE ***/
     ASTType *BasicType::Dereference(SemantEnv *env) {
       if (env) {
@@ -622,6 +646,14 @@
    ASTType *FunctionType::Dereference(SemantEnv *env) {
       return this; /* function types are infinitely dereferencable */
    }
+
+    ASTType *StructType::Dereference(SemantEnv *env) {
+       if (env) {
+          env->error()(g_filename, this)
+             << "do you really think you can dereference a struct?" << std::endl;
+       }
+       return nullptr;
+    }
     
     /*** COMBINE ***/
     BasicType *BasicType::Max(const BasicType *with) const {

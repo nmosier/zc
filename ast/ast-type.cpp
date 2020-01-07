@@ -49,6 +49,16 @@ namespace zc {
       os << ")";
    }
 
+   void StructType::DumpNode(std::ostream& os) const {
+      os << "struct ";
+      if (id() != nullptr) {
+         os << id()->id();
+      }
+      os << " { ";
+      membs()->DumpNode(os);
+      os << " }";
+   }
+
    void Types::DumpNode(std::ostream& os) const {
       std::for_each(vec_.begin(), vec_.end(),
                     [&](const ASTType *type) {

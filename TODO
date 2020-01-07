@@ -40,12 +40,6 @@ ASM
 [ ] Register attributes: loadable, movable, addable, etc.
 [ ] Separate singleton classes for each register (`a', `hl', etc.)
 
-CGEN
-
-GENERAL
-[ ] Add function calls.
-[ ] Add fwd declaration headers.
-
 CODEGEN
 [ ] add `live()' method for blocks to determine if they can be joined.
 [ ] better solution than `return register'
@@ -55,8 +49,13 @@ CODEGEN
 [ ] abstract away instruction and transition access in blocks.
 [X] functions should have epilogue that `ret' transitions jump to
 [ ] casting should also worked for signed values, eventually.
+[ ] test addresses, derefence
 
 LANGUAGE FEATURES
 [X] cast expressions
 [ ] hexadecimal notation (0x...)
-[ ] while loops
+[X] while loops
+[ ] for loops
+[ ] structs
+[ ] sizeof operator
+[ ] void param decl

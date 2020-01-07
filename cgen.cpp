@@ -310,17 +310,44 @@ namespace zc {
       int bs = bytes(type()->size());
       switch (kind()) {
       case Kind::UOP_ADDR:
+         assert(mode == ExprKind::EXPR_RVALUE);
+         
          /* get subexpression as lvalue */
          block = expr()->CodeGen(env, block, ExprKind::EXPR_LVALUE);
          break;
          
       case Kind::UOP_DEREFERENCE:
-         /* get subexpression as rvalue */
+         /* get address as rvalue */
          block = expr()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
 
-         /* load pointer from resulting address */
-         block->instrs().push_back(new LoadInstruction(&rv_hl, &rv_hl));
-         
+         switch (mode) {
+         case ExprKind::EXPR_RVALUE:
+            switch (bs) {
+            case byte_size:
+               block->instrs().push_back
+                  (new LoadInstruction
+                   (&rv_a,
+                    new MemoryValue
+                    (new MemoryLocation(&rv_hl),
+                     byte_size)));
+               break;
+            case word_size: abort();
+            case long_size:
+               block->instrs().push_back
+                  (new LoadInstruction
+                   (&rv_hl,
+                    new MemoryValue
+                    (new MemoryLocation(&rv_hl),
+                     long_size)));
+               break;
+            }
+            break;
+            
+         case ExprKind::EXPR_LVALUE:
+            break;
+         case ExprKind::EXPR_NONE: abort();
+         }
+
          break;
          
       case Kind::UOP_POSITIVE:
