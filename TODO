@@ -34,6 +34,7 @@ AST
     - ASTBoundType becomes ASTTaggedType<Symbol *>
 [ ] Constructor type functions for converting Declarator to type
 [X] Get rid of virtual on ASTNodeVec
+[ ] Remove DeclSpecs.o
 
 ASM
 [ ] Register attributes: loadable, movable, addable, etc.
@@ -53,3 +54,6 @@ CODEGEN
 [ ] use std::deque for instructions in blocks.
 [ ] abstract away instruction and transition access in blocks.
 [ ] functions should have epilogue that `ret' transitions jump to
+
+LANGUAGE FEATURES
+[ ] cast expressions

@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "asm.hpp"
 
 namespace zc::z80 {
@@ -17,5 +19,14 @@ namespace zc::z80 {
       rv_h(&r_h), rv_l(&r_l), rv_ixh(&r_ixh), rv_ixl(&r_ixl), rv_iyh(&r_iyh), rv_iyl(&r_iyl);
    const RegisterValue rv_af(&r_af), rv_bc(&r_bc), rv_de(&r_de), rv_hl(&r_hl), rv_ix(&r_ix),
       rv_iy(&r_iy), rv_sp(&r_sp);
+
+   bool MultibyteRegister::contains(const Register *reg) const {
+      if (reg->kind() != Kind::REG_BYTE) {
+         return false;
+      }
+
+      const ByteRegister *byte_reg = dynamic_cast<const ByteRegister *>(reg);
+      return std::find(regs().begin(), regs().end(), byte_reg) != regs().end();
+   }
    
 }

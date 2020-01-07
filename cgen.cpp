@@ -695,7 +695,18 @@ namespace zc {
       
       return block;
    }
-   
+
+   Block *CastExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
+      assert(mode == ExprKind::EXPR_RVALUE);
+
+      const Register *src = return_register(expr()->type()->size());
+      const Register *dst = return_register(decl()->Type()->size());
+
+      dst->Cast(block, src);
+
+      return block;
+   }
+
    /*** OTHER ***/
 
    static int label_counter = 0;
@@ -895,6 +906,35 @@ namespace zc {
       block->instrs().push_back(new PopInstruction(&rv_ix));
       block->instrs().push_back(new RetInstruction());
    }
+
+   /*** Other ***/
+   void ByteRegister::Cast(Block *block, const Register *from) const {
+      switch (from->kind()) {
+      case Kind::REG_BYTE:
+         break;
+      case Kind::REG_MULTIBYTE:
+         block->instrs().push_back(new LoadInstruction(new RegisterValue(this),
+                                                       new RegisterValue(from)));
+         break;
+      }
+   }
+
+   void MultibyteRegister::Cast(Block *block, const Register *from) const {
+      switch (from->kind()) {
+      case Kind::REG_BYTE:
+         /* ensure long register being cast to does not contain given register. */
+         assert(!contains(from));
+
+         block->instrs().push_back(new LoadInstruction(new RegisterValue(this), &imm_l<0>));
+         block->instrs().push_back(new LoadInstruction(new RegisterValue(regs()[1]),
+                                                       new RegisterValue(from)));
+
+         break;
+         
+      case Kind::REG_MULTIBYTE:
+         break;
+      }
+   }
    
    /*** ASM DUMPS ***/
    void CgenEnv::DumpAsm(std::ostream& os) const {
@@ -1072,4 +1112,8 @@ namespace zc {
       frame.add_local(Type());
    }
 
+
+
+   
+   
 }

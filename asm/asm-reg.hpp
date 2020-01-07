@@ -32,10 +32,13 @@ namespace zc::z80 {
     */
    class Register {
    public:
+      enum Kind {REG_BYTE, REG_MULTIBYTE};
+      virtual Kind kind() const = 0;
       const std::string& name() const { return name_; }
       const int size() const { return size_; }
 
       void Emit(std::ostream& os) const { os << name(); }
+      virtual void Cast(Block *block, const Register *from) const = 0;
 
    protected:
       const std::string name_;
@@ -46,6 +49,10 @@ namespace zc::z80 {
 
    class ByteRegister: public Register {
    public:
+      virtual Kind kind() const override { return Kind::REG_BYTE; }
+
+      virtual void Cast(Block *block, const Register *from) const override;
+      
       template <typename... Args>
       ByteRegister(Args... args): Register(args..., byte_size) {}
       
@@ -55,7 +62,11 @@ namespace zc::z80 {
    class MultibyteRegister: public Register {
    public:
       typedef std::array<const Register *, word_size> ByteRegs;
+      virtual Kind kind() const override { return Kind::REG_MULTIBYTE; }
       const ByteRegs& regs() const { return regs_; }
+      bool contains(const Register *reg) const;
+
+      virtual void Cast(Block *block, const Register *from) const override;
       
       template <typename... Args>
       MultibyteRegister(const ByteRegs& regs, Args... args):

@@ -60,6 +60,11 @@ namespace zc {
       params()->Dump(os, level, with_types);
    }
 
+   void CastExpr::DumpChildren(std::ostream& os, int level, bool with_types) const {
+      decl()->Dump(os, level, with_types);
+      expr()->Dump(os, level, with_types);
+   }
+
 
    bool BinaryExpr::is_logical() const {
       switch (kind()) {

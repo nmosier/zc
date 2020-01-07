@@ -194,6 +194,11 @@
       }
       
       type_ = lhs_->type();
+
+      /* add cast expression to coerce rhs value */
+      if (!lhs_->type()->TypeEq(rhs_->type())) {
+         /* TODO: need to delete useless Decl first... */
+      }
    }
 
     void CallExpr::TypeCheck(SemantEnv& env) {
@@ -231,6 +236,12 @@
        }
     }
 
+    void CastExpr::TypeCheck(SemantEnv& env) {
+       decl_->TypeCheck(env);
+       expr_->TypeCheck(env);
+
+       type_ = decl()->Type();
+    }
 
    void UnaryExpr::TypeCheck(SemantEnv& env) {
       expr_->TypeCheck(env);

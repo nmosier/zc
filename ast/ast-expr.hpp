@@ -220,6 +220,31 @@ namespace zc {
          ASTExpr(args...), fn_(fn), params_(params) {}
       
    };
+
+   class CastExpr: public ASTExpr {
+   public:
+      virtual ExprKind expr_kind() const override { return ExprKind::EXPR_RVALUE; }
+      Decl *decl() const { return decl_; }
+      ASTExpr *expr() const { return expr_; }
+
+      template <typename... Args>
+      static CastExpr *Create(Args... args) { return new CastExpr(args...); }
+
+      virtual void DumpNode(std::ostream& os) const override { os << "CastExpr"; }
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
+
+      virtual void TypeCheck(SemantEnv& env) override;
+
+      virtual Block *CodeGen(CgenEnv& env, Block *block, ExprKind mode) override;
+      
+   protected:
+      Decl *decl_;
+      ASTExpr *expr_;
+
+      template <typename... Args>
+      CastExpr(Decl *decl, ASTExpr *expr, Args... args):
+         ASTExpr(args...), decl_(decl), expr_(expr) {}
+   };
 }
 
 #endif
