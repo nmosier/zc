@@ -85,6 +85,7 @@
 %token RETURN
 %token IF
 %token ELSE
+%token WHILE
                          /* IDENTIFIERS */
 %type  <translation_unit> translation_unit
 %type  <external_decls> external_decl
@@ -96,7 +97,7 @@
 %type  <pointer>       pointer
 %type  <param_decl>    param_decl
 %type  <param_decls>   param_type_list optional_param_type_list param_list
-%type  <stat>          stat jump_stat selection_stat
+%type  <stat>          stat jump_stat selection_stat iteration_stat
 %type  <stats>         optional_stat_list stat_list
 %type  <compound_stat> compound_stat
 %type  <expr_stat>     exp_stat
@@ -203,6 +204,7 @@ stat:           exp_stat { $$ = $1; }
         |       compound_stat { $$ = $1; }
         |       jump_stat { $$ = $1; }
         |       selection_stat { $$ = $1; }
+        |       iteration_stat{ $$ = $1; }
         ; /* incomplete */
 optional_stat_list:
                 /* empty */ { $$ = zc::ASTStats::Create(@$); @$ = 0; }
@@ -219,6 +221,11 @@ jump_stat:      RETURN optional_exp ';' { $$ = zc::ReturnStat::Create($2, @1); }
         ;
 selection_stat: IF '(' exp ')' stat { $$ = zc::IfStat::Create($3, $5, nullptr, @1); }
         |       IF '(' exp ')' stat ELSE stat { $$ = zc::IfStat::Create($3, $5, $7, @1); }
+        ;
+iteration_stat:
+                WHILE '(' exp ')' stat {
+                    $$ = zc::WhileStat::Create($3, $5, @3);
+                }
         ;
 exp_stat:       optional_exp ';' { $$ = zc::ExprStat::Create($1, @1); }
         ;

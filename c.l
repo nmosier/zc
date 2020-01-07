@@ -53,6 +53,7 @@ E  [Ee][+-]?{D}+
 
 "if" { return IF; }
 "else" { return ELSE; }
+"while" { return WHILE; }
 
 {L}({L}|{D})* {
     /* convert yytext to AST identifier */

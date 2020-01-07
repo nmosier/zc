@@ -59,3 +59,4 @@ CODEGEN
 LANGUAGE FEATURES
 [X] cast expressions
 [ ] hexadecimal notation (0x...)
+[ ] while loops

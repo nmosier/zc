@@ -217,6 +217,31 @@ namespace zc {
       return join_block;
    }
 
+   Block *WhileStat::CodeGen(CgenEnv& env, Block *block) {
+      Label *body_label = new_label("while_body");
+      Block *body_block = new Block(body_label);
+      
+      Label *pred_label = new_label("while_pred");
+      Block *pred_block = new Block(pred_label);
+
+      BlockTransition *pred_trans = new JumpTransition(pred_block, Cond::ANY);
+      block->transitions().vec().push_back(pred_trans);
+
+      pred_block = pred()->CodeGen(env, pred_block, ASTExpr::ExprKind::EXPR_RVALUE);
+      emit_nonzero_test(env, block, pred()->type()->size());
+
+      pred_block->transitions().vec().push_back(new JumpTransition(body_block, Cond::NZ));
+
+      body_block = body()->CodeGen(env, body_block);
+      body_block->transitions().vec().push_back(pred_trans);
+
+      Label *join_label = new_label("while_end");
+      Block *join_block = new Block(join_label);
+      pred_block->transitions().vec().push_back(new JumpTransition(join_block, Cond::ANY));
+
+      return join_block;
+   }
+
    Block *AssignmentExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
       assert(mode == ExprKind::EXPR_RVALUE);
 
@@ -1116,6 +1141,10 @@ namespace zc {
    void IfStat::FrameGen(StackFrame& frame) const {
       if_body()->FrameGen(frame);
       else_body()->FrameGen(frame);
+   }
+
+   void WhileStat::FrameGen(StackFrame& frame) const {
+      body()->FrameGen(frame);
    }
 
    void Decl::FrameGen(StackFrame& frame) const {

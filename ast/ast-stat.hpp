@@ -143,6 +143,43 @@ namespace zc {
       IfStat(ASTExpr *cond, ASTStat *if_body, ASTStat *else_body, Args... args):
          SelectionStat(args...), cond_(cond), if_body_(if_body), else_body_(else_body) {}
    };
+
+   /* NOTE: Abstract */
+   class IterationStat: public ASTStat {
+   public:
+      ASTExpr *pred() const { return pred_; }
+      ASTStat *body() const { return body_; }
+      
+   protected:
+      ASTExpr *pred_;
+      ASTStat *body_;
+      
+      template <typename... Args>
+      IterationStat(ASTExpr *pred, ASTStat *body, Args... args):
+         ASTStat(args...), pred_(pred), body_(body) {}
+   };
+
+   class WhileStat: public IterationStat {
+   public:
+      template <typename... Args>
+      static WhileStat *Create(Args... args) {
+         return new WhileStat(args...);
+      }
+
+      virtual void DumpNode(std::ostream& os) const override { os << "WhileStat"; }
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
+
+      /* Semantic Analysis */
+      virtual void TypeCheck(SemantEnv& env) override;
+
+      /* Code Generation */
+      virtual Block *CodeGen(CgenEnv& env, Block *block) override;
+      virtual void FrameGen(StackFrame& env) const override;          
+      
+   protected:
+      template <typename... Args>
+      WhileStat(Args... args): IterationStat(args...) {}
+   };
    
 }
 

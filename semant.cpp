@@ -176,6 +176,11 @@
        }
     }
 
+    void WhileStat::TypeCheck(SemantEnv& env) {
+       pred()->TypeCheck(env);
+       body()->TypeCheck(env);
+    }
+
     void ExprStat::TypeCheck(SemantEnv& env) {
        expr()->TypeCheck(env);
     }
