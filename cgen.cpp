@@ -341,7 +341,7 @@ namespace zc {
       int bs = bytes(sz);
 
       /* TODO: this assertion should be removed later once casts are included. */
-      // assert(lhs()->type()->size() == rhs()->type()->size());
+      assert(lhs()->type()->size() == rhs()->type()->size());
       Size op_sz = lhs()->type()->size();
       int op_bs = bytes(op_sz);
       
@@ -700,8 +700,9 @@ namespace zc {
       assert(mode == ExprKind::EXPR_RVALUE);
 
       const Register *src = return_register(expr()->type()->size());
-      const Register *dst = return_register(decl()->Type()->size());
+      const Register *dst = return_register(type()->size());
 
+      expr()->CodeGen(env, block, mode);
       dst->Cast(block, src);
 
       return block;
@@ -913,8 +914,12 @@ namespace zc {
       case Kind::REG_BYTE:
          break;
       case Kind::REG_MULTIBYTE:
-         block->instrs().push_back(new LoadInstruction(new RegisterValue(this),
-                                                       new RegisterValue(from)));
+         {
+            const MultibyteRegister *from_mb = dynamic_cast<const MultibyteRegister *>(from);
+            const ByteRegister *from_lsb = from_mb->regs().back();
+            const RegisterValue *from_rv = new RegisterValue(from_lsb);
+            block->instrs().push_back(new LoadInstruction(new RegisterValue(this), from_rv));
+         }
          break;
       }
    }

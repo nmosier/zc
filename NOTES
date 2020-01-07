@@ -10,3 +10,9 @@ Passes
 C RUNTIME:
 __call:
    jp (hl)
+
+
+*** Removing Decl ***
+abstract decl -> type
+agnostic decl -> type
+named decl -> type + id

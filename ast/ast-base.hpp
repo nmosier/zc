@@ -157,8 +157,12 @@ namespace zc {
        * Type of expression; populated by @see TypeCheck()
        */
       ASTType *type_;
-      
-      ASTExpr(const SourceLoc& loc): ASTNode(loc), type_(nullptr) {}
+
+      template <typename... Args>
+      ASTExpr(Args... args): ASTNode(args...), type_(nullptr) {}
+
+      template <typename... Args>
+      ASTExpr(ASTType *type, Args... args): ASTNode(args...), type_(type) {}
    };
 
    class ASTUnaryExpr: public ASTExpr {

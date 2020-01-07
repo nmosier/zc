@@ -45,6 +45,7 @@
 namespace zc {
 
    extern bool g_semant_debug;
+   extern SemantEnv g_semant_env;
 
    void Semant(TranslationUnit *root);
 

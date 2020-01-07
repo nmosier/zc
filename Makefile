@@ -9,7 +9,7 @@ ASM_HDRS = asm.hpp $(wildcard asm/*.hpp)
 ASM_SRCS = $(wildcard asm/*.cpp)
 ASM_OBJS = $(ASM_SRCS:.cpp=.o)
 
-BISON_FLAGS = -d
+BISON_FLAGS = -v -d
 
 BISON_SRC = c.tab.cpp
 BISON_OBJ = $(BISON_SRC:.cpp=.o)

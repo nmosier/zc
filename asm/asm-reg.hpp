@@ -61,7 +61,7 @@ namespace zc::z80 {
 
    class MultibyteRegister: public Register {
    public:
-      typedef std::array<const Register *, word_size> ByteRegs;
+      typedef std::array<const ByteRegister *, word_size> ByteRegs;
       virtual Kind kind() const override { return Kind::REG_MULTIBYTE; }
       const ByteRegs& regs() const { return regs_; }
       bool contains(const Register *reg) const;

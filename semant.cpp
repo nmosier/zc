@@ -10,12 +10,13 @@
 
     bool g_semant_debug = false;
     SemantError g_semant_error(std::cerr);
+    SemantEnv g_semant_env(g_semant_error);
 
     void Semant(TranslationUnit *root) {
-       SemantEnv env(g_semant_error);
-       root->Enscope(env);
-       root->TypeCheck(env);
-       root->Descope(env);
+       //       SemantEnv env(g_semant_error);
+       root->Enscope(g_semant_env);
+       root->TypeCheck(g_semant_env);
+       root->Descope(g_semant_env);
     }
 
     std::ostream& SemantError::operator()(const char *filename, const ASTNode *node) {
@@ -197,7 +198,7 @@
 
       /* add cast expression to coerce rhs value */
       if (!lhs_->type()->TypeEq(rhs_->type())) {
-         /* TODO: need to delete useless Decl first... */
+         rhs_ = CastExpr::Create(lhs_->type(), rhs_, rhs_->loc());
       }
    }
 
@@ -237,10 +238,7 @@
     }
 
     void CastExpr::TypeCheck(SemantEnv& env) {
-       decl_->TypeCheck(env);
        expr_->TypeCheck(env);
-
-       type_ = decl()->Type();
     }
 
    void UnaryExpr::TypeCheck(SemantEnv& env) {
@@ -281,6 +279,7 @@
    void BinaryExpr::TypeCheck(SemantEnv& env) {
       lhs_->TypeCheck(env);
       rhs_->TypeCheck(env);
+
       
       switch (kind()) {
       case Kind::BOP_LOGICAL_AND:
@@ -306,6 +305,13 @@
             if (lhs_int && rhs_int) {
                type_ = dynamic_cast<const BasicType *>
                   (lhs_->type())->Max(dynamic_cast<const BasicType *>(rhs_->type()));
+
+               /* make implicit casts explicit */
+               if (!lhs_->type()->TypeEq(type_)) {
+                  lhs_ = CastExpr::Create(type_, lhs_, lhs_->loc());
+               } else if (!rhs_->type()->TypeEq(type_)) {
+                  rhs_ = CastExpr::Create(type_, rhs_, rhs_->loc());
+               }
             } else {
                if (!lhs_int) {
                   env.error()(g_filename, this) << "left-hand expression in binary operation "
