@@ -11,3 +11,4 @@ c.tab.hpp
 tst
 .DS_Store
 cgen-main*
+*.output
