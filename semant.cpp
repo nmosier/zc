@@ -42,7 +42,7 @@
 
        /* reduce long long -> long_long */
        if (specs.count(TypeSpec::TYPE_LONG) == 2) {
-          auto p = specs_.equal_range(TypeSpec::TYPE_LONG);
+          auto p = specs.equal_range(TypeSpec::TYPE_LONG);
           specs.erase(p.first, p.second);
           specs.insert(TypeSpec::TYPE_LONG_LONG);
        }
