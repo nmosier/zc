@@ -226,10 +226,15 @@ namespace zc {
       block = rhs()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
 
       /* save right-hand value */
-      block->instrs().push_back
-         (new PushInstruction
-          (new RegisterValue
-           (return_register(sz))));
+      switch (bs) {
+      case byte_size:
+         block->instrs().push_back(new PushInstruction(&rv_af));
+         break;
+      case word_size:
+         abort();
+      case long_size:
+         block->instrs().push_back(new PushInstruction(&rv_hl));
+      }
 
       /* compute left-hand lvalue */
       block = lhs()->CodeGen(env, block, ExprKind::EXPR_LVALUE);

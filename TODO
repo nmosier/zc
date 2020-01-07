@@ -57,4 +57,4 @@ CODEGEN
 [ ] casting should also worked for signed values, eventually.
 
 LANGUAGE FEATURES
-[ ] cast expressions
+[X] cast expressions
