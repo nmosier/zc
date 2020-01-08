@@ -61,7 +61,6 @@ namespace zc {
       int locals_bytes() const { return locals_bytes_; }
 
       void add_local(const ASTType *type);
-      void add_local(Size sz);
       void add_local(int bs) { locals_bytes_ += bs; }
 
       SymInfo *next_arg(const ASTType *type);
@@ -263,7 +262,7 @@ namespace zc {
       FunctionImpls impls_;
    };
 
-   const Register *return_register(Size sz);
+   const Register *return_register(int bytes);
    Label *new_label();
    Label *new_label(const std::string& prefix);
 
@@ -271,17 +270,17 @@ namespace zc {
     * Check whether expression is nonzero (i.e. evaluates to true as a predicate).
     * Zero flag (ZF) is set accordingly.
     */
-   void emit_nonzero_test(CgenEnv& env, Block *block, Size size);
+   void emit_nonzero_test(CgenEnv& env, Block *block, int bytes);
 
    /**
     * Emit logical not on expression.
     */
-   void emit_logical_not(CgenEnv& env, Block *block, Size size);
+   void emit_logical_not(CgenEnv& env, Block *block, int bytes);
 
    /**
     * Emit code that converts integral value into boolean (0 or 1).
     */
-   void emit_booleanize(CgenEnv& env, Block *block, Size size);
+   void emit_booleanize(CgenEnv& env, Block *block, int bytes);
 
    /**
     * Generic emission routine for performing binary operation on two integers.

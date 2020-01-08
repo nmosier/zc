@@ -11,18 +11,16 @@ namespace zc {
 
    class CompoundStat: public ASTStat {
    public:
-      Decls *decls() const { return decls_; }
+      Types *decls() const { return decls_; }
       ASTStats *stats() const { return stats_; }
-      
-      static CompoundStat *Create(Decls *decls, ASTStats *stats, SourceLoc& loc) {
-         return new CompoundStat(decls, stats, loc);
+
+      template <typename... Args>
+      static CompoundStat *Create(Args... args) {
+         return new CompoundStat(args...);
       }
 
       virtual void DumpNode(std::ostream& os) const override { os << "CompoundStat"; }
-      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {
-         decls_->Dump(os, level, with_types);
-         stats_->Dump(os, level, with_types);
-      }
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
 
       /* Semantic Analysis */
       virtual void TypeCheck(SemantEnv& env) override { return TypeCheck(env, true); }
@@ -36,10 +34,10 @@ namespace zc {
       virtual void FrameGen(StackFrame& env) const override;
       
    protected:
-      Decls *decls_;
+      Types *decls_;
       ASTStats *stats_;
       
-      CompoundStat(Decls *decls, ASTStats *stats, SourceLoc& loc):
+      CompoundStat(Types *decls, ASTStats *stats, SourceLoc& loc):
          ASTStat(loc), decls_(decls), stats_(stats) {}
    };
    

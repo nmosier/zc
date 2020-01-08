@@ -5,6 +5,9 @@
 #ifndef __AST_FWD_HPP
 #define __AST_FWD_HPP
 
+#include <variant>
+#include <vector>
+
 namespace zc {
 
    /* typedefs */
@@ -49,6 +52,7 @@ namespace zc {
    class StackFrame;
    class FunctionImpl;
    class StructSpec;
+
 }
 
 #endif

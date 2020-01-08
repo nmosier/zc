@@ -24,7 +24,6 @@ namespace zc::z80 {
       
       virtual void Emit(std::ostream& os) const = 0;
       virtual Value *Add(const intmax_t& offset) const = 0;
-      Value *Add(Size sz) const { return Add(bytes(sz)); }
       
    protected:
       int size_;

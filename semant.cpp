@@ -1,8 +1,9 @@
- #include <optional>
+#include <unordered_set>
 
  #include "ast.hpp"
  #include "symtab.hpp"
  #include "semant.hpp"
+ #include "c.tab.hpp"
 
  extern const char *g_filename;
 
@@ -20,13 +21,71 @@
     }
 
     std::ostream& SemantError::operator()(const char *filename, const ASTNode *node) {
+       return SemantError::operator()(filename, node->loc());
+    }
+    
+    std::ostream& SemantError::operator()(const char *filename, const SourceLoc& loc) {
        errors_++;
-       os_ << filename << ":" << node->loc() << ": ";
+       os_ << filename << ":" << loc << ": ";
        return os_;
     }
 
     TypeSpec *TypeSpecs::TypeCombine() const {
        return TypeCombine(nullptr);
+    }
+
+    static IntegralType::IntKind token_to_intspec(int token) {
+       using Kind = IntegralType::IntKind;
+       std::unordered_map<int,Kind> map
+          {{CHAR, Kind::SPEC_CHAR},
+           {SHORT, Kind::SPEC_SHORT},
+           {INT, Kind::SPEC_INT},
+           {LONG, Kind::SPEC_LONG}
+          };
+       return map[token];
+    }
+
+    /**
+     * combine basic type spec tags into one during parsing
+     */
+    IntegralType *combine_integral_type_specs(std::unordered_multiset<int>& int_specs,
+                                              SemantError& error, const SourceLoc& loc) {
+       using Kind = IntegralType::IntKind;
+       
+       switch (int_specs.size()) {
+       case 0:
+          error(g_filename, loc) << "declaration missing type specifier" << std::endl;
+          return IntegralType::Create(Kind::SPEC_INT, loc);
+          
+       case 1:
+          return IntegralType::Create(token_to_intspec(*int_specs.begin()), loc);
+
+       case 2:
+          if (int_specs.count(LONG) == 2) {
+             return IntegralType::Create(Kind::SPEC_LONG_LONG, loc);
+          } else if (int_specs.count(CHAR) > 0) {
+             error(g_filename, loc) << "cannot combine 'char' type specifier with other "
+                                     << "type specifiers" << std::endl;
+             return IntegralType::Create(token_to_intspec(*int_specs.begin()), loc);
+          } else if (int_specs.count(INT) == 1) {
+             int_specs.erase(INT);
+             return IntegralType::Create(token_to_intspec(*int_specs.begin()), loc);
+          } else {
+             error(g_filename, loc) << "too many type specifiers given" << std::endl;
+             return IntegralType::Create(token_to_intspec(*int_specs.begin()), loc);
+          }
+          
+       case 3:
+          if (int_specs.count(LONG) == 2 && int_specs.count(INT) == 1) {
+             return IntegralType::Create(token_to_intspec(*int_specs.begin()), loc);
+          }
+          
+       default:
+             error(g_filename, loc) << "too many type specifiers given; "
+                                            << "how about I just pick one at random?"
+                                            << std::endl;
+             return IntegralType::Create(token_to_intspec(*int_specs.begin()), loc);
+       }
     }
 
     TypeSpec *TypeSpecs::TypeCombine(SemantEnv *env) const {
@@ -119,10 +178,6 @@
 
     /*** TYPE CHECK ***/
 
-    void BasicType::TypeCheck(SemantEnv& env, bool allow_void) {
-       type_spec()->TypeCheck(env, allow_void);
-    }
-
     void PointerType::TypeCheck(SemantEnv& env, bool allow_void) {
        pointee()->TypeCheck(env, true);
     }
@@ -144,7 +199,9 @@
     }
 
     void StructType::TypeCheck(SemantEnv& env, bool allow_void) {
-       membs()->TypeCheck(env);
+       if (membs() != nullptr) {
+          membs()->TypeCheck(env);
+       }
     }
 
     void Types::TypeCheck(SemantEnv& env) {
@@ -169,10 +226,6 @@
        Descope(env);
     }
     
-    void DeclSpecs::TypeCheck(SemantEnv& env) {
-       type_specs()->TypeCheck(env);
-    }
-
     void TypeSpecs::TypeCheck(SemantEnv& env) {
        /* make sure all type specifiers present are compatible */
        TypeCombine(&env);
@@ -278,8 +331,7 @@
        const FunctionType *type;
        if ((type = fn()->type()->get_callable()) == nullptr) {
           env.error()(g_filename, this) << "expression is not callable" << std::endl;
-          type_ = BasicType::Create(IntegralSpec::Create(IntegralSpec::IntKind::SPEC_INT, loc()),
-                                    loc());
+          type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());
           return;
        }
 
@@ -336,7 +388,7 @@
       case Kind::UOP_LOGICAL_NOT:
          /* requires integral type */
          
-         if (!expr_->type()->is_integral()) {
+         if (!(expr_->type()->kind() == ASTType::Kind::TYPE_INTEGRAL)) {
             env.error()(g_filename, this) << "positive/negative sign verboten for non-integral type"
                                           << std::endl;
          }
@@ -368,12 +420,12 @@
       case Kind::BOP_DIVIDE:
       case Kind::BOP_MOD:
          {
-            bool lhs_int = lhs_->type()->is_integral();
-            bool rhs_int = rhs_->type()->is_integral();
+            bool lhs_int = lhs_->type()->kind() == ASTType::Kind::TYPE_INTEGRAL;
+            bool rhs_int = rhs_->type()->kind() == ASTType::Kind::TYPE_INTEGRAL;
 
             if (lhs_int && rhs_int) {
-               type_ = dynamic_cast<const BasicType *>
-                  (lhs_->type())->Max(dynamic_cast<const BasicType *>(rhs_->type()));
+               type_ = dynamic_cast<const IntegralType *>
+                  (lhs_->type())->Max(dynamic_cast<const IntegralType *>(rhs_->type()));
 
                /* make implicit casts explicit */
                if (!lhs_->type()->TypeEq(type_)) {
@@ -394,40 +446,32 @@
             }
 
             if (is_logical()) {
-               type_ =
-                  BasicType::Create(IntegralSpec::Create(IntegralSpec::IntKind::SPEC_CHAR, loc()),
-                                    loc());
+               type_ = IntegralType::Create(IntegralType::IntKind::SPEC_CHAR, loc());
             }
          }
       }
    }
 
    void LiteralExpr::TypeCheck(SemantEnv& env) {
-      type_ = BasicType::Create(IntegralSpec::Create(IntegralSpec::IntKind::SPEC_LONG_LONG,
-                                                     loc()),
-                                loc());
+      type_ = IntegralType::Create(IntegralType::IntKind::SPEC_LONG_LONG, loc());
    }
 
    void StringExpr::TypeCheck(SemantEnv& env) {
-      type_ =
-         PointerType::Create
-         (1,
-          BasicType::Create(IntegralSpec::Create(IntegralSpec::IntKind::SPEC_CHAR, loc()), loc()),
-          loc());
+      type_ = PointerType::Create(1, IntegralType::Create(IntegralType::IntKind::SPEC_CHAR, loc()),
+                                  loc());
    }
 
    void IdentifierExpr::TypeCheck(SemantEnv& env) {
       if ((type_ = env.symtab().Lookup(id()->id())) == nullptr) {
          env.error()(g_filename, this) << "use of undeclared identifier '" << *id()->id()
                                        << "'" << std::endl;
-         type_ = BasicType::Create(IntegralSpec::Create(IntegralSpec::IntKind::SPEC_INT, loc()),
-                                   loc());
+         type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());         
       }
    }
 
     void NoExpr::TypeCheck(SemantEnv& env) {
        /* set type */
-       type_ = BasicType::Create(VoidSpec::Create(loc()), loc());
+       type_ = VoidType::Create(loc());
     }
 
 
@@ -488,15 +532,6 @@
     }
 
     /*** TYPE EQUALITY ***/
-    bool BasicType::TypeEq(const ASTType *other) const {
-       const BasicType *basic_other = dynamic_cast<const BasicType *>(other);
-       if (basic_other == nullptr) {
-          return false;
-       } else {
-          return type_spec()->Eq(basic_other->type_spec());
-       }
-    }
-
     bool PointerType::TypeEq(const ASTType *other) const {
        const PointerType *ptr_other = dynamic_cast<const PointerType *>(other);
        if (ptr_other == nullptr) {
@@ -543,22 +578,6 @@
     }
 
     /*** TYPE COERCION ***/
-    bool BasicType::TypeCoerce(const ASTType *from) const {
-       const BasicType *basic_from = dynamic_cast<const BasicType *>(from);
-       if (basic_from == nullptr) {
-          return false;
-       } else {
-          bool eq = this->type_spec()->kind() == basic_from->type_spec()->kind();
-          switch (this->type_spec()->kind()) {
-          case TypeSpec::Kind::SPEC_VOID:
-          case TypeSpec::Kind::SPEC_INTEGRAL:
-             return eq;
-          case TypeSpec::Kind::SPEC_STRUCT:
-             return TypeEq(from);
-          }
-      }
-   }
-
    bool PointerType::TypeCoerce(const ASTType *from) const {
       /* -1. Check if types are equal. */
       if (this->TypeEq(from)) {
@@ -572,11 +591,8 @@
       }
       
       /* 1. Check if coercing to 'void *'. */
-      if (pointee()->kind() == ASTType::Kind::TYPE_BASIC) {
-         const BasicType *basic_pointee = dynamic_cast<const BasicType *>(pointee());
-         if (basic_pointee->type_spec()->kind() == TypeSpec::Kind::SPEC_VOID) {
-            return true;
-         }
+      if (pointee()->kind() == ASTType::Kind::TYPE_VOID) {
+         return true;
       }
 
       return false; /* cannot coerce since pointers are non-identical and `to' is not void ptr */
@@ -605,7 +621,6 @@
 
    void FunctionDeclarator::JoinPointers() {
       declarator()->JoinPointers();
-      params()->JoinPointers();
    }
 
    void Decls::JoinPointers() {
@@ -620,7 +635,7 @@
    }
 
     ASTType *ExternalDecl::Type() const {
-       return decl()->Type();
+       return decl();
     }
     
    ASTType *BasicDeclarator::Type(ASTType *type) const {
@@ -632,7 +647,7 @@
       switch (declarator()->kind()) {
       case Kind::DECLARATOR_BASIC:
          /* basic pointer */
-         return PointerType::Create(depth(), declarator()->Type(type), type->decl(), loc());
+         return PointerType::Create(depth(), declarator()->Type(type), type->sym(), loc());
          
       case Kind::DECLARATOR_POINTER:
          /* this shouldn't happen */
@@ -640,32 +655,33 @@
          
       case Kind::DECLARATOR_FUNCTION:
          /* tricky: pointer is actualy part of the return value type */
-         return declarator()->Type(PointerType::Create(depth(), type, type->decl(), loc()));
+         return declarator()->Type(PointerType::Create(depth(), type, type->sym(), loc()));
       }
    }
 
    ASTType *FunctionDeclarator::Type(ASTType *type) const {
       /* NOTE: _type_ represents the (possibly partial) return value of this function. */
-      Types *param_types = params()->Type();
+      Types *param_types = params();
 
       /* WHOA -- if this works, it's beautiful. */
       switch (declarator()->kind()) {
       case Kind::DECLARATOR_BASIC:
-         return FunctionType::Create(type, param_types, type->decl(), loc());
+         return FunctionType::Create(type, param_types, type->sym(), loc());
          
       case Kind::DECLARATOR_POINTER:
          /* Actually a function pointer -- but primarily a pointer. */
-         return declarator()->Type(FunctionType::Create(type, param_types, type->decl(), loc()));
+         return declarator()->Type(FunctionType::Create(type, param_types, type->sym(), loc()));
          
       case Kind::DECLARATOR_FUNCTION:
          /* This function is actually the RETURN TYPE of another function declared
           * _declarator()_. */
-         return declarator()->Type(FunctionType::Create(type, param_types, type->decl(), loc()));
+         return declarator()->Type(FunctionType::Create(type, param_types, type->sym(), loc()));
       }
    }
 
    ASTType *Decl::Type() const {
-      ASTType *init_type = BasicType::Create(specs()->type_spec(), this, loc());
+      ASTType *init_type = specs();
+      init_type->set_sym(sym());
       return declarator()->Type(init_type);
    }
 
@@ -679,10 +695,6 @@
    }
 
     /*** ADDRESS OF TYPE ***/
-    ASTType *BasicType::Address() {
-       return PointerType::Create(1, this, loc());
-    }
-    
     ASTType *PointerType::Address() {
        return PointerType::Create(depth() + 1, pointee(), loc());
     }
@@ -696,14 +708,6 @@
     }
     
     /*** DEREFERENCE TYPE ***/
-    ASTType *BasicType::Dereference(SemantEnv *env) {
-      if (env) {
-         env->error()(g_filename, this) << "cannot derereference type" << std::endl;
-      }
-      
-      return nullptr;
-    }
-    
     ASTType *PointerType::Dereference(SemantEnv *env) {
        if (depth() == 1) {
           return pointee();
@@ -724,15 +728,6 @@
        return nullptr;
     }
     
-    /*** COMBINE ***/
-    BasicType *BasicType::Max(const BasicType *with) const {
-       if (type_spec()->kind() != TypeSpec::Kind::SPEC_INTEGRAL ||
-           with->type_spec()->kind() != TypeSpec::Kind::SPEC_INTEGRAL) {
-          return nullptr;
-       } else {
-          return BasicType::Create(dynamic_cast<const IntegralSpec *>(type_spec())->Max(dynamic_cast<const IntegralSpec *>(with->type_spec())), loc());
-       }
-    }
     
     /*** ENSCOPE ***/
     void TranslationUnit::Enscope(SemantEnv& env) const {
@@ -743,37 +738,28 @@
        env.ExitScope();
      }
 
-     void Decl::Enscope(SemantEnv& env) const { 
+     void ASTType::Enscope(SemantEnv& env) { 
         /* check for previous declarations in scope */
-        Symbol *sym = id()->id();
-
-        if (sym == nullptr) {
+        if (sym() == nullptr) {
            env.error()(g_filename, this) << "declaration is missing identifier" << std::endl;
            return;
         }
      
-        if (env.symtab().Probe(sym) != nullptr) {
+        if (env.symtab().Probe(sym()) != nullptr) {
            /* ERROR: symbol already defined in this scope. */
-           env.error()(g_filename, this) << "redefinition of '" << *sym << "'" << std::endl;
+           env.error()(g_filename, this) << "redefinition of '" << *sym() << "'" << std::endl;
            return;
         }
      
-        ASTType *type = Type();
-        type->TypeCheck(env);
+        TypeCheck(env);
      
         /* add symbol to scope */
-        env.symtab().AddToScope(sym, type);
+        env.symtab().AddToScope(sym(), this);
      }
     
-     void Decls::Enscope(SemantEnv& env) const {
-        for (const Decl *decl : vec_) {
-           decl->Enscope(env);
-        }
-     }
-
      void ExternalDecl::Enscope(SemantEnv& env) const {
         decl()->Enscope(env);
-        env.ext_env().Enter(decl()->id()->id());
+        env.ext_env().Enter(decl()->sym());
      }
 
      void ExternalDecl::Descope(SemantEnv& env) const {
@@ -796,8 +782,8 @@
 
        Types *params = type->params();
        std::for_each(params->vec().begin(), params->vec().end(),
-                     [&](const ASTType *param) {
-                        param->decl()->Enscope(env);
+                     [&](ASTType *param) {
+                        param->Enscope(env);
                      });
     }
 

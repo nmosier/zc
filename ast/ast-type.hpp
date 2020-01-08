@@ -5,46 +5,24 @@
 #ifndef __AST_TYPE_HPP
 #define __AST_TYPE_HPP
 
-#include "ast-size.hpp"
+#include "ast-decl.hpp"
 
 namespace zc {
 
    class FunctionType;
    class ASTType;
 
-#if 0
-   class BoundType: public ASTNode {
-   public:
-      Symbol *sym() const { return sym_; }
-      ASTType *type() const { return type_; }
-
-      virtual ASTType *
-      
-      template <typename... Args>
-      static BoundType *Create(Args... args) { return new BoundType(args...); }
-      
-   protected:
-      Symbol *sym_;
-      ASTType *type_;
-
-      template <typename... Args>
-      BoundType(Symbol *sym, ASTType *type, Args... args):
-         ASTNode(args...), sym_(sym), type_(type) {}
-   }
-#endif
-
    class ASTType: public ASTNode {
    public:
-      enum class Kind {TYPE_BASIC,
+      enum class Kind {TYPE_VOID,
+                       TYPE_INTEGRAL,
                        TYPE_POINTER,
                        TYPE_FUNCTION,
                        TYPE_STRUCT};
       virtual Kind kind() const = 0;
-      virtual const Decl *decl() const { return decl_; }
-      Symbol *sym() const;
-      virtual Size size() const = 0;
+      Symbol *sym() const { return sym_; }
+      void set_sym(Symbol *sym) { sym_ = sym; }
 
-      virtual bool is_integral() const = 0;
       bool is_callable() const { return get_callable() != nullptr; }
       virtual const FunctionType *get_callable() const = 0;
 
@@ -54,55 +32,34 @@ namespace zc {
       virtual void TypeCheck(SemantEnv& env, bool allow_void) = 0;
       virtual bool TypeEq(const ASTType *other) const = 0;
       virtual bool TypeCoerce(const ASTType *from) const = 0;
+      void Enscope(SemantEnv& env);
 
       virtual ASTType *Address() = 0;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) = 0;
+      
+      void CodeGen(CgenEnv& env);
+      virtual int bytes() const = 0;
+      void FrameGen(StackFrame& frame) const;
 
-      // void Enscope(SemantEnv& env) const;
+      template <typename... Args>
+      static ASTType *Create(Args... args) {
+         return Decl::Create(args...)->Type();
+      }
       
    protected:
-      /**
-       * Associated declaration.
-       */
-      const Decl *decl_;
-
-      ASTType(const SourceLoc& loc):
-         ASTNode(loc), decl_(nullptr) {}
-      ASTType(const Decl *decl, const SourceLoc& loc):
-         ASTNode(loc), decl_(decl) {}
-   };
-
-   class BasicType: public ASTType {
-   public:
-      TypeSpec *type_spec() const { return type_spec_; }
-      virtual Kind kind() const override { return Kind::TYPE_BASIC; }
-      virtual bool is_integral() const override;
-      virtual const FunctionType *get_callable() const override { return nullptr; }
+      Symbol *sym_;
 
       template <typename... Args>
-      static BasicType *Create(Args... args) {
-         return new BasicType(args...);
-      }
-
-      virtual void DumpNode(std::ostream& os) const override;
-
-      virtual bool TypeEq(const ASTType *other) const override;
-      virtual bool TypeCoerce(const ASTType *from) const override;
-      virtual void TypeCheck(SemantEnv& env, bool allow_void) override;
-
-      virtual ASTType *Address() override;
-      virtual ASTType *Dereference(SemantEnv *env = nullptr) override;
-      virtual Size size() const override;
-
-      BasicType *Max(const BasicType *with) const;
-       
-   protected:
-      TypeSpec *type_spec_;
-
+      ASTType(Args... args): ASTNode(args...), sym_(nullptr) {}
       template <typename... Args>
-      BasicType(TypeSpec *type_spec, Args... args):
-         ASTType(args...), type_spec_(type_spec) {}
+      ASTType(const Decl *decl, Args... args): ASTNode(args...), sym_(decl->id()->id()) {}
+      template <typename... Args>
+      ASTType(Symbol *sym, Args... args): ASTNode(args...), sym_(sym) {}
+
    };
+
+   std::ostream& operator<<(std::ostream& os, ASTType::Kind kind);
+
 
    class Types: public ASTNodeVec<ASTType> {
    public:
@@ -116,8 +73,13 @@ namespace zc {
       
       bool TypeEq(const Types *others) const;
       void TypeCheck(SemantEnv& env);
+      void Enscope(SemantEnv& env);
+
+      int bytes() const;
 
    protected:
+      template <typename... Args>
+      Types(Args... args): ASTNodeVec<ASTType>(args...) {}
       Types(Vec vec, const SourceLoc& loc): ASTNodeVec<ASTType>(vec, loc) {}
       
    };
@@ -125,7 +87,6 @@ namespace zc {
    class PointerType: public ASTType {
    public:
       virtual Kind kind() const override { return Kind::TYPE_POINTER; }
-      virtual bool is_integral() const override { return false; }
       virtual const FunctionType *get_callable() const override;
       int depth() const { return depth_; }
       ASTType *pointee() const { return pointee_; }
@@ -143,7 +104,8 @@ namespace zc {
 
       virtual ASTType *Address() override;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) override;
-      virtual Size size() const override { return Size::SZ_POINTER; }
+
+      virtual int bytes() const override;
       
    protected:
       int depth_;
@@ -157,7 +119,6 @@ namespace zc {
    class FunctionType: public ASTType {
    public:
       virtual Kind kind() const override { return Kind::TYPE_FUNCTION; }
-      virtual bool is_integral() const override { return false; }
       virtual const FunctionType *get_callable() const override { return this; }
       ASTType *return_type() const { return return_type_; }
       Types *params() const { return params_; }
@@ -175,9 +136,8 @@ namespace zc {
 
       virtual ASTType *Address() override;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) override;
-      virtual Size size() const override {
-         return Size::SZ_POINTER;
-      }
+
+      virtual int bytes() const override;
       
    protected:
       ASTType *return_type_;
@@ -188,10 +148,71 @@ namespace zc {
          ASTType(args...), return_type_(return_type), params_(params) {}
    };
 
+   class VoidType: public ASTType {
+   public:
+      virtual Kind kind() const override { return Kind::TYPE_VOID; }
+      virtual const FunctionType *get_callable() const override { return nullptr; }
+      
+      virtual void DumpNode(std::ostream& os) const override { os << "VoidType VOID"; }
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
+
+      virtual void TypeCheck(SemantEnv& env, bool allow_void) override;
+      virtual bool TypeEq(const ASTType *other) const override;
+      virtual bool TypeCoerce(const ASTType *from) const override { return TypeEq(from); }
+
+      virtual ASTType *Address() override {
+         throw std::logic_error("attempted to take address of 'void' type");
+      }
+
+      virtual ASTType *Dereference(SemantEnv *env) override {
+         throw std::logic_error("attempted to dereference 'void' type");
+      }
+
+      virtual int bytes() const override;      
+      
+      template <typename... Args>
+      static VoidType *Create(Args... args) { return new VoidType(args...); }
+      
+   protected:
+      template <typename... Args>
+      VoidType(Args... args): ASTType(args...) {}
+   };
+
+   class IntegralType: public ASTType {
+   public:
+      typedef IntegralSpec::IntKind IntKind;      
+      virtual Kind kind() const override { return Kind::TYPE_INTEGRAL; }
+      IntKind int_kind() const { return int_kind_; }
+      virtual const FunctionType *get_callable() const override { return nullptr; }
+
+      virtual void DumpNode(std::ostream& os) const override;
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
+
+      virtual void TypeCheck(SemantEnv& env, bool allow_void) override {}
+      virtual bool TypeEq(const ASTType *other)  const override;
+      virtual bool TypeCoerce(const ASTType *from) const override { return true; }
+      IntegralType *Max(const IntegralType *other) const;
+
+      virtual ASTType *Address() override;
+      virtual ASTType *Dereference(SemantEnv *env) override {
+         throw std::logic_error("attempted to dereference integral type");
+      }
+
+      virtual int bytes() const override;      
+      
+      template <typename... Args>
+      static IntegralType *Create(Args... args) { return new IntegralType(args...); }
+
+   protected:
+      IntKind int_kind_;
+
+      template <typename... Args>
+      IntegralType(IntKind int_kind, Args... args): ASTType(args...), int_kind_(int_kind) {}
+   };
+
    class StructType: public ASTType {
    public:
       virtual Kind kind() const override { return Kind::TYPE_STRUCT; }
-      virtual bool is_integral() const override { return false; }
       virtual const FunctionType *get_callable() const override { return nullptr; }
       Identifier *id() const { return id_; }
       Types *membs() const { return membs_; }
@@ -206,10 +227,9 @@ namespace zc {
       virtual void TypeCheck(SemantEnv& env, bool allow_void) override;
 
       virtual ASTType *Address() override;
-      virtual ASTType *Dereference(SemantEnv *env = nullptr) override;
-      virtual Size size() const override {
-         throw std::logic_error("attempted to to get size enum of struct");
-      }
+      virtual ASTType *Dereference(SemantEnv *env) override;
+
+      virtual int bytes() const override;
       
    protected:
       Identifier *id_;

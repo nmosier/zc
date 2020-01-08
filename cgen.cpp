@@ -45,7 +45,7 @@ namespace zc {
          addr_ = label_val;
 
          MemoryLocation *mem_loc = new MemoryLocation(label_val);
-         val_ = new MemoryValue(mem_loc, bytes(type_));
+         val_ = new MemoryValue(mem_loc, type()->bytes());
       }
    }
 
@@ -58,7 +58,7 @@ namespace zc {
       // assert(dynamic_cast<const MemoryValue *>(addr) == nullptr);
       
       MemoryLocation *mem_loc = new MemoryLocation(addr);
-      val_ = new MemoryValue(mem_loc, bytes(type));
+      val_ = new MemoryValue(mem_loc, type->bytes());
    }
 
    /*** STRING CONSTANTS ***/
@@ -139,7 +139,7 @@ namespace zc {
          env.EnterScope();
       }
 
-      for (Decl *decl : decls()->vec()) {
+      for (ASTType *decl : decls()->vec()) {
          decl->CodeGen(env);
       }
 
@@ -154,8 +154,8 @@ namespace zc {
       return block;
    }
 
-   void Decl::CodeGen(CgenEnv& env) {
-      SymInfo *info = env.ext_env().frame().next_local(Type());
+   void ASTType::CodeGen(CgenEnv& env) {
+      SymInfo *info = env.ext_env().frame().next_local(this);
 
       /* add decl to scope */
       env.symtab().AddToScope(sym(), info);
@@ -185,7 +185,7 @@ namespace zc {
 
       /* Test predicate 
        * NOTE: For now, assume result is in %a or %hl. */
-      emit_nonzero_test(env, block, cond()->type()->size());
+      emit_nonzero_test(env, block, cond()->type()->bytes());
 
       /* Create joining label and block. */
       Label *join_label = new_label("if_join");
@@ -228,7 +228,7 @@ namespace zc {
       block->transitions().vec().push_back(pred_trans);
 
       pred_block = pred()->CodeGen(env, pred_block, ASTExpr::ExprKind::EXPR_RVALUE);
-      emit_nonzero_test(env, block, pred()->type()->size());
+      emit_nonzero_test(env, block, pred()->type()->bytes());
 
       pred_block->transitions().vec().push_back(new JumpTransition(body_block, Cond::NZ));
 
@@ -246,12 +246,11 @@ namespace zc {
       assert(mode == ExprKind::EXPR_RVALUE);
 
       /* compute right-hand rvalue */
-      Size sz = rhs()->type()->size();
-      int bs = bytes(sz);
+      int bytes = rhs()->type()->bytes();
       block = rhs()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
 
       /* save right-hand value */
-      switch (bs) {
+      switch (bytes) {
       case byte_size:
          block->instrs().push_back(new PushInstruction(&rv_af));
          break;
@@ -265,7 +264,7 @@ namespace zc {
       block = lhs()->CodeGen(env, block, ExprKind::EXPR_LVALUE);
 
       /* restore right-hand value */
-      switch (bs) {
+      switch (bytes) {
       case byte_size:
          block->instrs().push_back(new PopInstruction(new RegisterValue(&r_af)));
          block->instrs().push_back
@@ -307,7 +306,7 @@ namespace zc {
    }
 
    Block *UnaryExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
-      int bs = bytes(type()->size());
+      int bytes = type()->bytes();
       switch (kind()) {
       case Kind::UOP_ADDR:
          assert(mode == ExprKind::EXPR_RVALUE);
@@ -322,7 +321,7 @@ namespace zc {
 
          switch (mode) {
          case ExprKind::EXPR_RVALUE:
-            switch (bs) {
+            switch (bytes) {
             case byte_size:
                block->instrs().push_back
                   (new LoadInstruction
@@ -355,7 +354,7 @@ namespace zc {
          break;
          
       case Kind::UOP_NEGATIVE:
-         switch (bs) {
+         switch (bytes) {
          case byte_size:
             block->instrs().push_back(new NegInstruction());
             break;
@@ -370,7 +369,7 @@ namespace zc {
          break;
          
       case Kind::UOP_BITWISE_NOT:
-         switch (bytes(type()->size())) {
+         switch (bytes) {
          case byte_size:
             block->instrs().push_back(new CplInstruction());
             break;
@@ -386,7 +385,7 @@ namespace zc {
          break;
          
       case Kind::UOP_LOGICAL_NOT:
-         emit_logical_not(env, block, type()->size());
+         emit_logical_not(env, block, bytes);
          break;
       }
 
@@ -394,14 +393,6 @@ namespace zc {
    }
 
    Block *BinaryExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
-      Size sz = type()->size();
-      int bs = bytes(sz);
-
-      /* TODO: this assertion should be removed later once casts are included. */
-      assert(lhs()->type()->size() == rhs()->type()->size());
-      Size op_sz = lhs()->type()->size();
-      int op_bs = bytes(op_sz);
-      
       switch (kind()) {
       case Kind::BOP_LOGICAL_AND:
          /* Short-circuit evaluation dictates that evaluation stops if the first operand 
@@ -410,9 +401,9 @@ namespace zc {
          {
             /* evaluate lhs */
             block = lhs()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
-            emit_booleanize(env, block, sz);
-            emit_nonzero_test(env, block, sz); /* NOTE: This should be optimized 
-                                                  * away in the future. */
+            emit_booleanize(env, block, lhs()->type()->bytes());
+            emit_nonzero_test(env, block, byte_size); /* NOTE: This should be optimized 
+                                                       * away in the future. */
 
             /* create transitions */
             const Label *end_label = new_label("BOP_LOGICAL_AND");
@@ -427,7 +418,7 @@ namespace zc {
 
             /* Evaluate rhs */
             cont_block = rhs()->CodeGen(env, cont_block, ExprKind::EXPR_RVALUE);
-            emit_booleanize(env, block, sz);
+            emit_booleanize(env, block, rhs()->type()->bytes());
             cont_block->transitions().vec().push_back(end_transition);
 
             return end_block;
@@ -439,9 +430,9 @@ namespace zc {
          {
             /* evaluate lhs */
             block = lhs()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
-            emit_booleanize(env, block, op_sz);
-            emit_nonzero_test(env, block, sz); /* NOTE: This should be optimized 
-                                                  * away in the future. */
+            emit_booleanize(env, block, lhs()->type()->bytes());
+            emit_nonzero_test(env, block, byte_size); /* NOTE: This should be optimized 
+                                                       * away in the future. */
 
             /* create transitions */
             const Label *end_label = new_label("BOP_LOGICAL_OR");
@@ -456,7 +447,7 @@ namespace zc {
 
             /* Evaluate rhs */
             cont_block = rhs()->CodeGen(env, cont_block, ExprKind::EXPR_RVALUE);
-            emit_booleanize(env, block, op_sz);
+            emit_booleanize(env, block, rhs()->type()->bytes());
             cont_block->transitions().vec().push_back(end_transition);
             
             return end_block;            
@@ -465,7 +456,7 @@ namespace zc {
       case Kind::BOP_EQ:
       case Kind::BOP_NEQ:
          emit_binop(env, block, this);
-         switch (op_bs) {
+         switch (lhs()->type()->bytes()) {
          case byte_size:
             block->instrs().push_back(new CompInstruction(&rv_a, &rv_b));
             break;
@@ -474,13 +465,15 @@ namespace zc {
             block->instrs().push_back(new XorInstruction(&rv_a, &rv_a));
             block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_de));
             break;
+         default:
+            abort();
          }
          block = emit_ld_a_zf(env, block, kind() == Kind::BOP_NEQ);
          break;
 
       case Kind::BOP_LT:
          emit_binop(env, block, this);
-         switch (op_bs) {
+         switch (lhs()->type()->bytes()) {
          case byte_size:
             /* cp a,b
              * ld a,0
@@ -499,6 +492,7 @@ namespace zc {
             block->instrs().push_back(new XorInstruction(&rv_a, &rv_a));
             block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_de));
             break;
+         default: abort();
          }
                                
          block->instrs().push_back(new AdcInstruction(&rv_a, &rv_a));
@@ -506,7 +500,7 @@ namespace zc {
 
       case Kind::BOP_LEQ:
          emit_binop(env, block, this);
-         switch (op_bs) {
+         switch (lhs()->type()->bytes()) {
          case byte_size:
             /* scf
              * sbc a,b
@@ -536,7 +530,7 @@ namespace zc {
 
       case Kind::BOP_GT:
          emit_binop(env, block, this);
-         switch (op_bs) {
+         switch (lhs()->type()->bytes()) {
          case byte_size:
             /* dec a
              * cp a,b
@@ -568,7 +562,7 @@ namespace zc {
 
       case Kind::BOP_GEQ:
          emit_binop(env, block, this);
-         switch (op_bs) {
+         switch (lhs()->type()->bytes()) {
          case byte_size:
             /* cp a,b
              * ld a,1
@@ -596,7 +590,7 @@ namespace zc {
 
       case Kind::BOP_PLUS:
          emit_binop(env, block, this);
-         switch (bs) {
+         switch (type()->bytes()) {
          case byte_size:
             /* add a,b */
             block->instrs().push_back(new AddInstruction(&rv_a, &rv_b));
@@ -611,7 +605,7 @@ namespace zc {
 
       case Kind::BOP_MINUS:
          emit_binop(env, block, this);
-         switch (bs) {
+         switch (type()->bytes()) {
          case byte_size:
             /* sub a,b */
             block->instrs().push_back(new SubInstruction(&rv_a, &rv_b));
@@ -629,7 +623,7 @@ namespace zc {
 
       case Kind::BOP_TIMES:
          emit_binop(env, block, this);
-         switch (bs) {
+         switch (type()->bytes()) {
          case byte_size:
             /* ld c,a
              * mlt bc
@@ -658,10 +652,8 @@ namespace zc {
    }
 
    Block *LiteralExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
-      Size sz = type()->size();
-      int bs = bytes(sz);
       const RegisterValue *rv;
-      switch (bs) {
+      switch (type()->bytes()) {
       case byte_size:
          rv = &rv_a;
          break;
@@ -670,7 +662,7 @@ namespace zc {
          rv = &rv_hl;
          break;
       }
-      const ImmediateValue *imm = new ImmediateValue(val(), bs);
+      const ImmediateValue *imm = new ImmediateValue(val(), type()->bytes());
 
       block->instrs().push_back(new LoadInstruction(rv, imm));
       return block;
@@ -684,7 +676,6 @@ namespace zc {
 
    Block *IdentifierExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
       const SymInfo *id_info = env.symtab().Lookup(id()->id());
-      Size size = type()->size();      
       
       switch (mode) {
       case ExprKind::EXPR_NONE: abort();
@@ -700,7 +691,7 @@ namespace zc {
          {
             const Value *id_rval = id_info->val();
             const RegisterValue *rv;
-            switch (bytes(size)) {
+            switch (type()->bytes()) {
             case byte_size:
                rv = &rv_a;
                break;
@@ -708,6 +699,7 @@ namespace zc {
             case long_size:
                rv = &rv_hl;
                break;
+            default: abort();
             }
             block->instrs().push_back(new LoadInstruction(rv, id_rval));
          }
@@ -724,7 +716,7 @@ namespace zc {
       for (ASTExpr *param : params()->vec()) {
          block = param->CodeGen(env, block, ExprKind::EXPR_RVALUE);
          const RegisterValue *rv;
-         switch (bytes(param->type()->size())) {
+         switch (param->type()->bytes()) {
          case byte_size:
             rv = &rv_af;
             break;
@@ -756,8 +748,8 @@ namespace zc {
    Block *CastExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
       assert(mode == ExprKind::EXPR_RVALUE);
 
-      const Register *src = return_register(expr()->type()->size());
-      const Register *dst = return_register(type()->size());
+      const Register *src = return_register(expr()->type()->bytes());
+      const Register *dst = return_register(type()->bytes());
 
       expr()->CodeGen(env, block, mode);
       dst->Cast(block, src);
@@ -769,16 +761,15 @@ namespace zc {
 
    static int label_counter = 0;
 
-   const Register *return_register(Size sz) {
-      switch (sz) {
-      case Size::SZ_CHAR:
+   const Register *return_register(int bytes) {
+      switch (bytes) {
+      case byte_size:
          return &r_a;
-      case Size::SZ_SHORT:
-      case Size::SZ_INT:
-      case Size::SZ_LONG:
-      case Size::SZ_LONG_LONG:
-      case Size::SZ_POINTER:
+      case word_size:
+      case long_size:
          return &r_hl;
+      default:
+         abort();
       }
    }
 
@@ -788,10 +779,10 @@ namespace zc {
       return new Label(s);
    }
 
-   void emit_nonzero_test(CgenEnv& env, Block *block, Size size) {
+   void emit_nonzero_test(CgenEnv& env, Block *block, int bytes) {
       Block::InstrVec& instrs = block->instrs();
       
-      switch (bytes(size)) {
+      switch (bytes) {
       case byte_size:
          /* or a,a */
          instrs.push_back(new OrInstruction(new RegisterValue(&r_a),
@@ -812,10 +803,10 @@ namespace zc {
       }
    }
 
-   void emit_logical_not(CgenEnv& env, Block *block, Size size) {
+   void emit_logical_not(CgenEnv& env, Block *block, int bytes) {
       Block::InstrVec& instrs = block->instrs();
       
-      switch (bytes(size)) {
+      switch (bytes) {
       case byte_size:
          /* cp a,1   ; CF set iff a == 0
           * ld a,0   ; 
@@ -844,10 +835,10 @@ namespace zc {
       }
    }
 
-   void emit_booleanize(CgenEnv& env, Block *block, Size size) {
+   void emit_booleanize(CgenEnv& env, Block *block, int bytes) {
       Block::InstrVec& instrs = block->instrs();
 
-      switch (bytes(size)) {
+      switch (bytes) {
       case byte_size:
          /* neg
           * ld a,0
@@ -873,21 +864,23 @@ namespace zc {
          instrs.push_back(new SbcInstruction(&rv_hl, &rv_de));
          instrs.push_back(new AdcInstruction(&rv_a, &rv_a));
          break;
+
+      default:
+         abort();
       }
    }
 
    void emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr) {
       Block::InstrVec& instrs = block->instrs();
-      Size sz = expr->type()->size();
-      int bs = bytes(sz);
-      Size op_sz = expr->lhs()->type()->size();
-      int op_bs = bytes(op_sz);
+      int bytes = expr->type()->bytes();
+      int lhs_bytes = expr->lhs()->type()->bytes();
+      int rhs_bytes = expr->rhs()->type()->bytes();
 
       /* evaluate rhs first */
       block = expr->rhs()->CodeGen(env, block, ASTBinaryExpr::ExprKind::EXPR_RVALUE);
 
       /* save rhs result */
-      switch (op_bs) {
+      switch (rhs_bytes) {
       case byte_size:
          block->instrs().push_back(new PushInstruction(&rv_af));
          break;
@@ -895,13 +888,15 @@ namespace zc {
       case long_size:
          block->instrs().push_back(new PushInstruction(&rv_hl));
          break;
+      default:
+         abort();
       }
 
       /* evaluate lhs */
       block = expr->lhs()->CodeGen(env, block, ASTBinaryExpr::ExprKind::EXPR_RVALUE);
 
       /* restore rhs result */
-      switch (op_bs) {
+      switch (rhs_bytes) {
       case byte_size:
          block->instrs().push_back(new PopInstruction(&rv_bc));
          break;
@@ -909,6 +904,7 @@ namespace zc {
       case long_size:
          block->instrs().push_back(new PopInstruction(&rv_de));
          break;
+      default: abort();
       }
    }
 
@@ -1131,8 +1127,7 @@ namespace zc {
 
    int StackFrame::bytes() const { return base_bytes_ + locals_bytes_ + args_bytes_; }
    
-   void StackFrame::add_local(Size sz) { add_local(::zc::bytes(sz)); }
-   void StackFrame::add_local(const ASTType *type) { add_local(type->size()); }
+   void StackFrame::add_local(const ASTType *type) { add_local(type->bytes()); }
 
    SymInfo *StackFrame::next_arg(const ASTType *type) {
       if (next_arg_addr_ == nullptr) {
@@ -1148,7 +1143,7 @@ namespace zc {
          next_local_addr_ = &FP_idxval;
       }
       SymInfo *info = new SymInfo(type, next_local_addr_);
-      next_local_addr_ = next_local_addr_->Add(type->size());
+      next_local_addr_ = next_local_addr_->Add(type->bytes());
       return info;
    }
    
@@ -1157,7 +1152,7 @@ namespace zc {
    }
 
    void CompoundStat::FrameGen(StackFrame& frame) const {
-      for (const Decl *decl : decls()->vec()) {
+      for (const ASTType *decl : decls()->vec()) {
          decl->FrameGen(frame);
       }
       for (const ASTStat *stat : stats()->vec()) {
@@ -1174,12 +1169,47 @@ namespace zc {
       body()->FrameGen(frame);
    }
 
-   void Decl::FrameGen(StackFrame& frame) const {
-      frame.add_local(Type());
+   void ASTType::FrameGen(StackFrame& frame) const {
+      frame.add_local(this);
    }
 
 
-
+   /*** TYPE SIZES ***/
+   int Types::bytes() const {
+      std::vector<int> byte_vec(vec().size());
+      std::transform(vec().begin(), vec().end(), byte_vec.begin(),
+                     [](const ASTType *type) -> int {
+                        return type->bytes();
+                     });
+      return std::accumulate(byte_vec.begin(), byte_vec.end(), 0);
+   }
    
+   int PointerType::bytes() const {
+      return long_size;
+   }
+
+   int FunctionType::bytes() const {
+      return long_size; /* actually treated as pointer */
+   }
+
+   int VoidType::bytes() const {
+      return 0;
+   }
+
+   int IntegralType::bytes() const {
+      using IntKind = IntegralSpec::IntKind;
+      std::unordered_map<IntKind,int> map
+         {{IntKind::SPEC_CHAR, byte_size},
+          {IntKind::SPEC_SHORT, word_size},
+          {IntKind::SPEC_INT, long_size},
+          {IntKind::SPEC_LONG_LONG, long_size},
+          {IntKind::SPEC_LONG_LONG, long_size},          
+         };
+      return map[int_kind()];
+   }
+
+   int StructType::bytes() const {
+      return membs()->bytes();
+   }
    
 }

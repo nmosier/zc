@@ -6,13 +6,15 @@
 #define __AST_DECL_HPP
 
 #include "ast/ast-base.hpp"
-#include "ast/ast-type.hpp"
 
 namespace zc {
 
+   class ASTType;
+   class Types;
+
   class ExternalDecl: public ASTNode {
    public:
-     Decl *decl() const { return decl_; }
+     ASTType *decl() const { return decl_; }
      Symbol *sym() const;
      
      template <typename... Args>
@@ -33,10 +35,10 @@ namespace zc {
       virtual void CodeGen(CgenEnv& env);
       
    protected:
-      Decl *decl_;
+      ASTType *decl_;
 
       template <typename... Args>
-      ExternalDecl(Decl *decl, Args... args): ASTNode(args...), decl_(decl) {}
+      ExternalDecl(ASTType *decl, Args... args): ASTNode(args...), decl_(decl) {}
    };
    
    template <> const char *ExternalDecls::name() const;
@@ -71,13 +73,14 @@ namespace zc {
 
    class Decl: public ASTNode {
    public:
-      DeclSpecs *specs() const { return specs_; }
+      ASTType *specs() const { return specs_; }
       ASTDeclarator *declarator() const { return declarator_; }
       Identifier *id() const;
       Symbol *sym() const;
-      
-      static Decl *Create(DeclSpecs *specs, ASTDeclarator *declarator, const SourceLoc& loc) {
-         return new Decl(specs, declarator, loc);
+
+      template <typename... Args>
+      static Decl *Create(Args... args) {
+         return new Decl(args...);
       }
 
       virtual void DumpNode(std::ostream& os) const override { os << "Decl"; }
@@ -92,7 +95,6 @@ namespace zc {
        * @param enscope whether to declare in scope.
        */
       void TypeCheck(SemantEnv& env);
-      void Enscope(SemantEnv& env) const;
 
       /** Convert declaration to type.
        */
@@ -105,10 +107,10 @@ namespace zc {
       void FrameGen(StackFrame& frame) const;
 
    protected:
-      DeclSpecs *specs_;
+      ASTType *specs_;
       ASTDeclarator *declarator_;
       
-      Decl(DeclSpecs *specs, ASTDeclarator *declarator, const SourceLoc& loc):
+      Decl(ASTType *specs, ASTDeclarator *declarator, const SourceLoc& loc):
          ASTNode(loc), specs_(specs), declarator_(declarator) {}
    };
 
@@ -180,7 +182,6 @@ namespace zc {
       virtual void TypeCheck(SemantEnv& env, bool allow_void) override {}
       
       IntegralSpec *Max(const IntegralSpec *other) const;
-      Size size() const;
 
       template <typename... Args>
       static IntegralSpec *Create(Args... args) { return new IntegralSpec(args...); }
@@ -233,9 +234,17 @@ namespace zc {
       TypeSpecs(const SourceLoc& loc): ASTNodeVec<TypeSpec>(loc) {}
    };
 
-
+#if 0   
+   /**
+    * Collection of declaration specifiers.
+    * NOTE: This is ephemeral; it is converted to a type during parsing.
+    */
    class DeclSpecs: public ASTNode {
    public:
+      typedef std::vector<int> Tokens;
+      Tokens& int_specs() { return int_specs_; }
+      
+      
       TypeSpecs *type_specs() const { return type_specs_; }
       TypeSpec *type_spec() const { return type_specs()->TypeCombine(); }
 
@@ -249,10 +258,11 @@ namespace zc {
       bool TypeCoerce(const DeclSpecs *from) const;
 
    protected:
-      TypeSpecs *type_specs_;
+      Tokens int_specs_;
       
       DeclSpecs(const SourceLoc& loc): ASTNode(loc), type_specs_(TypeSpecs::Create(loc)) {}
    };
+#endif
 
    
    class ASTDeclarator: public ASTNode {
@@ -343,13 +353,13 @@ namespace zc {
    class FunctionDeclarator: public ASTDeclarator {
    public:
       ASTDeclarator *declarator() const { return declarator_; }
-      Decls *params() const { return params_; }
+      Types *params() const { return params_; }
       virtual Identifier *id() const override { return declarator_->id(); }
       virtual Kind kind() const override { return Kind::DECLARATOR_FUNCTION; }
-      
-      static FunctionDeclarator *Create(ASTDeclarator *declarator, Decls *params,
-                                        const SourceLoc& loc) {
-         return new FunctionDeclarator(declarator, params, loc);
+
+      template <typename... Args>
+      static FunctionDeclarator *Create(Args... args) {
+         return new FunctionDeclarator(args...);
       }
 
       virtual void DumpNode(std::ostream& os) const override { os << "FunctionDeclarator"; }
@@ -363,9 +373,9 @@ namespace zc {
       
    protected:
       ASTDeclarator *declarator_;
-      Decls *params_;
+      Types *params_;
 
-      FunctionDeclarator(ASTDeclarator *declarator, Decls *params, const SourceLoc& loc):
+      FunctionDeclarator(ASTDeclarator *declarator, Types *params, const SourceLoc& loc):
          ASTDeclarator(loc), declarator_(declarator), params_(params) {}
    };
 

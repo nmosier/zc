@@ -6,5 +6,11 @@ namespace zc {
       pred()->Dump(os, level, with_types);
       body()->Dump(os, level, with_types);
    }
+
+   void CompoundStat::DumpChildren(std::ostream& os, int level, bool with_types) const {
+      decls_->Dump(os, level, with_types);
+      stats_->Dump(os, level, with_types);
+   }
+   
    
 }

@@ -27,9 +27,6 @@ namespace zc::z80 {
 #endif
       ;
 
-   int bytes(Size size);
-   int bytes(const ASTType *type);
-   
 }
 
 #endif

@@ -4,8 +4,11 @@
 #include "ast.hpp"
 #include "asm.hpp"
 
+extern const char *g_filename;
+
 namespace zc {
-   IntegralSpec *IntegralSpec::Max(const IntegralSpec *other) const {
+   
+   IntegralType *IntegralType::Max(const IntegralType *other) const {
       std::array<IntKind,5> ordering {IntKind::SPEC_CHAR,
                                       IntKind::SPEC_SHORT,
                                       IntKind::SPEC_INT,
@@ -16,27 +19,7 @@ namespace zc {
       auto this_it = std::find(ordering.begin(), ordering.end(), int_kind());
       auto other_it = std::find(ordering.begin(), ordering.end(), other->int_kind());
       
-      return IntegralSpec::Create(*std::max(this_it, other_it), loc());
-   }
-
-   Size IntegralSpec::size() const {
-      std::unordered_map<IntegralSpec::IntKind,Size> map
-         {{IntKind::SPEC_CHAR, Size::SZ_CHAR},
-          {IntKind::SPEC_SHORT, Size::SZ_SHORT},
-          {IntKind::SPEC_INT, Size::SZ_INT},
-          {IntKind::SPEC_LONG, Size::SZ_LONG},
-          {IntKind::SPEC_LONG_LONG, Size::SZ_LONG_LONG}
-         };
-
-      return map[int_kind()];
-   }
-
-   Size BasicType::size() const {
-      return dynamic_cast<const IntegralSpec *>(type_spec())->size();
-   }
-
-   void BasicType::DumpNode(std::ostream& os) const {
-      os << type_spec();
+      return IntegralType::Create(*std::max(this_it, other_it), loc());
    }
 
    void PointerType::DumpNode(std::ostream& os) const {
@@ -75,12 +58,46 @@ namespace zc {
          return dynamic_cast<const FunctionType *>(pointee()); /* beautiful */      
    }
 
-   Symbol *ASTType::sym() const { return decl()->id()->id(); }
+   std::ostream& operator<<(std::ostream& os, ASTType::Kind kind) {
+      using Kind = ASTType::Kind;
+      std::unordered_map<Kind,const char *> map
+         {{Kind::TYPE_VOID, "VOID"},
+          {Kind::TYPE_INTEGRAL, "INTEGRAL"},
+          {Kind::TYPE_POINTER, "POINTER"},
+          {Kind::TYPE_FUNCTION, "FUNCTION"},
+          {Kind::TYPE_STRUCT, "STRUCT"}
+         };
 
-
-   bool BasicType::is_integral() const {
-      return type_spec()->kind() == TypeSpec::Kind::SPEC_INTEGRAL;
+      return os << map[kind];
+   }
+   
+   void IntegralType::DumpNode(std::ostream& os) const {
+      os << "IntegralType " << kind();
    }
 
+   void VoidType::TypeCheck(SemantEnv& env, bool allow_void) {
+      if (!allow_void) {
+         env.error()(g_filename, this) << "incomplete 'void' type" << std::endl;
+      }
+   }
+
+   bool VoidType::TypeEq(const ASTType *other) const {
+      return dynamic_cast<const VoidType *>(other) != nullptr;
+   }
+
+   bool IntegralType::TypeEq(const ASTType *other) const {
+      auto int_other = dynamic_cast<const IntegralType *>(other);
+      return int_other == nullptr ? false : int_other->int_kind() == int_kind();
+   }
+
+   ASTType *IntegralType::Address() {
+      return PointerType::Create(1, this, loc());
+   }
+
+   void Types::Enscope(SemantEnv& env) {
+      for (ASTType *type : vec()) {
+         type->Enscope(env);
+      }
+   }
    
  }

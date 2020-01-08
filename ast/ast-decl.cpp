@@ -58,10 +58,6 @@ namespace zc {
       return os;
    }
 
-   void DeclSpecs::DumpChildren(std::ostream& os, int level, bool with_types) const {
-      type_specs()->Dump(os, level, with_types);
-   }
-
    void Decl::DumpType(std::ostream& os) const {
       Type()->DumpNode(os);
    }

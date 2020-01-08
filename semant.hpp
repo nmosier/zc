@@ -37,6 +37,8 @@
 #ifndef __SEMANT_HPP
 #define __SEMANT_HPP
 
+#include <unordered_set>
+
 #include "ast.hpp"
 #include "symtab.hpp"
 #include "scopedtab.hpp"
@@ -59,7 +61,7 @@ namespace zc {
       std::size_t errors() const { return errors_; }
         
       std::ostream& operator()(const char *filename, const ASTNode *node);
-       
+      std::ostream& operator()(const char *filename, const SourceLoc& loc);      
       std::ostream& operator()() {
          errors_++;
          return os_;
@@ -79,7 +81,11 @@ namespace zc {
 
    private:
       SemantError& error_;
-   };   
+   };
+
+   class IntegralType;
+   IntegralType *combine_integral_type_specs(std::unordered_multiset<int>& type_specs,
+                                             SemantError& error, const SourceLoc& loc);   
    
 }
 
