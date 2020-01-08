@@ -10,6 +10,28 @@
 namespace zc {
 
    class FunctionType;
+   class ASTType;
+
+#if 0
+   class BoundType: public ASTNode {
+   public:
+      Symbol *sym() const { return sym_; }
+      ASTType *type() const { return type_; }
+
+      virtual ASTType *
+      
+      template <typename... Args>
+      static BoundType *Create(Args... args) { return new BoundType(args...); }
+      
+   protected:
+      Symbol *sym_;
+      ASTType *type_;
+
+      template <typename... Args>
+      BoundType(Symbol *sym, ASTType *type, Args... args):
+         ASTNode(args...), sym_(sym), type_(type) {}
+   }
+#endif
 
    class ASTType: public ASTNode {
    public:
@@ -28,7 +50,8 @@ namespace zc {
 
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
 
-      virtual void TypeCheck(SemantEnv& env) = 0;
+      void TypeCheck(SemantEnv& env) { TypeCheck(env, true); }
+      virtual void TypeCheck(SemantEnv& env, bool allow_void) = 0;
       virtual bool TypeEq(const ASTType *other) const = 0;
       virtual bool TypeCoerce(const ASTType *from) const = 0;
 
@@ -65,7 +88,7 @@ namespace zc {
 
       virtual bool TypeEq(const ASTType *other) const override;
       virtual bool TypeCoerce(const ASTType *from) const override;
-      virtual void TypeCheck(SemantEnv& env) override;
+      virtual void TypeCheck(SemantEnv& env, bool allow_void) override;
 
       virtual ASTType *Address() override;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) override;
@@ -116,7 +139,7 @@ namespace zc {
 
       virtual bool TypeEq(const ASTType *other) const override;
       virtual bool TypeCoerce(const ASTType *from) const override;
-      virtual void TypeCheck(SemantEnv& env) override;
+      virtual void TypeCheck(SemantEnv& env, bool allow_void) override;
 
       virtual ASTType *Address() override;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) override;
@@ -148,7 +171,7 @@ namespace zc {
 
       virtual bool TypeEq(const ASTType *other) const override;
       virtual bool TypeCoerce(const ASTType *from) const override;
-      virtual void TypeCheck(SemantEnv& env) override;
+      virtual void TypeCheck(SemantEnv& env, bool allow_void) override;
 
       virtual ASTType *Address() override;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) override;
@@ -180,7 +203,7 @@ namespace zc {
 
       virtual bool TypeEq(const ASTType *other) const override;
       virtual bool TypeCoerce(const ASTType *from) const override;
-      virtual void TypeCheck(SemantEnv& env) override;
+      virtual void TypeCheck(SemantEnv& env, bool allow_void) override;
 
       virtual ASTType *Address() override;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) override;

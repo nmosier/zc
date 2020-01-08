@@ -85,4 +85,6 @@ namespace zc {
          id()->id() == dynamic_cast<const StructSpec *>(other)->id()->id();
    }
 
+   Symbol *StructSpec::sym() const { return id()->id(); }
+
 }

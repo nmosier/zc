@@ -141,6 +141,8 @@ namespace zc {
 
       virtual bool Eq(const TypeSpec *other) const = 0;
 
+      virtual void TypeCheck(SemantEnv& env, bool allow_void) = 0;
+
    protected:
       template <typename... Args>
       TypeSpec(Args... args): ASTNode(args...) {}
@@ -154,6 +156,8 @@ namespace zc {
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
 
       virtual bool Eq(const TypeSpec *other) const override;
+
+      virtual void TypeCheck(SemantEnv& env, bool allow_void) override {}
       
       template <typename... Args>
       static VoidSpec *Create(Args... args) { return new VoidSpec(args...); }
@@ -173,6 +177,8 @@ namespace zc {
 
       virtual bool Eq(const TypeSpec *other) const override;      
 
+      virtual void TypeCheck(SemantEnv& env, bool allow_void) override {}
+      
       IntegralSpec *Max(const IntegralSpec *other) const;
       Size size() const;
 
@@ -192,11 +198,14 @@ namespace zc {
 
       Identifier *id() const { return id_; }
       Decls *membs() const { return membs_; }
+      Symbol *sym() const;
 
       virtual bool Eq(const TypeSpec *other) const override;
       
       virtual void DumpNode(std::ostream& os) const override { os << "StructSpec STRUCT"; }
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
+
+      virtual void TypeCheck(SemantEnv& env, bool allow_void) override;
       
       template <typename... Args>
       static StructSpec *Create(Args... args) { return new StructSpec(args...); }

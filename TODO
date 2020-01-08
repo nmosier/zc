@@ -18,7 +18,8 @@ Legend
 
 PARSER
 [ ] Handle nested pointers properly, e.g. *(*id) -> **id
-[ ] type_spec from enum to class
+[X] type_spec from enum to class
+[ ] never return decls, only bound types.
 
 SEMANTIC ANALYSIS
 [X] `long long int` -> `LONG`, not `LONG_LONG`

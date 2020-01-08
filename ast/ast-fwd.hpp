@@ -48,6 +48,7 @@ namespace zc {
    class CgenEnv;
    class StackFrame;
    class FunctionImpl;
+   class StructSpec;
 }
 
 #endif

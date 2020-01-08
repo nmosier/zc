@@ -119,17 +119,15 @@
 
     /*** TYPE CHECK ***/
 
-    void BasicType::TypeCheck(SemantEnv& env) {
-       if (type_spec()->kind() == TypeSpec::Kind::SPEC_VOID) {
-          env.error()(g_filename, this) << "incomplete type 'void'" << std::endl;
-       }
+    void BasicType::TypeCheck(SemantEnv& env, bool allow_void) {
+       type_spec()->TypeCheck(env, allow_void);
     }
 
-    void PointerType::TypeCheck(SemantEnv& env) {
-       pointee()->TypeCheck(env);
+    void PointerType::TypeCheck(SemantEnv& env, bool allow_void) {
+       pointee()->TypeCheck(env, true);
     }
 
-    void FunctionType::TypeCheck(SemantEnv& env) {
+    void FunctionType::TypeCheck(SemantEnv& env, bool allow_void) {
        /* NOTE: function's don't need to have complete return types (i.e. they can be 'void').
         * Therefore, we need not type-check the function's return type.
         */
@@ -141,13 +139,11 @@
           /* error recovery: transform return type into function */
           return_type_ = PointerType::Create(1, return_type(), return_type()->loc());
        }
-    
+       return_type()->TypeCheck(env, true);
        params()->TypeCheck(env);
     }
 
-    void StructType::TypeCheck(SemantEnv& env) {
-       /* TODO: make sure struct is not redefined. */
-
+    void StructType::TypeCheck(SemantEnv& env, bool allow_void) {
        membs()->TypeCheck(env);
     }
 
@@ -190,6 +186,20 @@
     void FunctionDeclarator::TypeCheck(SemantEnv& env) {
        declarator()->TypeCheck(env);
        params()->TypeCheck(env);
+    }
+
+    void StructSpec::TypeCheck(SemantEnv& env, bool allow_void) {
+       if (membs() == nullptr) {
+          /* require that struct have already been defined */
+          if (env.structs().Lookup(id()->id()) == nullptr) {
+             env.error()(g_filename, this) << "struct " << *sym() << " has not been declared"
+                                           << std::endl;
+          }
+       } else if (env.structs().Probe(id()->id()) != nullptr) {
+          env.error()(g_filename, this) << "redefinition of struct " << id()->id() << std::endl;
+       } else {
+          env.structs().AddToScope(id()->id(), this);
+       }
     }
     
 
@@ -617,7 +627,7 @@
       return type;
    }
 
-   /* This is so fucking confusing. */
+   /* This is so confusing. */
    ASTType *PointerDeclarator::Type(ASTType *type) const {
       switch (declarator()->kind()) {
       case Kind::DECLARATOR_BASIC:
