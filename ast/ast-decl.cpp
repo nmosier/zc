@@ -37,17 +37,27 @@ namespace zc {
       declarator_->Dump(os, level, with_types);
    }
 
-   std::ostream& operator<<(std::ostream& os, TypeSpec spec) {
-      switch (spec) {
-      case TypeSpec::TYPE_VOID:      os << "VOID"; return os;
-      case TypeSpec::TYPE_CHAR:      os << "CHAR"; return os;
-      case TypeSpec::TYPE_SHORT:     os << "SHORT"; return os;
-      case TypeSpec::TYPE_INT:       os << "INT"; return os;
-      case TypeSpec::TYPE_LONG:      os << "LONG"; return os;
-      case TypeSpec::TYPE_LONG_LONG: os << "LONG_LONG"; return os;
-      }
+   void IntegralSpec::DumpNode(std::ostream& os) const {
+      os << "IntegralSpec " << int_kind();
    }
-   
+
+   void StructSpec::DumpChildren(std::ostream& os, int level, bool with_types) const {
+      id()->Dump(os, level, with_types);
+      membs()->Dump(os, level, with_types);
+   }
+
+   std::ostream& operator<<(std::ostream& os, IntegralSpec::IntKind kind) {
+      std::unordered_map<IntegralSpec::IntKind,const char *> map
+         {{IntegralSpec::IntKind::SPEC_CHAR, "CHAR"},
+          {IntegralSpec::IntKind::SPEC_SHORT, "SHORT"},
+          {IntegralSpec::IntKind::SPEC_INT, "INT"},
+          {IntegralSpec::IntKind::SPEC_LONG, "LONG"},
+          {IntegralSpec::IntKind::SPEC_LONG_LONG, "LONG LONG"},
+         };
+      os << map[kind];
+      return os;
+   }
+
    void DeclSpecs::DumpChildren(std::ostream& os, int level, bool with_types) const {
       type_specs()->Dump(os, level, with_types);
    }
@@ -60,5 +70,19 @@ namespace zc {
 
    Symbol *ExternalDecl::sym() const { return decl()->sym(); }
    Symbol *Decl::sym() const { return id()->id(); }
+
+   bool VoidSpec::Eq(const TypeSpec *other) const {
+      return other->kind() == TypeSpec::Kind::SPEC_VOID;
+   }
+
+   bool IntegralSpec::Eq(const TypeSpec *other) const {
+      return other->kind() == TypeSpec::Kind::SPEC_INTEGRAL &&
+         int_kind() == dynamic_cast<const IntegralSpec *>(other)->int_kind();
+   }
+
+   bool StructSpec::Eq(const TypeSpec *other) const {
+      return other->kind() == TypeSpec::Kind::SPEC_STRUCT &&
+         id()->id() == dynamic_cast<const StructSpec *>(other)->id()->id();
+   }
 
 }

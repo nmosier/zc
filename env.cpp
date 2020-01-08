@@ -7,7 +7,20 @@
 
 namespace zc {
 
-   template class Env<ASTType, SymbolEnv>;
-   template class Env<SymInfo, CgenExtEnv>;
+
+   template <typename A, typename B, class C>
+   void Env<A,B,C>::EnterScope() {
+      symtab_.EnterScope();
+      structs_.EnterScope();
+   }
+
+   template <typename A, typename B, class C>   
+   void Env<A,B,C>::ExitScope() {
+      symtab_.EnterScope();
+      structs_.EnterScope();
+   }
+
+   template class Env<ASTType, ASTType, SymbolEnv>;
+   template class Env<SymInfo, StructInfo, CgenExtEnv>;
    
 }

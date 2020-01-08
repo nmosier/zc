@@ -84,35 +84,6 @@ namespace zc {
    template <> const char *ASTStats::name() const;
    
 
-   template <typename Spec>
-   class ASTSpecs: public ASTNode {
-      static_assert(std::is_enum<Spec>::value);
-   public:
-      typedef std::multiset<Spec> Specs;
-      const Specs& specs() const { return specs_; }
-
-      template <typename... Args> static ASTSpecs *Create(Args... args) {
-         return new ASTSpecs(args...);
-      }
-      
-      virtual void DumpNode(std::ostream& os) const override {
-         os << name();
-         for (Spec spec : specs_) {
-            os << " " << spec;
-         }
-      }
-      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
-
-      /* experimental */
-      void insert(Spec spec) { specs_.insert(spec); }
-
-   protected:
-      Specs specs_;
-      const char *name() const { return "ASTSpecs"; }
-
-      ASTSpecs(const SourceLoc& loc): ASTNode(loc) {}
-      
-   };
    
    template <class... Types>
    class ASTVariantFeature {

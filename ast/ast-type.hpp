@@ -51,9 +51,9 @@ namespace zc {
 
    class BasicType: public ASTType {
    public:
-      TypeSpec type_spec() const { return type_spec_; }
+      TypeSpec *type_spec() const { return type_spec_; }
       virtual Kind kind() const override { return Kind::TYPE_BASIC; }
-      virtual bool is_integral() const override { return IsIntegral(type_spec()); }
+      virtual bool is_integral() const override;
       virtual const FunctionType *get_callable() const override { return nullptr; }
 
       template <typename... Args>
@@ -69,15 +69,15 @@ namespace zc {
 
       virtual ASTType *Address() override;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) override;
-      virtual Size size() const override { return ::zc::size(type_spec()); }
+      virtual Size size() const override;
 
       BasicType *Max(const BasicType *with) const;
        
    protected:
-      TypeSpec type_spec_;
+      TypeSpec *type_spec_;
 
       template <typename... Args>
-      BasicType(TypeSpec type_spec, Args... args):
+      BasicType(TypeSpec *type_spec, Args... args):
          ASTType(args...), type_spec_(type_spec) {}
    };
 

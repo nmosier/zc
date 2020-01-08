@@ -42,20 +42,8 @@ namespace zc {
    class ConditionalExpr;
    class LogicalOrExpr;
    class LogicalAndExpr;
-
-   /** Collection of type specification categories */
-   enum class TypeSpec {TYPE_VOID,
-                        TYPE_CHAR,
-                        TYPE_SHORT,
-                        TYPE_INT,
-                        TYPE_LONG,
-                        TYPE_LONG_LONG,
-   };
-   bool IsIntegral(TypeSpec type);
-   TypeSpec Max(TypeSpec lhs, TypeSpec rhs);
-   
    class TypeSpecs;
-
+   class TypeSpec;
    class SemantEnv;
    class CgenEnv;
    class StackFrame;

@@ -5,30 +5,34 @@
 #include "asm.hpp"
 
 namespace zc {
+   IntegralSpec *IntegralSpec::Max(const IntegralSpec *other) const {
+      std::array<IntKind,5> ordering {IntKind::SPEC_CHAR,
+                                      IntKind::SPEC_SHORT,
+                                      IntKind::SPEC_INT,
+                                      IntKind::SPEC_LONG,
+                                      IntKind::SPEC_LONG_LONG
+      };
 
-   bool IsIntegral(TypeSpec type) {
-      switch (type) {
-      case TypeSpec::TYPE_VOID:      return false;
-      case TypeSpec::TYPE_CHAR:      return true;
-      case TypeSpec::TYPE_SHORT:     return true;
-      case TypeSpec::TYPE_INT:       return true;
-      case TypeSpec::TYPE_LONG:      return true;
-      case TypeSpec::TYPE_LONG_LONG: return true;
-      }
+      auto this_it = std::find(ordering.begin(), ordering.end(), int_kind());
+      auto other_it = std::find(ordering.begin(), ordering.end(), other->int_kind());
+      
+      return IntegralSpec::Create(*std::max(this_it, other_it), loc());
    }
 
-   TypeSpec Max(TypeSpec lhs, TypeSpec rhs) {
-      assert(IsIntegral(lhs) && IsIntegral(rhs));
-      if (lhs == TypeSpec::TYPE_CHAR || rhs == TypeSpec::TYPE_CHAR) {
-         return (lhs == TypeSpec::TYPE_CHAR) ? rhs : lhs;
-      }
-      if (lhs == TypeSpec::TYPE_SHORT || rhs == TypeSpec::TYPE_SHORT) {
-         return (lhs == TypeSpec::TYPE_SHORT) ? rhs : lhs;
-      }
-      if (lhs == TypeSpec::TYPE_INT || rhs == TypeSpec::TYPE_INT) {
-         return (lhs == TypeSpec::TYPE_INT) ? rhs : lhs;
-      }
-      return lhs; // LONG_LONG
+   Size IntegralSpec::size() const {
+      std::unordered_map<IntegralSpec::IntKind,Size> map
+         {{IntKind::SPEC_CHAR, Size::SZ_CHAR},
+          {IntKind::SPEC_SHORT, Size::SZ_SHORT},
+          {IntKind::SPEC_INT, Size::SZ_INT},
+          {IntKind::SPEC_LONG, Size::SZ_LONG},
+          {IntKind::SPEC_LONG_LONG, Size::SZ_LONG_LONG}
+         };
+
+      return map[int_kind()];
+   }
+
+   Size BasicType::size() const {
+      return dynamic_cast<const IntegralSpec *>(type_spec())->size();
    }
 
    void BasicType::DumpNode(std::ostream& os) const {
@@ -73,4 +77,10 @@ namespace zc {
 
    Symbol *ASTType::sym() const { return decl()->id()->id(); }
 
+
+   bool BasicType::is_integral() const {
+      return type_spec()->kind() == TypeSpec::Kind::SPEC_INTEGRAL;
+   }
+
+   
  }

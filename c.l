@@ -48,6 +48,7 @@ E  [Ee][+-]?{D}+
 "short" { return SHORT; }
 "int" { return INT; }
 "long" { return LONG; }
+"struct" { return STRUCT; }
 
 "return" { return RETURN; }
 

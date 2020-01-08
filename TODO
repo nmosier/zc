@@ -1,3 +1,11 @@
+TODO LIST
+
+Legend
+[X] -- done
+[~] -- in progress
+[ ] -- todo
+
+
 [ ] remove IdentifierExpr
 [ ] finish TypeCheck() for all nodes
 [ ] add annotation for expressions for whether `lvalue' or `rvalue'
@@ -10,6 +18,7 @@
 
 PARSER
 [ ] Handle nested pointers properly, e.g. *(*id) -> **id
+[ ] type_spec from enum to class
 
 SEMANTIC ANALYSIS
 [X] `long long int` -> `LONG`, not `LONG_LONG`
@@ -35,6 +44,7 @@ AST
 [ ] Constructor type functions for converting Declarator to type
 [X] Get rid of virtual on ASTNodeVec
 [ ] Remove DeclSpecs
+[ ] Get rid of Sizes
 
 ASM
 [ ] Register attributes: loadable, movable, addable, etc.
@@ -49,13 +59,13 @@ CODEGEN
 [ ] abstract away instruction and transition access in blocks.
 [X] functions should have epilogue that `ret' transitions jump to
 [ ] casting should also worked for signed values, eventually.
-[ ] test addresses, derefence
+[X] test addresses, derefence
 
 LANGUAGE FEATURES
 [X] cast expressions
 [ ] hexadecimal notation (0x...)
 [X] while loops
 [ ] for loops
-[ ] structs
+[~] structs
 [ ] sizeof operator
 [ ] void param decl

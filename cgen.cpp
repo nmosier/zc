@@ -81,13 +81,13 @@ namespace zc {
    /*** CODE GENERATION ***/
 
    void TranslationUnit::CodeGen(CgenEnv& env) {
-      env.symtab().EnterScope();
+      env.EnterScope();
 
       for (ExternalDecl *decl : decls()->vec()) {
          decl->CodeGen(env);
       }
       
-      env.symtab().ExitScope();
+      env.ExitScope();
    }
 
    void ExternalDecl::CodeGen(CgenEnv& env) {
@@ -104,7 +104,7 @@ namespace zc {
       env.ext_env().Enter(sym(), args);
 
       /* enter parameters into subscope */
-      env.symtab().EnterScope();      
+      env.EnterScope();      
 
       /* initialize stack frame */
       FrameGen(env.ext_env().frame());
@@ -131,12 +131,12 @@ namespace zc {
       env.impls().impls().push_back(FunctionImpl(env, start_block, ret_block));
 
       env.ext_env().Exit();
-      env.symtab().ExitScope();
+      env.ExitScope();
    }
 
    Block *CompoundStat::CodeGen(CgenEnv& env, Block *block, bool new_scope) {
       if (new_scope) {
-         env.symtab().EnterScope();
+         env.EnterScope();
       }
 
       for (Decl *decl : decls()->vec()) {
@@ -148,7 +148,7 @@ namespace zc {
       }
       
       if (new_scope) {
-         env.symtab().ExitScope();
+         env.ExitScope();
       }
 
       return block;

@@ -37,7 +37,7 @@
     zc::Decls *decls;
     zc::Decl *decl;
     zc::DeclSpecs *decl_specs;
-    zc::TypeSpec type_spec;
+    zc::TypeSpec *type_spec;
     zc::ASTDeclarators *declarators;
     zc::ASTDeclarator *declarator;
     zc::Decls *param_types;
@@ -53,6 +53,7 @@
     zc::BinaryExpr::Kind binary_operator;
     zc::UnaryExpr::Kind unary_operator;
     zc::ASTType *type;
+    zc::TypeSpec::Kind type_spec_kind;
 }
 
 %initial-action {
@@ -80,6 +81,7 @@
 %token <expr> INT_CONST
 %token <expr> CHAR_CONST
 %token <identifier> ID
+%token STRUCT
 
  /* CONTROL */
 %token RETURN
@@ -90,10 +92,10 @@
 %type  <translation_unit> translation_unit
 %type  <external_decls> external_decl
 %type  <function_def>  function_definition
-%type  <decls>         optional_decl_list decl_list decl
+%type  <decls>         optional_decl_list decl_list decl struct_decl_list struct_decl
 %type  <decl_specs>    type_spec_list
-%type  <declarators>   init_declarator_list optional_init_declarator_list
-%type  <declarator>    init_declarator declarator direct_declarator optional_abstract_declarator abstract_declarator direct_abstract_declarator
+%type  <declarators>   init_declarator_list optional_init_declarator_list struct_declarator_list
+%type  <declarator>    init_declarator declarator direct_declarator optional_abstract_declarator abstract_declarator direct_abstract_declarator struct_declarator
 %type  <pointer>       pointer
 %type  <param_decl>    param_decl
 %type  <param_decls>   param_type_list optional_param_type_list param_list
@@ -104,10 +106,11 @@
 %type  <expr>          exp postfix_exp primary_exp unary_exp conditional_exp logical_or_exp logical_and_exp inclusive_or_exp exclusive_or_exp and_exp equality_exp relational_exp shift_expression additive_exp mult_exp cast_exp constant_exp assignment_exp optional_exp
 %type  <binary_operator> relational_operator additive_operator mult_operator equality_operator
 %type  <unary_operator> unary_operator
-%type  <type_spec>     type_spec
+%type  <type_spec>     type_spec struct_or_union_spec
 %type  <exprs>         optional_argument_exp_list argument_exp_list
 %type  <type>           type_name
-
+%type   <type_spec_kind>     struct_or_union
+                        
 %%
 
 translation_unit:
@@ -155,12 +158,63 @@ decl:           type_spec_list optional_init_declarator_list ';' {
                     }
                 }
         ;
-type_spec:      VOID { $$ = zc::TypeSpec::TYPE_VOID; }
-        |       CHAR { $$ = zc::TypeSpec::TYPE_CHAR; }
-        |       SHORT { $$ = zc::TypeSpec::TYPE_SHORT; }
-        |       INT { $$ = zc::TypeSpec::TYPE_INT; }
-        |       LONG { $$ = zc::TypeSpec::TYPE_LONG; }
+type_spec:      VOID { $$ = zc::VoidSpec::Create(@1); }
+        |       CHAR { $$ = zc::IntegralSpec::Create(zc::IntegralSpec::IntKind::SPEC_CHAR, @1); }
+        |       SHORT { $$ = zc::IntegralSpec::Create(zc::IntegralSpec::IntKind::SPEC_SHORT, @1); }
+        |       INT { $$ = zc::IntegralSpec::Create(zc::IntegralSpec::IntKind::SPEC_INT, @1); }
+        |       LONG { $$ = zc::IntegralSpec::Create(zc::IntegralSpec::IntKind::SPEC_LONG, @1); }
+        |       struct_or_union_spec { $$ = $1; }
         ;
+struct_or_union_spec:
+                struct_or_union ID '{' struct_decl_list '}' {
+                    switch ($1) {
+                    case zc::TypeSpec::Kind::SPEC_STRUCT:
+                        $$ = zc::StructSpec::Create($2, $4, @1);
+                        break;
+                    default:
+                        abort();
+                    }
+                }
+        |       struct_or_union ID {
+               switch ($1) {
+                    case zc::TypeSpec::Kind::SPEC_STRUCT:
+                        $$ = zc::StructSpec::Create($2, nullptr, @1);
+                        break;
+                    default:
+                        abort();
+                    }
+                }   
+        ; /* incomplete */
+struct_or_union:
+                STRUCT { $$ = zc::TypeSpec::Kind::SPEC_STRUCT; }
+        ; /* incomplete */
+struct_decl_list:
+                struct_decl {
+                         $$ = zc::Decls::Create(@1);
+                         $$->vec().insert($$->vec().end(), $1->vec().begin(), $1->vec().end());
+                }
+        |       struct_decl_list struct_decl {
+                     $$ = $1;
+                     $$->vec().insert($$->vec().end(), $2->vec().begin(), $2->vec().end());
+                }
+        ;
+struct_decl:    type_spec_list struct_declarator_list ';' {
+                    $$ = zc::Decls::Create(@1);
+                    for (zc::ASTDeclarator *declarator : $2->vec()) {
+                        $$->vec().push_back(zc::Decl::Create($1, declarator, @1));
+                    }
+                }           
+        ;
+struct_declarator_list:
+                struct_declarator { $$ = zc::ASTDeclarators::Create(@1); $$->vec().push_back($1); }
+        |       struct_declarator_list ',' struct_declarator {
+                     $$ = $1;
+                     $$->vec().push_back($3);
+                }
+        ;
+struct_declarator:
+                declarator
+        ; /* incomplete (bit fields) */
 optional_init_declarator_list:
                 /* empty */ { $$ = zc::ASTDeclarators::Create(@$); @$ = 0; }
         |       init_declarator_list
@@ -308,11 +362,11 @@ type_name:      type_spec_list optional_abstract_declarator {
 type_spec_list:
                 type_spec {
                     $$ = zc::DeclSpecs::Create(@1);
-                    $$->type_specs()->insert($1);
+                    $$->type_specs()->vec().push_back($1);
                 }
         |       type_spec type_spec_list {
                     $$ = $2;
-                    $$->type_specs()->insert($1);
+                    $$->type_specs()->vec().push_back($1);
                 }
         ; /* incomplete, maybe */
 optional_abstract_declarator:

@@ -133,24 +133,102 @@ namespace zc {
    };
 
 
-   class TypeSpecs: public ASTSpecs<TypeSpec> {
+   /* NOTE: Abstract class. */
+   class TypeSpec: public ASTNode {
+   public:
+      enum class Kind {SPEC_VOID, SPEC_INTEGRAL, SPEC_STRUCT};
+      virtual Kind kind() const = 0;
+
+      virtual bool Eq(const TypeSpec *other) const = 0;
+
+   protected:
+      template <typename... Args>
+      TypeSpec(Args... args): ASTNode(args...) {}
+   };
+
+   class VoidSpec: public TypeSpec {
+   public:
+      virtual Kind kind() const override { return Kind::SPEC_VOID; }
+
+      virtual void DumpNode(std::ostream& os) const override { os << "VoidSpec VOID"; }
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
+
+      virtual bool Eq(const TypeSpec *other) const override;
+      
+      template <typename... Args>
+      static VoidSpec *Create(Args... args) { return new VoidSpec(args...); }
+   private:
+      template <typename... Args>
+      VoidSpec(Args... args): TypeSpec(args...) {}
+   };
+
+   class IntegralSpec: public TypeSpec {
+   public:
+      virtual Kind kind() const override { return Kind::SPEC_INTEGRAL; }
+      enum class IntKind {SPEC_CHAR, SPEC_SHORT, SPEC_INT, SPEC_LONG, SPEC_LONG_LONG};
+      IntKind int_kind() const { return int_kind_; }
+
+      virtual void DumpNode(std::ostream& os) const override;
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
+
+      virtual bool Eq(const TypeSpec *other) const override;      
+
+      IntegralSpec *Max(const IntegralSpec *other) const;
+      Size size() const;
+
+      template <typename... Args>
+      static IntegralSpec *Create(Args... args) { return new IntegralSpec(args...); }
+      
+   protected:
+      IntKind int_kind_;
+
+      template <typename... Args>
+      IntegralSpec(IntKind int_kind, Args... args): TypeSpec(args...), int_kind_(int_kind) {}
+   };
+
+   class StructSpec: public TypeSpec {
+   public:
+      virtual Kind kind() const override { return Kind::SPEC_STRUCT; }
+
+      Identifier *id() const { return id_; }
+      Decls *membs() const { return membs_; }
+
+      virtual bool Eq(const TypeSpec *other) const override;
+      
+      virtual void DumpNode(std::ostream& os) const override { os << "StructSpec STRUCT"; }
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
+      
+      template <typename... Args>
+      static StructSpec *Create(Args... args) { return new StructSpec(args...); }
+      
+   private:
+      Identifier *id_;
+      Decls *membs_;
+
+      template <typename... Args>
+      StructSpec(Identifier *id, Decls *membs, Args... args):
+         TypeSpec(args...), id_(id), membs_(membs) {}
+   };
+      
+
+   class TypeSpecs: public ASTNodeVec<TypeSpec> {
    public:
       static TypeSpecs *Create(const SourceLoc& loc) { return new TypeSpecs(loc); }
       
-      TypeSpec TypeCombine() const;
-      TypeSpec TypeCombine(SemantEnv *env) const;
+      TypeSpec *TypeCombine() const;
+      TypeSpec *TypeCombine(SemantEnv *env) const;
       
       void TypeCheck(SemantEnv& env);
       
    protected:
-      TypeSpecs(const SourceLoc& loc): ASTSpecs<TypeSpec>(loc) {}
+      TypeSpecs(const SourceLoc& loc): ASTNodeVec<TypeSpec>(loc) {}
    };
 
 
    class DeclSpecs: public ASTNode {
    public:
       TypeSpecs *type_specs() const { return type_specs_; }
-      TypeSpec type_spec() const { return type_specs()->TypeCombine(); }
+      TypeSpec *type_spec() const { return type_specs()->TypeCombine(); }
 
       static DeclSpecs *Create(const SourceLoc& loc) { return new DeclSpecs(loc); }
 
@@ -168,8 +246,6 @@ namespace zc {
    };
 
    
-   std::ostream& operator<< (std::ostream& os, TypeSpec spec);
-
    class ASTDeclarator: public ASTNode {
    public:
       /** The fundamental kind of declarator. */
@@ -308,6 +384,9 @@ namespace zc {
          id_ = g_id_tab[id];
       }
    };
+
+
+   std::ostream& operator<<(std::ostream& os, IntegralSpec::IntKind kind);
 
 }
 
