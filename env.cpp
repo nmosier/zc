@@ -20,7 +20,7 @@ namespace zc {
       structs_.EnterScope();
    }
 
-   template class Env<ASTType, StructSpec, SymbolEnv>;
+   template class Env<ASTType, StructType, SymbolEnv>;
    template class Env<SymInfo, StructInfo, CgenExtEnv>;
    
 }

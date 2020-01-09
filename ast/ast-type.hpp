@@ -32,7 +32,7 @@ namespace zc {
       virtual void TypeCheck(SemantEnv& env, bool allow_void) = 0;
       virtual bool TypeEq(const ASTType *other) const = 0;
       virtual bool TypeCoerce(const ASTType *from) const = 0;
-      void Enscope(SemantEnv& env);
+      virtual void Enscope(SemantEnv& env);
 
       virtual ASTType *Address() = 0;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) = 0;
@@ -180,7 +180,7 @@ namespace zc {
 
    class IntegralType: public ASTType {
    public:
-      typedef IntegralSpec::IntKind IntKind;      
+      enum class IntKind {SPEC_CHAR, SPEC_SHORT, SPEC_INT, SPEC_LONG, SPEC_LONG_LONG};
       virtual Kind kind() const override { return Kind::TYPE_INTEGRAL; }
       IntKind int_kind() const { return int_kind_; }
       virtual const FunctionType *get_callable() const override { return nullptr; }
@@ -214,7 +214,7 @@ namespace zc {
    public:
       virtual Kind kind() const override { return Kind::TYPE_STRUCT; }
       virtual const FunctionType *get_callable() const override { return nullptr; }
-      Identifier *id() const { return id_; }
+      Symbol *struct_id() const { return struct_id_; }
       Types *membs() const { return membs_; }
 
       template <typename... Args>
@@ -225,6 +225,8 @@ namespace zc {
       virtual bool TypeEq(const ASTType *other) const override;
       virtual bool TypeCoerce(const ASTType *from) const override;
       virtual void TypeCheck(SemantEnv& env, bool allow_void) override;
+      virtual void Enscope(SemantEnv& env) override;
+      void EnscopeStruct(SemantEnv& env);
 
       virtual ASTType *Address() override;
       virtual ASTType *Dereference(SemantEnv *env) override;
@@ -232,13 +234,16 @@ namespace zc {
       virtual int bytes() const override;
       
    protected:
-      Identifier *id_;
+      Symbol *struct_id_;
       Types *membs_;
 
       template <typename... Args>
-      StructType(Identifier *id, Types *membs, Args... args):
-         ASTType(args...), id_(id), membs_(membs) {}
+      StructType(Symbol *struct_id, Types *membs, Args... args):
+         ASTType(args...), struct_id_(struct_id), membs_(membs) {}
    };
+
+   std::ostream& operator<<(std::ostream& os, IntegralType::IntKind kind);   
+   
 
 }
    

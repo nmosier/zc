@@ -74,9 +74,10 @@ namespace zc {
 
    extern SemantError g_semant_error;
 
-   class SemantEnv: public Env<ASTType, StructSpec, SymbolEnv> {
+   class StructType;
+   class SemantEnv: public Env<ASTType, StructType, SymbolEnv> {
    public:
-      SemantEnv(SemantError& error): Env<ASTType, StructSpec, SymbolEnv>(), error_(error) {}
+      SemantEnv(SemantError& error): Env<ASTType, StructType, SymbolEnv>(), error_(error) {}
       SemantError& error() { return error_; }
 
    private:

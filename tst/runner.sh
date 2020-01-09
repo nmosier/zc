@@ -106,7 +106,8 @@ for test in "${tests[@]}"; do
 
     if [[ $DIFF_LC_ONLY && $test_exit -eq 0 ]]; then
         # Only compare numbers of lines...
-        if [[ $(awk 'END { print NR; }' "${test}.stderr") -gt $(awk 'END { print NR; }' "${OUT_DIR}/${name}.stderr") ]]; then
+        # if [[ $(awk 'END { print NR; }' "${test}.stderr") -gt $(awk 'END { print NR; }' "${OUT_DIR}/${name}.stderr") ]]; then
+        if [[ `wc -l "${test}.stderr" | tr -s " " | cut -f2 -d" "` -ne `wc -l "${OUT_DIR}/${name}.stderr" | tr -s " " | cut -f2 -d" "` ]]; then
             # Print side by side output and mark as failing
             #diff -y -b -w <(sort "${test}.stderr") <(sort "${OUT_DIR}/${name}.stderr")
             $DIFF_CMD <(sort "${test}.stderr") <(sort "${OUT_DIR}/${name}.stderr")

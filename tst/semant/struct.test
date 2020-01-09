@@ -1,0 +1,6 @@
+struct coords { int a; } a;
+struct coords;
+
+struct coords *main(int argc) {
+   
+}

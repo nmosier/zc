@@ -175,10 +175,10 @@ integral_spec:  CHAR { $$ = CHAR; }
         ;
 struct_spec:
                 STRUCT ID '{' struct_decl_list '}' {
-                    $$ = zc::StructType::Create($2, $4, @1);
+                    $$ = zc::StructType::Create($2->id(), $4, @1);
                 }
         |       STRUCT ID {
-                    $$ = zc::StructType::Create($2, nullptr, @1);
+                    $$ = zc::StructType::Create($2->id(), nullptr, @1);
                 }
         ; /* incomplete */
 struct_decl_list:

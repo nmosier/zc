@@ -1197,7 +1197,7 @@ namespace zc {
    }
 
    int IntegralType::bytes() const {
-      using IntKind = IntegralSpec::IntKind;
+      using IntKind = IntegralType::IntKind;
       std::unordered_map<IntKind,int> map
          {{IntKind::SPEC_CHAR, byte_size},
           {IntKind::SPEC_SHORT, word_size},

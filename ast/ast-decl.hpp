@@ -135,6 +135,7 @@ namespace zc {
    };
 
 
+#if 0
    /* NOTE: Abstract class. */
    class TypeSpec: public ASTNode {
    public:
@@ -150,76 +151,6 @@ namespace zc {
       TypeSpec(Args... args): ASTNode(args...) {}
    };
 
-   class VoidSpec: public TypeSpec {
-   public:
-      virtual Kind kind() const override { return Kind::SPEC_VOID; }
-
-      virtual void DumpNode(std::ostream& os) const override { os << "VoidSpec VOID"; }
-      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
-
-      virtual bool Eq(const TypeSpec *other) const override;
-
-      virtual void TypeCheck(SemantEnv& env, bool allow_void) override {}
-      
-      template <typename... Args>
-      static VoidSpec *Create(Args... args) { return new VoidSpec(args...); }
-   private:
-      template <typename... Args>
-      VoidSpec(Args... args): TypeSpec(args...) {}
-   };
-
-   class IntegralSpec: public TypeSpec {
-   public:
-      virtual Kind kind() const override { return Kind::SPEC_INTEGRAL; }
-      enum class IntKind {SPEC_CHAR, SPEC_SHORT, SPEC_INT, SPEC_LONG, SPEC_LONG_LONG};
-      IntKind int_kind() const { return int_kind_; }
-
-      virtual void DumpNode(std::ostream& os) const override;
-      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
-
-      virtual bool Eq(const TypeSpec *other) const override;      
-
-      virtual void TypeCheck(SemantEnv& env, bool allow_void) override {}
-      
-      IntegralSpec *Max(const IntegralSpec *other) const;
-
-      template <typename... Args>
-      static IntegralSpec *Create(Args... args) { return new IntegralSpec(args...); }
-      
-   protected:
-      IntKind int_kind_;
-
-      template <typename... Args>
-      IntegralSpec(IntKind int_kind, Args... args): TypeSpec(args...), int_kind_(int_kind) {}
-   };
-
-   class StructSpec: public TypeSpec {
-   public:
-      virtual Kind kind() const override { return Kind::SPEC_STRUCT; }
-
-      Identifier *id() const { return id_; }
-      Decls *membs() const { return membs_; }
-      Symbol *sym() const;
-
-      virtual bool Eq(const TypeSpec *other) const override;
-      
-      virtual void DumpNode(std::ostream& os) const override { os << "StructSpec STRUCT"; }
-      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
-
-      virtual void TypeCheck(SemantEnv& env, bool allow_void) override;
-      
-      template <typename... Args>
-      static StructSpec *Create(Args... args) { return new StructSpec(args...); }
-      
-   private:
-      Identifier *id_;
-      Decls *membs_;
-
-      template <typename... Args>
-      StructSpec(Identifier *id, Decls *membs, Args... args):
-         TypeSpec(args...), id_(id), membs_(membs) {}
-   };
-      
 
    class TypeSpecs: public ASTNodeVec<TypeSpec> {
    public:
@@ -233,37 +164,7 @@ namespace zc {
    protected:
       TypeSpecs(const SourceLoc& loc): ASTNodeVec<TypeSpec>(loc) {}
    };
-
-#if 0   
-   /**
-    * Collection of declaration specifiers.
-    * NOTE: This is ephemeral; it is converted to a type during parsing.
-    */
-   class DeclSpecs: public ASTNode {
-   public:
-      typedef std::vector<int> Tokens;
-      Tokens& int_specs() { return int_specs_; }
-      
-      
-      TypeSpecs *type_specs() const { return type_specs_; }
-      TypeSpec *type_spec() const { return type_specs()->TypeCombine(); }
-
-      static DeclSpecs *Create(const SourceLoc& loc) { return new DeclSpecs(loc); }
-
-      virtual void DumpNode(std::ostream& os) const override { os << "DeclSpecs"; }
-      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
-
-      void TypeCheck(SemantEnv& env);
-      bool TypeEq(const DeclSpecs *other) const;
-      bool TypeCoerce(const DeclSpecs *from) const;
-
-   protected:
-      Tokens int_specs_;
-      
-      DeclSpecs(const SourceLoc& loc): ASTNode(loc), type_specs_(TypeSpecs::Create(loc)) {}
-   };
 #endif
-
    
    class ASTDeclarator: public ASTNode {
    public:
@@ -405,7 +306,7 @@ namespace zc {
    };
 
 
-   std::ostream& operator<<(std::ostream& os, IntegralSpec::IntKind kind);
+
 
 }
 

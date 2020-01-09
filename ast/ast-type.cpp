@@ -7,6 +7,19 @@
 extern const char *g_filename;
 
 namespace zc {
+
+   std::ostream& operator<<(std::ostream& os, IntegralType::IntKind kind) {
+      using IntKind = IntegralType::IntKind;
+      std::unordered_map<IntegralType::IntKind,const char *> map
+         {{IntKind::SPEC_CHAR, "CHAR"},
+          {IntKind::SPEC_SHORT, "SHORT"},
+          {IntKind::SPEC_INT, "INT"},
+          {IntKind::SPEC_LONG, "LONG"},
+          {IntKind::SPEC_LONG_LONG, "LONG LONG"},
+         };
+      os << map[kind];
+      return os;
+   }   
    
    IntegralType *IntegralType::Max(const IntegralType *other) const {
       std::array<IntKind,5> ordering {IntKind::SPEC_CHAR,
@@ -38,11 +51,13 @@ namespace zc {
 
    void StructType::DumpNode(std::ostream& os) const {
       os << "struct ";
-      if (id() != nullptr) {
-         os << id()->id();
+      if (struct_id() != nullptr) {
+         os << struct_id();
       }
       os << " { ";
-      membs()->DumpNode(os);
+      if (membs() != nullptr) {
+         membs()->DumpNode(os);
+      }
       os << " }";
    }
 

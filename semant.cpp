@@ -30,10 +30,6 @@
        return os_;
     }
 
-    TypeSpec *TypeSpecs::TypeCombine() const {
-       return TypeCombine(nullptr);
-    }
-
     static IntegralType::IntKind token_to_intspec(int token) {
        using Kind = IntegralType::IntKind;
        std::unordered_map<int,Kind> map
@@ -88,93 +84,6 @@
        }
     }
 
-    TypeSpec *TypeSpecs::TypeCombine(SemantEnv *env) const {
-       using IntKind = IntegralSpec::IntKind;
-       
-       /* check if any type specs were given */
-       if (vec().size() == 0) {
-          if (env) {
-             env->error()(g_filename, this) << "declaration missing type specifier" << std::endl;
-          }
-          return IntegralSpec::Create(IntKind::SPEC_INT, loc());
-       }
-
-       /* if exactly one type spec is given, no combining is necessary. */
-       if (vec().size() == 1) {
-          return vec().front(); 
-       }
-
-       /* if all specs aren't integral, make fun of the programmer */
-       if (std::any_of(vec().begin(), vec().end(),
-                       [](const TypeSpec *spec) -> bool {
-                          return spec->kind() != TypeSpec::Kind::SPEC_INTEGRAL;
-                       })) {
-          if (env) {
-             env->error()(g_filename, this) << "what exactly are you trying to achieve with that "
-                                            << "peculiar combination of type specifiers?"
-                                            << std::endl;
-          }
-          return vec().front();
-       }
-
-       /* reduce to multiset of integral type specs */
-       std::vector<IntegralSpec::IntKind> int_specs(vec().size());
-       std::transform(vec().begin(), vec().end(), int_specs.begin(), 
-                      [](const TypeSpec *spec) -> IntegralSpec::IntKind {
-                         return dynamic_cast<const IntegralSpec *>(spec)->int_kind();
-                      });
-       int ll_cnt = std::count(int_specs.begin(), int_specs.end(), IntKind::SPEC_LONG);
-       if (ll_cnt > 2) {
-          if (env) {
-             env->error()(g_filename, this) << "try declaring it as a 'long long long long' instead"
-                                            << std::endl;
-          }
-          return vec().front();
-       } else if (ll_cnt == 2) {
-          /* reduce long long -> long_long */
-          std::remove(int_specs.begin(), int_specs.end(), IntKind::SPEC_LONG);
-          int_specs.push_back(IntKind::SPEC_LONG_LONG);
-       }
-
-       /* make sure one of the specs isn't a char, since that can't be combined with anything */
-       if (std::find(int_specs.begin(),
-                     int_specs.end(), IntKind::SPEC_CHAR) != int_specs.end()) {
-          if (env) {
-             env->error()(g_filename, this) << "cannot combine 'char' type specifier with other "
-                                            << "type specifiers" << std::endl;
-          }
-          return IntegralSpec::Create(int_specs.front(), loc());
-       }
-
-       /* remove reduntant INT */
-       int int_cnt = std::count(int_specs.begin(), int_specs.end(), IntKind::SPEC_INT);
-       if (int_cnt > 1) {
-          if (env) {
-             env->error()(g_filename, this) << "maybe you should tack on another 'int' type "
-                                            << "specifier just to make sure" << std::endl;
-          }
-          return IntegralSpec::Create(int_specs.front(), loc());
-       } else if (int_cnt == 1) {
-          /* remove reduntant INT */
-          std::remove(int_specs.begin(), int_specs.end(), IntKind::SPEC_INT);
-       } else {
-          if (env) {
-             env->error()(g_filename, this) << "the more type specifiers, the better!"
-                                          << " Keep 'em coming!"
-                                          << std::endl;
-          }
-          return IntegralSpec::Create(int_specs.front(), loc());
-       }
-
-       if (int_specs.size() != 1) {
-          if (env) {
-             env->error()(g_filename, this) << "too many or incompatible type specifiers given"
-                                            << std::endl;
-          }
-       }
-
-       return IntegralSpec::Create(int_specs.front(), loc());
-    }
 
     /*** TYPE CHECK ***/
 
@@ -200,7 +109,48 @@
 
     void StructType::TypeCheck(SemantEnv& env, bool allow_void) {
        if (membs() != nullptr) {
+          /* this struct is a complete definition */
+          
           membs()->TypeCheck(env);
+
+          /* enscope struct if it isn't anonymous */
+          if (sym() != nullptr) {
+             EnscopeStruct(env);
+          }
+       } else {
+          /* struct cannot be anonymous by C syntax */
+          const StructType *type = env.structs().Lookup(struct_id());
+          if (type == nullptr) {
+             /* forward-declare struct */
+             EnscopeStruct(env);
+          } else {
+             /* inherit definition of members from already-declared struct */
+             membs_ = type->membs_;
+          }
+       }
+    }
+
+    void StructType::EnscopeStruct(SemantEnv& env) {
+       assert(struct_id() != nullptr); /* ensure struct isn't anonymous */
+
+       StructType *type = env.structs().Probe(struct_id());
+       if (type == nullptr) {
+          /* first mention of struct */
+          env.structs().AddToScope(struct_id(), this);
+       } else if (type->membs() == nullptr) {
+          /* struct in table is incomplete */
+
+          if (membs() != nullptr) {
+             /* this struct is a full definition, so add members to existing enscoped struct */
+             type->membs_ = membs();
+          }
+       } else {
+          if (membs() == nullptr) {
+             membs_ = type->membs();
+          } else {
+             env.error()(g_filename, this) << "redefinition of struct '" << *struct_id()
+                                           << "'" << std::endl;
+          }
        }
     }
 
@@ -226,11 +176,6 @@
        Descope(env);
     }
     
-    void TypeSpecs::TypeCheck(SemantEnv& env) {
-       /* make sure all type specifiers present are compatible */
-       TypeCombine(&env);
-    }
-
     void Decl::TypeCheck(SemantEnv& env) {
        specs()->TypeCheck(env);
        declarator()->TypeCheck(env);
@@ -240,22 +185,7 @@
        declarator()->TypeCheck(env);
        params()->TypeCheck(env);
     }
-
-    void StructSpec::TypeCheck(SemantEnv& env, bool allow_void) {
-       if (membs() == nullptr) {
-          /* require that struct have already been defined */
-          if (env.structs().Lookup(id()->id()) == nullptr) {
-             env.error()(g_filename, this) << "struct " << *sym() << " has not been declared"
-                                           << std::endl;
-          }
-       } else if (env.structs().Probe(id()->id()) != nullptr) {
-          env.error()(g_filename, this) << "redefinition of struct " << id()->id() << std::endl;
-       } else {
-          env.structs().AddToScope(id()->id(), this);
-       }
-    }
     
-
    void CompoundStat::TypeCheck(SemantEnv& env, bool scoped) {
       decls()->TypeCheck(env);
 
@@ -556,8 +486,8 @@
        if (st_other == nullptr) {
           return false;
        } else {
-          return this->id() != nullptr && st_other->id() != nullptr &&
-             this->id()->id() == st_other->id()->id();
+          return this->struct_id() != nullptr && st_other->struct_id() != nullptr &&
+             this->struct_id() == st_other->struct_id();
        }
     }
 
@@ -751,11 +681,12 @@
            return;
         }
      
-        TypeCheck(env);
-     
         /* add symbol to scope */
         env.symtab().AddToScope(sym(), this);
      }
+
+    void StructType::Enscope(SemantEnv& env) {
+    }
     
      void ExternalDecl::Enscope(SemantEnv& env) const {
         decl()->Enscope(env);
