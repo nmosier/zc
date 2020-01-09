@@ -91,9 +91,11 @@ namespace zc {
    }
 
    void ExternalDecl::CodeGen(CgenEnv& env) {
-      /* enter global variable into global scope */
-      SymInfo *info = new SymInfo(this);
-      env.symtab().AddToScope(sym(), info);
+      /* enter global variable declaration into global scope */
+      if (sym()) {
+         SymInfo *info = new SymInfo(this);
+         env.symtab().AddToScope(sym(), info);
+      }
    }
 
    void FunctionDef::CodeGen(CgenEnv& env) {
@@ -157,8 +159,10 @@ namespace zc {
    void ASTType::CodeGen(CgenEnv& env) {
       SymInfo *info = env.ext_env().frame().next_local(this);
 
-      /* add decl to scope */
-      env.symtab().AddToScope(sym(), info);
+      if (sym() != nullptr) {
+         /* if this type is bounded to a symbol, declare that symbol */
+         env.symtab().AddToScope(sym(), info);
+      }
    }
 
    Block *ReturnStat::CodeGen(CgenEnv& env, Block *block) {
@@ -757,6 +761,49 @@ namespace zc {
       return block;
    }
 
+   Block *MembExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
+      /* code generate struct as lvalue */
+      block = expr()->CodeGen(env, block, ExprKind::EXPR_LVALUE);
+      
+      /* get internal offset */
+      int offset = dynamic_cast<StructType *>(expr()->type())->offset(memb());
+      ImmediateValue *imm = new ImmediateValue(offset, long_size);
+      block->instrs().push_back(new LoadInstruction(&rv_de, imm));
+      block->instrs().push_back(new AddInstruction(&rv_hl, &rv_de));
+      
+      switch (mode) {
+      case ExprKind::EXPR_LVALUE:
+         break; /* already computed address */
+         
+      case ExprKind::EXPR_RVALUE:
+         {
+            const RegisterValue *dst;
+         
+            switch (type()->bytes()) {
+            case byte_size:
+               dst = &rv_a;
+               break;
+            case word_size: abort();
+            case long_size:
+               dst = &rv_hl;
+               break;
+            default:
+               abort();
+            }
+         
+            auto memloc = new MemoryLocation(dst);
+            auto memval = new MemoryValue(memloc, type()->bytes());
+            block->instrs().push_back(new LoadInstruction(&rv_hl, memval));
+         }
+         break;
+
+      case ExprKind::EXPR_NONE:
+         abort();
+      }
+
+      return block;
+   }
+
    /*** OTHER ***/
 
    static int label_counter = 0;
@@ -1210,6 +1257,17 @@ namespace zc {
 
    int StructType::bytes() const {
       return membs()->bytes();
+   }
+
+   int StructType::offset(const Symbol *sym) {
+      auto it = std::find_if(membs()->vec().begin(), membs()->vec().end(),
+                             [&](const ASTType *type) -> bool {
+                                return type->sym() == sym;
+                             });
+      return std::accumulate(membs()->vec().begin(), it, 0,
+                             [](int acc, const ASTType *type) -> int {
+                                return acc + type->bytes();
+                             });
    }
    
 }

@@ -23,4 +23,27 @@ C declaration specifiers come in a few different types: type specifiers (`void',
 [1 hr] Set up basic testing infrastructure.
    I copied the "runner.sh" script from Professor Linderman's midd-cool-osx GitHub repository and made a few changes to make it work better with zc's semant-main and cgen-main compiler drivers. I also created a new "tst/semant" directory and placed some simple tests in there. More complex ones are to come.
 
+[1 hr] Wrote struct tests and fixed struct type-checking bugs.
+   More bugs that I haven't fixed: structs definitions without accompanying variable declarations (e.g. `struct coords { int x; int y; };' ) never makes it past the parser. I'll fix this bug tomorrow.
 
+01/09/2020
+[1 hr] I thought about how to approach the bug mentioned in the previous entry, i.e. when the struct definition
+      struct coords {
+             int x;
+             int y;
+      };
+   is made without any accompanying variable declaraiton, the parser simply drops the struct definition because there are no variables to declare. One solution that I chose not to pursue would be to
+   add ``bound types'', each of which would inherit from a respective ``unbound type'' and implement a ``declarable'' interface. Then, the result of a declaration would be a list of types, some of which
+   would be declarable. While this wouldn't help the above problem much, it feels like a more satisfactory approach than just checking if a type's ``sym'' field is null to determine whether it's an
+   abstract or bounded type.
+
+   Instead, I implemented more of a quick fix: if a type specifier accompanies no declarators, the declaration list simply contains one element, the type specifier. This way the parser always retains
+   the struct definition.
+
+   I also wrote some basic struct declaration tests for the semantic analyzer. It passes those.
+
+[1 hr]
+
+
+
+Observations: structs can be forward-declared and defined in type casts!

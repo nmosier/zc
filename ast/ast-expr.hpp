@@ -243,6 +243,34 @@ namespace zc {
       CastExpr(ASTType *type, ASTExpr *expr, Args... args):
          ASTExpr(type, args...), expr_(expr) {}
    };
+
+   /**
+    * Struct member access expression.
+    */
+   class MembExpr: public ASTExpr {
+   public:
+      ASTExpr *expr() const { return expr_; }
+      Symbol *memb() const { return memb_; }
+      virtual ExprKind expr_kind() const override { return ExprKind::EXPR_LVALUE; }
+
+      template <typename... Args>
+      static MembExpr *Create(Args... args) { return new MembExpr(args...); }
+
+      virtual void DumpNode(std::ostream& os) const override;
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
+
+      virtual void TypeCheck(SemantEnv& env) override;
+
+      virtual Block *CodeGen(CgenEnv& env, Block *block, ExprKind mode) override;      
+      
+   protected:
+      ASTExpr *expr_;
+      Symbol *memb_;
+
+      template <typename... Args>
+      MembExpr(ASTExpr *expr, Symbol *memb, Args... args):
+         ASTExpr(args...), expr_(expr), memb_(memb) {}
+   };
 }
 
 #endif

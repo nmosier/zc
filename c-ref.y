@@ -75,7 +75,7 @@ enumerator_list		: enumerator
 enumerator		: id
 			| id '=' const_exp
 			;
-declarator		: pointer direct_declarator
+declarator  : pointer direct_declarator
 			|	direct_declarator
 			;
 direct_declarator	: id

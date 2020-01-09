@@ -114,7 +114,7 @@
           membs()->TypeCheck(env);
 
           /* enscope struct if it isn't anonymous */
-          if (sym() != nullptr) {
+          if (struct_id() != nullptr) {
              EnscopeStruct(env);
           }
        } else {
@@ -290,6 +290,27 @@
 
     void CastExpr::TypeCheck(SemantEnv& env) {
        expr_->TypeCheck(env);
+    }
+
+    void MembExpr::TypeCheck(SemantEnv& env) {
+       expr()->TypeCheck(env);
+       if (expr()->type()->kind() != ASTType::Kind::TYPE_STRUCT) {
+          env.error()(g_filename, this) << "member access into non-struct type" << std::endl;
+       }
+       const StructType *struct_type = dynamic_cast<const StructType *>(expr()->type());
+       if (struct_type->membs() == nullptr) {
+          env.error()(g_filename, this) << "member access into incomplete struct '"
+                                        << struct_type->struct_id() << "'" << std::endl;
+       } else {
+          Types *membs = struct_type->membs();
+          ASTType *memb_decl = membs->Lookup(memb());
+          if (memb_decl == nullptr) {
+             env.error()(g_filename, this) << "no member named '" << *memb() << "' in struct '"
+                                           << struct_type->struct_id() << "'" << std::endl;
+          } else {
+             type_ = memb_decl;
+          }
+       }
     }
 
    void UnaryExpr::TypeCheck(SemantEnv& env) {
@@ -671,7 +692,8 @@
      void ASTType::Enscope(SemantEnv& env) { 
         /* check for previous declarations in scope */
         if (sym() == nullptr) {
-           env.error()(g_filename, this) << "declaration is missing identifier" << std::endl;
+           // env.error()(g_filename, this) << "declaration is missing identifier" << std::endl;
+           /* NOTE: this actually shouldn't be an error. Some compilers generate it as a warning. */
            return;
         }
      
@@ -685,9 +707,6 @@
         env.symtab().AddToScope(sym(), this);
      }
 
-    void StructType::Enscope(SemantEnv& env) {
-    }
-    
      void ExternalDecl::Enscope(SemantEnv& env) const {
         decl()->Enscope(env);
         env.ext_env().Enter(decl()->sym());

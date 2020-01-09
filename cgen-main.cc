@@ -112,16 +112,14 @@ int main(int argc, char *argv[]) {
 
   auto firstfile_index = optind;
 
+  std::ifstream ifs;
   if (firstfile_index < argc) {
-     if ((stdin = fopen(argv[firstfile_index], "r")) == NULL) {
-        perror("fopen");
-        exit(1);
-     }
+     ifs.exceptions(std::ifstream::failbit);
+     ifs.open(argv[firstfile_index]);
+     g_istream = &ifs;
   }
 
   yyparse();
-
-  fclose(stdin);
 
   Semant(g_AST_root);
 

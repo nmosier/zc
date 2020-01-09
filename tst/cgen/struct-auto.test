@@ -1,0 +1,10 @@
+struct coords {
+   int x;
+   int y;
+};
+
+int main(int argc, char **argv) {
+   struct coords c;
+
+   return 0;
+}

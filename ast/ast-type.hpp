@@ -32,11 +32,11 @@ namespace zc {
       virtual void TypeCheck(SemantEnv& env, bool allow_void) = 0;
       virtual bool TypeEq(const ASTType *other) const = 0;
       virtual bool TypeCoerce(const ASTType *from) const = 0;
-      virtual void Enscope(SemantEnv& env);
+      void Enscope(SemantEnv& env);
 
       virtual ASTType *Address() = 0;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) = 0;
-      
+
       void CodeGen(CgenEnv& env);
       virtual int bytes() const = 0;
       void FrameGen(StackFrame& frame) const;
@@ -70,6 +70,8 @@ namespace zc {
 
       virtual void DumpNode(std::ostream& os) const override;
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
+
+      ASTType *Lookup(const Symbol *sym) const;
       
       bool TypeEq(const Types *others) const;
       void TypeCheck(SemantEnv& env);
@@ -90,7 +92,7 @@ namespace zc {
       virtual const FunctionType *get_callable() const override;
       int depth() const { return depth_; }
       ASTType *pointee() const { return pointee_; }
-
+      
       template <typename... Args>
       static PointerType *Create(Args... args) {
          return new PointerType(args...);
@@ -216,6 +218,7 @@ namespace zc {
       virtual const FunctionType *get_callable() const override { return nullptr; }
       Symbol *struct_id() const { return struct_id_; }
       Types *membs() const { return membs_; }
+      int offset(const Symbol *sym);
 
       template <typename... Args>
       static StructType *Create(Args... args) { return new StructType(args...); }
@@ -225,7 +228,6 @@ namespace zc {
       virtual bool TypeEq(const ASTType *other) const override;
       virtual bool TypeCoerce(const ASTType *from) const override;
       virtual void TypeCheck(SemantEnv& env, bool allow_void) override;
-      virtual void Enscope(SemantEnv& env) override;
       void EnscopeStruct(SemantEnv& env);
 
       virtual ASTType *Address() override;

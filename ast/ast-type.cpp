@@ -1,5 +1,6 @@
 #include <cassert>
 #include <stdexcept>
+#include <algorithm>
 
 #include "ast.hpp"
 #include "asm.hpp"
@@ -113,6 +114,14 @@ namespace zc {
       for (ASTType *type : vec()) {
          type->Enscope(env);
       }
+   }
+
+   ASTType *Types::Lookup(const Symbol *sym) const {
+      auto it = std::find_if(vec().begin(), vec().end(),
+                             [&](const ASTType *type) -> bool {
+                                return type->sym() == sym;
+                             });
+      return it == vec().end() ? nullptr : *it;
    }
    
  }

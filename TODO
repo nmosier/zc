@@ -35,6 +35,12 @@ SEMANTIC ANALYSIS
 [ ] Fix "incomplete type" error when declaring "void *"
 [ ] Add explicit cast expressions whenever needed so that types always match.
 [X] Always cast down logical expressions to char.
+[ ] Rename/reallocate variables (and structs) so that re-enscoping is not necessary during CodeGen.
+    For example, the outermost declaration of 'int a', say, could be labeled as '1', and the
+    innermost declaration of 'char a', say, could be labeled as '123', say. Each oterhwise
+    conflicting declaration would be assigned an unambiguous unique label.
+[ ] Handle case when types are forward-declared or defined in type casts.
+[ ] Check for duplicate struct members.
 
 AST
 [X] Add bindings of types to identifiers (TypeID, perhaps?)
@@ -46,6 +52,7 @@ AST
 [X] Get rid of virtual on ASTNodeVec
 [ ] Remove DeclSpecs
 [ ] Get rid of Sizes
+[ ] remove ExprKind::EXPR_NONE
 
 ASM
 [ ] Register attributes: loadable, movable, addable, etc.
@@ -70,3 +77,4 @@ LANGUAGE FEATURES
 [~] structs
 [ ] sizeof operator
 [ ] void param decl
+[ ] add struct access semantics

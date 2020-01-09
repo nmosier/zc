@@ -68,6 +68,14 @@ namespace zc {
       expr()->Dump(os, level, with_types);
    }
 
+   void MembExpr::DumpNode(std::ostream& os) const {
+      os << "MembExpr '" << *memb() << "' ";
+      type()->DumpNode(os);
+   }
+
+   void MembExpr::DumpChildren(std::ostream& os, int level, bool with_types) const {
+      expr()->Dump(os, level, with_types);
+   }
 
    bool BinaryExpr::is_logical() const {
       switch (kind()) {
