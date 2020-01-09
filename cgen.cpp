@@ -804,6 +804,17 @@ namespace zc {
       return block;
    }
 
+   Block *SizeofExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
+      struct CodeGenVisitor {
+         int operator()(const ASTType *type) { return type->bytes(); }
+         int operator()(const ASTExpr *expr) { return expr->type()->bytes(); }
+      };
+
+      int bytes = std::visit(CodeGenVisitor(), variant_);
+      block->instrs().push_back(new LoadInstruction(&rv_hl, new ImmediateValue(bytes, long_size)));
+      return block;
+   }
+
    /*** OTHER ***/
 
    static int label_counter = 0;

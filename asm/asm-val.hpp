@@ -43,6 +43,8 @@ namespace zc::z80 {
       
       template <typename... Args>
       ImmediateValue(const intmax_t& imm, Args... args): imm_(imm), Value(args...) {}
+
+      ImmediateValue(const intmax_t& imm);
       
    protected:
       intmax_t imm_;

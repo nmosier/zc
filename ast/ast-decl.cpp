@@ -45,7 +45,12 @@ namespace zc {
    Identifier *Decl::id() const { return declarator_->id(); }
 
    Symbol *ExternalDecl::sym() const { return decl()->sym(); }
-   Symbol *Decl::sym() const { return id()->id(); }
-
+   Symbol *Decl::sym() const {
+      if (id() != nullptr) {
+         return id()->id();
+      } else {
+         return nullptr;
+      }
+   }
 
 }

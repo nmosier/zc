@@ -245,7 +245,6 @@ namespace zc {
    };
 
    std::ostream& operator<<(std::ostream& os, IntegralType::IntKind kind);   
-   
 
 }
    

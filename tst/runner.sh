@@ -23,7 +23,7 @@ Options:
 EOF
 }
 
-while getopts "sphlq" Option
+while getopts "esphlq" Option
 do
     case $Option in
         s)
@@ -34,6 +34,9 @@ do
             ;;
         l)
             DIFF_LC_ONLY=1
+            ;;
+        e)
+            DIFF_NONEMPTY_ONLY=1
             ;;
         q)
             DIFF_CMD="cmp -s"
@@ -104,7 +107,16 @@ for test in "${tests[@]}"; do
        fi
     fi
 
-    if [[ $DIFF_LC_ONLY && $test_exit -eq 0 ]]; then
+    if [[ $DIFF_NONEMPTY_ONLY ]]; then
+        # Check if stderr is nonempty.
+        if [ -s "${test}.stderr" ] && ! [ -s "${OUT_DIR}/${name}.stderr" ]; then
+            echo "unexpected stderr output"
+            test_exit=1;            
+        elif ! [ -s "${test}.stderr" ] && [ -s "${OUT_DIR}/${name}.stderr" ]; then
+            echo "expected stderr output"
+            test_exit=1;
+        fi
+    elif [[ $DIFF_LC_ONLY && $test_exit -eq 0 ]]; then
         # Only compare numbers of lines...
         # if [[ $(awk 'END { print NR; }' "${test}.stderr") -gt $(awk 'END { print NR; }' "${OUT_DIR}/${name}.stderr") ]]; then
         if [[ `wc -l "${test}.stderr" | tr -s " " | cut -f2 -d" "` -ne `wc -l "${OUT_DIR}/${name}.stderr" | tr -s " " | cut -f2 -d" "` ]]; then

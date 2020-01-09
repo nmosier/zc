@@ -4,6 +4,7 @@
  #include "symtab.hpp"
  #include "semant.hpp"
  #include "c.tab.hpp"
+#include "util.hpp"
 
  extern const char *g_filename;
 
@@ -311,6 +312,14 @@
              type_ = memb_decl;
           }
        }
+    }
+
+    void SizeofExpr::TypeCheck(SemantEnv& env) {
+       std::visit(overloaded {
+             [&](auto val) { val->TypeCheck(env); }
+                }, variant_);
+
+       type_ = IntegralType::Create(IntegralType::IntKind::SPEC_LONG_LONG, loc());
     }
 
    void UnaryExpr::TypeCheck(SemantEnv& env) {

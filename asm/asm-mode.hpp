@@ -27,6 +27,12 @@ namespace zc::z80 {
 #endif
       ;
 
+   constexpr intmax_t byte_max = (1 << (byte_size * 8)) - 1;
+   constexpr intmax_t word_max = (1 << (word_size * 8)) - 1;
+   constexpr intmax_t long_max = (1 << (long_size * 8)) - 1;
+
+   
+
 }
 
 #endif

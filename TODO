@@ -53,6 +53,7 @@ AST
 [ ] Remove DeclSpecs
 [ ] Get rid of Sizes
 [ ] remove ExprKind::EXPR_NONE
+[ ] Add extra `immediate' operand "IntKind" type that is flexible
 
 ASM
 [ ] Register attributes: loadable, movable, addable, etc.
@@ -74,7 +75,7 @@ LANGUAGE FEATURES
 [ ] hexadecimal notation (0x...)
 [X] while loops
 [ ] for loops
-[~] structs
-[ ] sizeof operator
+[X] structs
+[~] sizeof operator
 [ ] void param decl
-[ ] add struct access semantics
+[X] add struct access semantics

@@ -43,7 +43,14 @@ C declaration specifiers come in a few different types: type specifiers (`void',
    I also wrote some basic struct declaration tests for the semantic analyzer. It passes those.
 
 [1 hr]
-
+   I implemented code generation for structs and struct member access and wrote a couple tests; it appears to be working. I also fixed some semantic analysis bugs along the way.
+   I expect there a few bugs related to declaration (including struct declaration) semantics currently:
+     [ ] If a declaration is simply an unbound type (e.g. in the above ``struct coords'' example), the compiler currently still allocates storage for it. This is due to a quirk in how bound declarations
+         and unbound types are (or, rather, aren't) distinguished. There's got to be a better way to distinguish bound and unbound types, but I can't haven't found one yet.
+   And anticipated struct codegen bugs:
+     [ ] compiler aborts if one struct is (validly) assigned to another of the same type. In the future, this kind of assignment should result in a call to memcpy().
+   Next, I'll work on ... the sizeof operator!
+   
 
 
 Observations: structs can be forward-declared and defined in type casts!

@@ -1,4 +1,5 @@
 #include "ast.hpp"
+#include "util.hpp"
 
 namespace zc {
 
@@ -92,5 +93,12 @@ namespace zc {
          return false;
       }
    }
-   
+
+   void SizeofExpr::DumpChildren(std::ostream& os, int level, bool with_types) const {
+      std::visit(overloaded {
+            [&](const ASTType *type) { type->Dump(os, level, with_types); },
+            [&](const ASTExpr *expr) { expr->Dump(os, level, with_types); }
+         }, variant_);
+   }
+
 }

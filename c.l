@@ -49,6 +49,7 @@ E  [Ee][+-]?{D}+
 "int" { return INT; }
 "long" { return LONG; }
 "struct" { return STRUCT; }
+"sizeof" { return SIZEOF; }
 
 "return" { return RETURN; }
 

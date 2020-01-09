@@ -21,11 +21,17 @@ namespace zc {
    }
 
    /*** VISITATION & VARIANTS ***/
+#if 0
    template <class ...Fs>
    struct visitor : Fs... {
       visitor(Fs const&... fs): Fs{fs}... {}
       using Fs::operator()...;
    };
+#endif
+
+   
+   template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+   template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
    
 }
 

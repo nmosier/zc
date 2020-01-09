@@ -6,6 +6,7 @@
 #define __AST_EXPR_HPP
 
 #include <cstdint>
+#include <variant>
 
 #include "symtab.hpp"
 
@@ -271,6 +272,29 @@ namespace zc {
       MembExpr(ASTExpr *expr, Symbol *memb, Args... args):
          ASTExpr(args...), expr_(expr), memb_(memb) {}
    };
+
+   class SizeofExpr: public ASTExpr {
+      typedef std::variant<ASTType *, ASTExpr *> Variant;
+   public:
+      ExprKind expr_kind() const override { return ExprKind::EXPR_RVALUE; }
+      
+      template <typename... Args>
+      static SizeofExpr *Create(Args... args) { return new SizeofExpr(args...); }
+
+      virtual void DumpNode(std::ostream& os) const override { os << "DumpNode"; }
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
+
+      virtual void TypeCheck(SemantEnv& env) override;
+
+      virtual Block *CodeGen(CgenEnv& env, Block *block, ExprKind mode) override;
+      
+   protected:
+      Variant variant_;
+
+      template <class V, typename... Args>
+      SizeofExpr(const V& v, Args... args): ASTExpr(args...), variant_(v) {}
+   };
+   
 }
 
 #endif

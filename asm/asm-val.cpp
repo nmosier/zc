@@ -74,4 +74,15 @@ namespace zc::z80 {
       return new MemoryValue(loc()->Advance(-next_size), next_size);
    }
 
+
+   ImmediateValue::ImmediateValue(const intmax_t& imm): Value(long_size), imm_(imm) {
+      if (imm <= byte_max) {
+         size_ = byte_size;
+      } else if (imm <= word_max) {
+         size_ = word_size;
+      } else if (imm <= long_max) {
+         size_ = long_size;
+      }
+   }
+
 }
