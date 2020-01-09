@@ -36,6 +36,7 @@ limitations under the License.
 #include <iostream>
 #include <unistd.h>     // getopt
 #include <stdio.h>
+#include <fstream>
 
 #include "ast.hpp"
 #include "semant.hpp"
@@ -82,12 +83,20 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  auto firstfile_index = optind;
+
+  std::ifstream ifs;  
+  if (firstfile_index < argc) {
+      ifs.open(argv[firstfile_index]);
+      g_istream = &ifs;
+  }  
+
   // Parse AST dump
   if (yyparse()) {
      std::cout << "parsing failed; terminating..." << std::endl;
      exit(1);
   }
-  
+
   zc::Semant(g_AST_root);
 
   g_AST_root->Dump(std::cout, 0, true); /* dump types as well */

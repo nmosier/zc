@@ -37,6 +37,7 @@ limitations under the License.
 #include <iostream>
 #include <fstream>
 #include <unistd.h>
+#include <stdio.h>
 
 #include "ast.hpp"
 #include "cgen.hpp"
@@ -111,7 +112,18 @@ int main(int argc, char *argv[]) {
 
   auto firstfile_index = optind;
 
+  if (firstfile_index < argc) {
+     if ((stdin = fopen(argv[firstfile_index], "r")) == NULL) {
+        perror("fopen");
+        exit(1);
+     }
+  }
+
   yyparse();
+
+  fclose(stdin);
+
+  Semant(g_AST_root);
 
   // Don't touch the output file until we know that earlier phases of the
   // compiler have succeeded.
@@ -143,7 +155,6 @@ int main(int argc, char *argv[]) {
   }
 
   /* code generation: 1st pass (code gen) */
-  Semant(g_AST_root);
   Cgen(g_AST_root, output_stream, out_filename.c_str());
   
   return 0;

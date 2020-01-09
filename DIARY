@@ -3,5 +3,24 @@ TASK: Add support for structs.
  * ...
 
 01/08/2020
+
+Today, I continued working on adding support for structs. This involves
+       (1) declaring the STRUCT token in the parser and adding a rule to the lexer to tokenize `struct' into STRUCT,
+       (2) adding productions to the `decl_specs' non-terminal in the parser's grammar file so that it recognizes `struct' type specifiers,
+       (3) implementing some kind of scoping mechanism for struct declaration,
+       (4) adding type checking functions to ensure structs aren't redefined and that they are defined when used, and finally
+       (5) generate code for reserving storage for structs and accessing struct members.
+
+
+In the process of doing this, I started to enounter issues with 
 TASK: Continue adding support for structs.
- ...
+
+TASK: Improve handling of declaration specifiers.
+C declaration specifiers come in a few different types: type specifiers (`void', `char', `int', etc.), storage class specifiers (`extern', `static', etc.), and type qualifiers (`const', `volatile', etc.). Currently, zc only supports most type specifiers but no storage class specifiers or type qualifiers.
+
+
+@@@@@@@@@@@@@@@
+[1 hr] Set up basic testing infrastructure.
+   I copied the "runner.sh" script from Professor Linderman's midd-cool-osx GitHub repository and made a few changes to make it work better with zc's semant-main and cgen-main compiler drivers. I also created a new "tst/semant" directory and placed some simple tests in there. More complex ones are to come.
+
+
