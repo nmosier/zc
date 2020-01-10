@@ -119,9 +119,17 @@ int main(int argc, char *argv[]) {
      g_istream = &ifs;
   }
 
-  yyparse();
+  if (yyparse()) {
+     std::cout << "parsing failed; terminating..." << std::endl;
+     exit(1);
+  }
 
   Semant(g_AST_root);
+
+  if (zc::g_semant_error.errors() > 0) {
+     std::cerr << "Encountered semantic errors, exiting..." << std::endl;
+     exit(0);
+  }
 
   // Don't touch the output file until we know that earlier phases of the
   // compiler have succeeded.

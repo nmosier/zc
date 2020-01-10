@@ -51,6 +51,9 @@ C declaration specifiers come in a few different types: type specifiers (`void',
      [ ] compiler aborts if one struct is (validly) assigned to another of the same type. In the future, this kind of assignment should result in a call to memcpy().
    Next, I'll work on ... the sizeof operator!
    
-
-
-Observations: structs can be forward-declared and defined in type casts!
+[2 hrs]
+   I added the ``sizeof'' operator. ``sizeof'' is a compile-time operator that accepts two kinds of arguments -- types and expressions -- and returns the number of bytes the argument requires
+   for storage. I added the syntactic rules for ``sizeof'' in the parser grammer, added the ``SIZEOF'' token to the lexer, and created a new expression class, ``SizeofExpr''.
+   ``SizeofExpr'' has a variant member that holds an ASTType or another ASTExpr. During semantic analysis, both the ASTType and ASTExpr are type-checked (in the pedantic case, a struct may be defined
+   within the type!), but during codegen, the ``sizeof'' expression collapses to an immediate value (no code is generated for the possible subexpression).
+   Next, I'll work on ... 

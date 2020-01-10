@@ -134,7 +134,7 @@
     void StructType::EnscopeStruct(SemantEnv& env) {
        assert(struct_id() != nullptr); /* ensure struct isn't anonymous */
 
-       StructType *type = env.structs().Probe(struct_id());
+       StructType *type = env.structs().Lookup(struct_id());
        if (type == nullptr) {
           /* first mention of struct */
           env.structs().AddToScope(struct_id(), this);
@@ -149,8 +149,10 @@
           if (membs() == nullptr) {
              membs_ = type->membs();
           } else {
-             env.error()(g_filename, this) << "redefinition of struct '" << *struct_id()
-                                           << "'" << std::endl;
+             if (env.structs().Probe(struct_id()) != nullptr) {
+                env.error()(g_filename, this) << "redefinition of struct '" << *struct_id()
+                                              << "'" << std::endl;
+             }
           }
        }
     }

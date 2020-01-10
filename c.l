@@ -85,6 +85,7 @@ E  [Ee][+-]?{D}+
 "<=" { return LEQ; }
 "==" { return EQ; }
 "!=" { return NEQ; }
+"->" { return ARROW; }
 
     /* single character tokens */
 [;{},:=()[\].&!~\-+*/%<>^|?] { return yytext[0]; }
