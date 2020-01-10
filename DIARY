@@ -69,4 +69,7 @@ Next, I wrote a couple tests for the arrow operator, which is when I started to 
 
 01/10/2020
 
+[4 hrs] I added both array 
 Good news: pointers to arrays don't decay into double pointers, thankfully.
+
+unions

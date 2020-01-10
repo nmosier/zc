@@ -364,7 +364,7 @@
                                        loc());
           }
        }
-       type_ = base()->type();
+       type_ = base()->type()->get_containee();
     }
 
    void UnaryExpr::TypeCheck(SemantEnv& env) {

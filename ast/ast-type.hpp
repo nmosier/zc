@@ -31,7 +31,7 @@ namespace zc {
        * Whether type contains another type (i.e. is a pointer or array).
        */
       bool is_container() const { return get_containee() != nullptr; }
-      virtual const ASTType *get_containee() const { return nullptr; }
+      virtual ASTType *get_containee() const { return nullptr; }
 
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
 
@@ -97,7 +97,7 @@ namespace zc {
    public:
       virtual Kind kind() const override { return Kind::TYPE_POINTER; }
       virtual const FunctionType *get_callable() const override;
-      virtual const ASTType *get_containee() const override { return pointee(); }
+      virtual ASTType *get_containee() const override { return pointee(); }
       int depth() const { return depth_; }
       ASTType *pointee() const { return pointee_; }
       
@@ -255,7 +255,7 @@ namespace zc {
       ASTType *elem() const { return elem_; }
       ASTExpr *count() const { return count_; }
       intmax_t int_count() const { return int_count_; }
-      virtual const ASTType *get_containee() const override { return elem(); }            
+      virtual ASTType *get_containee() const override { return elem(); }            
 
       virtual void DumpNode(std::ostream& os) const override;
 

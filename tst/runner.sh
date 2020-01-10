@@ -110,10 +110,11 @@ for test in "${tests[@]}"; do
     if [[ $DIFF_NONEMPTY_ONLY ]]; then
         # Check if stderr is nonempty.
         if [ -s "${test}.stderr" ] && ! [ -s "${OUT_DIR}/${name}.stderr" ]; then
-            echo "unexpected stderr output"
+            echo "expected stderr output"
             test_exit=1;            
         elif ! [ -s "${test}.stderr" ] && [ -s "${OUT_DIR}/${name}.stderr" ]; then
-            echo "expected stderr output"
+            echo "unexpected stderr output"
+            cat "${OUT_DIR}/${name}.stderr"
             test_exit=1;
         fi
     elif [[ $DIFF_LC_ONLY && $test_exit -eq 0 ]]; then

@@ -820,12 +820,26 @@ namespace zc {
       block->instrs().push_back
          (new LoadInstruction
           (&rv_bc,
-           new ImmediateValue(type()->get_containee()->bytes(), long_size)));
+           new ImmediateValue(type()->bytes(), long_size)));
       emit_crt("__imuls", block);
       block->instrs().push_back(new PushInstruction(&rv_hl));
       block = base()->CodeGen(env, block, ExprKind::EXPR_LVALUE);
       block->instrs().push_back(new PopInstruction(&rv_de));
       block->instrs().push_back(new AddInstruction(&rv_hl, &rv_de));
+
+      switch (mode) {
+      case ExprKind::EXPR_LVALUE:
+         break;
+         
+      case ExprKind::EXPR_RVALUE:
+         {
+            MemoryValue *val = new MemoryValue(new MemoryLocation(&rv_hl), type()->bytes());
+            block->instrs().push_back(new LoadInstruction
+                                      (new RegisterValue(return_register(type()->bytes())), val));
+         }
+         break;
+      case ExprKind::EXPR_NONE: abort();
+      }
       return block;
    }
 
