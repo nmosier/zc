@@ -302,6 +302,11 @@ namespace zc {
     * Emit CRT frameunset.
     */
    void emit_frameunset(CgenEnv& env, Block *block);
+
+   /**
+    * Emit call to CRT routine.
+    */
+   void emit_crt(const std::string& name, Block *block);
    
    /*** C RUNTIME ***/
    const Label crt_l_indcall("__indcall");

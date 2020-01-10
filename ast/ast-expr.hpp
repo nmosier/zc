@@ -16,7 +16,8 @@ namespace zc {
 
    class AssignmentExpr: public ASTBinaryExpr {
    public:
-      virtual ExprKind expr_kind() const override;      
+      virtual ExprKind expr_kind() const override;
+      virtual bool is_const() const override { return false; }
 
       static AssignmentExpr *Create(ASTExpr *lhs, ASTExpr *rhs, const SourceLoc& loc) {
          return new AssignmentExpr(lhs, rhs, loc);
@@ -43,7 +44,9 @@ namespace zc {
       };
       Kind kind() const { return kind_; }
       const char *kindstr() const;
-      virtual ExprKind expr_kind() const override;      
+      virtual ExprKind expr_kind() const override;
+      virtual bool is_const() const override;
+      virtual intmax_t int_const() const override;
       
       static UnaryExpr *Create(Kind kind, ASTExpr *expr, const SourceLoc& loc) {
          return new UnaryExpr(kind, expr, loc);
@@ -60,8 +63,6 @@ namespace zc {
       UnaryExpr(Kind kind, ASTExpr *expr, const SourceLoc& loc): ASTUnaryExpr(expr, loc), kind_(kind) {}
    };
 
-
-   
    class BinaryExpr: public ASTBinaryExpr {
    public:
       enum class Kind {BOP_LOGICAL_AND,
@@ -83,6 +84,8 @@ namespace zc {
       };
       Kind kind() const { return kind_; }
       bool is_logical() const;
+      virtual bool is_const() const override;
+      virtual intmax_t int_const() const override;      
       
       static BinaryExpr *Create(Kind kind, ASTExpr *lhs, ASTExpr *rhs, const SourceLoc& loc)
       { return new BinaryExpr(kind, lhs, rhs, loc); }
@@ -106,7 +109,9 @@ namespace zc {
    class LiteralExpr: public ASTExpr {
    public:
       const intmax_t& val() const { return val_; }
-      virtual ExprKind expr_kind() const override;      
+      virtual ExprKind expr_kind() const override;
+      virtual bool is_const() const override { return true; }
+      virtual intmax_t int_const() const override { return val_; }
       
       static LiteralExpr *Create(const intmax_t& val, const SourceLoc& loc) {
          return new LiteralExpr(val, loc);
@@ -129,7 +134,9 @@ namespace zc {
    class StringExpr: public ASTExpr {
    public:
       const std::string *str() const { return str_; }
-      virtual ExprKind expr_kind() const override;      
+      virtual ExprKind expr_kind() const override;
+      virtual bool is_const() const override { return true; }
+      
       static StringExpr *Create(const std::string& str, const SourceLoc& loc)
       { return new StringExpr(str, loc); }
 
@@ -157,6 +164,7 @@ namespace zc {
    public:
       Identifier *id() const { return id_; }
       virtual ExprKind expr_kind() const override;
+      virtual bool is_const() const override { return false; }
       
       static IdentifierExpr *Create(Identifier *id, const SourceLoc& loc) {
          return new IdentifierExpr(id, loc);
@@ -177,6 +185,8 @@ namespace zc {
    class NoExpr: public ASTExpr {
    public:
       virtual ExprKind expr_kind() const override { return ExprKind::EXPR_NONE; }
+      virtual bool is_const() const override { return false; }
+      
       static NoExpr *Create(const SourceLoc& loc) { return new NoExpr(loc); }
 
       virtual void DumpNode(std::ostream& os) const override { os << "NoExpr"; }
@@ -197,6 +207,7 @@ namespace zc {
    class CallExpr: public ASTExpr {
    public:
       virtual ExprKind expr_kind() const override { return ExprKind::EXPR_RVALUE; }
+      virtual bool is_const() const override { return false; }
       ASTExpr *fn() const { return fn_; }
       ASTExprs *params() const { return params_; }
 
@@ -226,6 +237,8 @@ namespace zc {
    public:
       virtual ExprKind expr_kind() const override { return ExprKind::EXPR_RVALUE; }
       ASTExpr *expr() const { return expr_; }
+      virtual bool is_const() const override { return expr()->is_const(); }
+      virtual intmax_t int_const() const override;
 
       template <typename... Args>
       static CastExpr *Create(Args... args) { return new CastExpr(args...); }
@@ -253,6 +266,7 @@ namespace zc {
       ASTExpr *expr() const { return expr_; }
       Symbol *memb() const { return memb_; }
       virtual ExprKind expr_kind() const override { return ExprKind::EXPR_LVALUE; }
+      virtual bool is_const() const override { return false; }
 
       template <typename... Args>
       static MembExpr *Create(Args... args) { return new MembExpr(args...); }
@@ -276,7 +290,9 @@ namespace zc {
    class SizeofExpr: public ASTExpr {
       typedef std::variant<ASTType *, ASTExpr *> Variant;
    public:
-      ExprKind expr_kind() const override { return ExprKind::EXPR_RVALUE; }
+      virtual ExprKind expr_kind() const override { return ExprKind::EXPR_RVALUE; }
+      virtual bool is_const() const override { return true; }
+      virtual intmax_t int_const() const override;
       
       template <typename... Args>
       static SizeofExpr *Create(Args... args) { return new SizeofExpr(args...); }
@@ -294,6 +310,35 @@ namespace zc {
       template <class V, typename... Args>
       SizeofExpr(const V& v, Args... args): ASTExpr(args...), variant_(v) {}
    };
+   
+   class IndexExpr: public ASTExpr {
+   public:
+      virtual ExprKind expr_kind() const override { return ExprKind::EXPR_LVALUE; }
+      ASTExpr *base() const { return base_; }
+      ASTExpr *index() const { return index_; }
+      virtual bool is_const() const override { return false; } /* TODO: is actually const if
+                                                                * expr is string constant.
+                                                                * Need to create CONST enum
+                                                                * first. */
+      // virtual intmax_t int_const() const override;
+
+      template <typename... Args>
+      static IndexExpr *Create(Args... args) { return new IndexExpr(args...); }
+
+      virtual void DumpNode(std::ostream& os) const override { os << "IndexExpr"; }
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
+      virtual void TypeCheck(SemantEnv& env) override;
+      virtual Block *CodeGen(CgenEnv& env, Block *block, ExprKind mode) override;
+      
+   protected:
+      ASTExpr *base_;
+      ASTExpr *index_;
+      
+      template <typename... Args>
+      IndexExpr(ASTExpr *base, ASTExpr *index, Args... args):
+         ASTExpr(args...), base_(base), index_(index) {}
+   };
+
    
 }
 

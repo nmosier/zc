@@ -56,4 +56,17 @@ C declaration specifiers come in a few different types: type specifiers (`void',
    for storage. I added the syntactic rules for ``sizeof'' in the parser grammer, added the ``SIZEOF'' token to the lexer, and created a new expression class, ``SizeofExpr''.
    ``SizeofExpr'' has a variant member that holds an ASTType or another ASTExpr. During semantic analysis, both the ASTType and ASTExpr are type-checked (in the pedantic case, a struct may be defined
    within the type!), but during codegen, the ``sizeof'' expression collapses to an immediate value (no code is generated for the possible subexpression).
-   Next, I'll work on ... 
+   Next, I'll work on ... adding the ``->'' operator.
+
+[2 hrs]
+   Adding the arrow operator was relatively straightforward: all it required was adding the applicable lexer/parser rules. It didn't require any extra work on the semantic analyzer or code generator, since I had already implemented '.' semantics, and
+          coords->x
+is semantically equivalent to
+          (*coords).x
+Accordingly, the new rule in the parser simply takes the left-hand expression, wraps it in a dereference unary operation, and then creates a ``MembExpr'' object.
+Next, I wrote a couple tests for the arrow operator, which is when I started to encounter strange behavior. When I ran a simple test on semant-main, it correctly did not report any errors; however, when I ran the same test on cgen-main, it did report errors (but only when the test was on stdin, rather than passed as a command-line argument). I figured out I was referencing the wrong variable in the StructType::EnscopeStruct function, and I fixed the issue. (This didn't explain the difference in behavior, however.)
+      Next, I'll work on adding arrays.
+
+01/10/2020
+
+Good news: pointers to arrays don't decay into double pointers, thankfully.

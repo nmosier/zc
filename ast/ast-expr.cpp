@@ -1,3 +1,5 @@
+#include <unordered_map>
+
 #include "ast.hpp"
 #include "util.hpp"
 
@@ -101,4 +103,72 @@ namespace zc {
          }, variant_);
    }
 
+   bool UnaryExpr::is_const() const {
+      std::unordered_set<Kind> set
+         {Kind::UOP_POSITIVE,
+          Kind::UOP_NEGATIVE,
+          Kind::UOP_BITWISE_NOT,
+          Kind::UOP_LOGICAL_NOT
+         };
+      return set.find(kind()) != set.end() ? expr()->is_const() : false;
+   }
+
+   bool BinaryExpr::is_const() const {
+      return lhs()->is_const() && rhs()->is_const();
+   }
+   
+   intmax_t UnaryExpr::int_const() const {
+      intmax_t i = expr()->int_const();
+      switch (kind()) {
+      case Kind::UOP_POSITIVE: return i;
+      case Kind::UOP_NEGATIVE: return -i;
+      case Kind::UOP_BITWISE_NOT: return ~i;
+      case Kind::UOP_LOGICAL_NOT: return !i;
+      case Kind::UOP_ADDR:
+      case Kind::UOP_DEREFERENCE:
+         abort();
+      }
+   }
+
+   intmax_t BinaryExpr::int_const() const {
+      intmax_t l = lhs()->int_const();
+      intmax_t r = rhs()->int_const();
+      switch (kind()) {
+      case Kind::BOP_LOGICAL_AND: return l && r;
+      case Kind::BOP_BITWISE_AND: return l &  r;
+      case Kind::BOP_LOGICAL_OR:  return l || r;
+      case Kind::BOP_BITWISE_OR:  return l |  r;
+      case Kind::BOP_BITWISE_XOR: return l ^  r;
+      case Kind::BOP_EQ:          return l == r;
+      case Kind::BOP_NEQ:         return l != r;
+      case Kind::BOP_LT:          return l <  r;
+      case Kind::BOP_LEQ:         return l <= r;
+      case Kind::BOP_GT:          return l >  r;
+      case Kind::BOP_GEQ:         return l >= r;
+      case Kind::BOP_PLUS:        return l +  r;
+      case Kind::BOP_MINUS:       return l -  r;
+      case Kind::BOP_TIMES:       return l *  r;
+      case Kind::BOP_DIVIDE:      return l /  r;
+      case Kind::BOP_MOD:         return l %  r;
+      }
+   }
+
+   intmax_t CastExpr::int_const() const {
+      intmax_t i = expr()->int_const();
+      int bytes = type()->bytes();
+      /* round down integer */
+      return i % (1 << (bytes * 8));
+   }
+
+   intmax_t SizeofExpr::int_const() const {
+      return std::visit(overloaded {
+                             [](ASTType *type) -> intmax_t { return type->bytes(); },
+                             [](ASTExpr *expr) -> intmax_t { return expr->type()->bytes(); }
+         }, variant_);
+   }
+
+   void IndexExpr::DumpChildren(std::ostream& os, int level, bool with_types) const {
+      base()->Dump(os, level, with_types);
+      index()->Dump(os, level, with_types);      
+   }
 }

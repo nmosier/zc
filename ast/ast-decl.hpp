@@ -169,9 +169,10 @@ namespace zc {
    class ASTDeclarator: public ASTNode {
    public:
       /** The fundamental kind of declarator. */
-      enum class Kind {DECLARATOR_POINTER,   /*!< pointer */
-                       DECLARATOR_BASIC,     /*!< direct value */
-                       DECLARATOR_FUNCTION}; /*!< function */
+      enum class Kind {DECLARATOR_POINTER,
+                       DECLARATOR_BASIC, 
+                       DECLARATOR_FUNCTION,
+                       DECLARATOR_ARRAY};
       virtual Identifier *id() const = 0;
       virtual Kind kind() const = 0;
 
@@ -278,6 +279,32 @@ namespace zc {
 
       FunctionDeclarator(ASTDeclarator *declarator, Types *params, const SourceLoc& loc):
          ASTDeclarator(loc), declarator_(declarator), params_(params) {}
+   };
+
+   class ArrayDeclarator: public ASTDeclarator {
+   public:
+      ASTDeclarator *declarator() const { return declarator_; }
+      ASTExpr *count_expr() const { return count_expr_; }
+      virtual Identifier *id() const override { return declarator_->id(); }
+      virtual Kind kind() const override { return Kind::DECLARATOR_ARRAY; }
+
+      template <typename... Args>
+      static ArrayDeclarator *Create(Args... args) { return new ArrayDeclarator(args...); }
+
+      virtual void DumpNode(std::ostream& os) const override { os << "ArrayDeclarator"; }
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
+      virtual void TypeCheck(SemantEnv& env) override;
+      virtual ASTType *Type(ASTType *init_type) const override;
+      virtual void JoinPointers() override { declarator()->JoinPointers(); }
+
+      
+   protected:
+      ASTDeclarator *declarator_;
+      ASTExpr *count_expr_;
+
+      template <typename... Args>
+      ArrayDeclarator(ASTDeclarator *declarator, ASTExpr *count_expr, Args... args):
+         ASTDeclarator(args...), declarator_(declarator), count_expr_(count_expr) {}
    };
 
 

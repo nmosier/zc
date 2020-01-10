@@ -815,6 +815,22 @@ namespace zc {
       return block;
    }
 
+   Block *IndexExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
+      block = index()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
+      block->instrs().push_back
+         (new LoadInstruction
+          (&rv_bc,
+           new ImmediateValue(type()->get_containee()->bytes(), long_size)));
+      emit_crt("__imuls", block);
+      block->instrs().push_back(new PushInstruction(&rv_hl));
+      block = base()->CodeGen(env, block, ExprKind::EXPR_LVALUE);
+      block->instrs().push_back(new PopInstruction(&rv_de));
+      block->instrs().push_back(new AddInstruction(&rv_hl, &rv_de));
+      return block;
+   }
+
+
+   
    /*** OTHER ***/
 
    static int label_counter = 0;
@@ -964,6 +980,11 @@ namespace zc {
          break;
       default: abort();
       }
+   }
+
+   void emit_crt(const std::string& name, Block *block) {
+      const LabelValue *lv = crt.val(name);
+      block->instrs().push_back(new CallInstruction(lv));
    }
 
    Block *emit_ld_a_zf(CgenEnv& env, Block *block, bool inverted) {
@@ -1268,6 +1289,10 @@ namespace zc {
 
    int StructType::bytes() const {
       return membs()->bytes();
+   }
+
+   int ArrayType::bytes() const {
+      return elem()->bytes() * int_count();
    }
 
    int StructType::offset(const Symbol *sym) {

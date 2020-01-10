@@ -110,6 +110,10 @@ namespace zc {
                         *   of an assignment */
          };
       virtual ExprKind expr_kind() const = 0;
+      virtual bool is_const() const = 0;
+      virtual intmax_t int_const() const {
+         throw std::logic_error("attempt to evaluate expression that is not constant");
+      }
       
       virtual void TypeCheck(SemantEnv& env) = 0;
 

@@ -53,4 +53,9 @@ namespace zc {
       }
    }
 
+   void ArrayDeclarator::DumpChildren(std::ostream& os, int level, bool with_types) const {
+      declarator()->Dump(os, level, with_types);
+      count_expr()->Dump(os, level, with_types);
+   }
+
 }

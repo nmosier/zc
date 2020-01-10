@@ -1,10 +1,11 @@
 #include <unordered_set>
 
  #include "ast.hpp"
+ #include "asm.hpp"
  #include "symtab.hpp"
  #include "semant.hpp"
  #include "c.tab.hpp"
-#include "util.hpp"
+ #include "util.hpp"
 
  extern const char *g_filename;
 
@@ -131,6 +132,21 @@
        }
     }
 
+    void ArrayType::TypeCheck(SemantEnv& env, bool allow_void) {
+       /* For now, assert that size parameter for arrays must always be given. */
+       elem()->TypeCheck(env, false);
+
+       if (count()->is_const()) {
+          if ((int_count_ = count()->int_const()) < 0) {
+             env.error()(g_filename, this) << "array has negative size" << std::endl;
+             int_count_ *= -1;
+          }
+       } else {
+          env.error()(g_filename, this) << "array size must be constant expression" << std::endl;
+          int_count_ = 0;
+       }
+    }
+
     void StructType::EnscopeStruct(SemantEnv& env) {
        assert(struct_id() != nullptr); /* ensure struct isn't anonymous */
 
@@ -156,6 +172,7 @@
           }
        }
     }
+
 
     void Types::TypeCheck(SemantEnv& env) {
        ASTNodeVec::TypeCheck(env);
@@ -187,6 +204,14 @@
     void FunctionDeclarator::TypeCheck(SemantEnv& env) {
        declarator()->TypeCheck(env);
        params()->TypeCheck(env);
+    }
+
+    void ArrayDeclarator::TypeCheck(SemantEnv& env) {
+       declarator()->TypeCheck(env);
+       count_expr()->TypeCheck(env);
+       if (!count_expr()->is_const()) {
+          env.error()(g_filename, this) << "array size expression is not constant" << std::endl;
+       }
     }
     
    void CompoundStat::TypeCheck(SemantEnv& env, bool scoped) {
@@ -322,6 +347,24 @@
                 }, variant_);
 
        type_ = IntegralType::Create(IntegralType::IntKind::SPEC_LONG_LONG, loc());
+    }
+
+    void IndexExpr::TypeCheck(SemantEnv& env) {
+       using IntKind = IntegralType::IntKind;
+       
+       base()->TypeCheck(env);
+       index()->TypeCheck(env);
+       if (index()->type()->kind() != ASTType::Kind::TYPE_INTEGRAL) {
+          env.error()(g_filename, this) << "cannot index type with a non-integral value"
+                                        << std::endl;
+       } else {
+          const IntegralType *int_type = dynamic_cast<const IntegralType *>(index()->type());
+          if (int_type->bytes() != z80::long_size) {
+             index_ = CastExpr::Create(IntegralType::Create(IntKind::SPEC_LONG, loc()), index(),
+                                       loc());
+          }
+       }
+       type_ = base()->type();
     }
 
    void UnaryExpr::TypeCheck(SemantEnv& env) {
@@ -545,6 +588,13 @@
       if (this->TypeEq(from)) {
          return true;
       }
+
+      /* check if `from' is an array. */
+      const ArrayType *from_arr = dynamic_cast<const ArrayType *>(from);
+      if (from_arr != nullptr) {
+         /* ensure base elements are of same type */
+         return from_arr->TypeEq(pointee());
+      }
       
       /* 0. Verify `from' is a pointer. */
       const PointerType *from_ptr = dynamic_cast<const PointerType *>(from);
@@ -618,6 +668,10 @@
       case Kind::DECLARATOR_FUNCTION:
          /* tricky: pointer is actualy part of the return value type */
          return declarator()->Type(PointerType::Create(depth(), type, type->sym(), loc()));
+
+      case Kind::DECLARATOR_ARRAY:
+         /* pointer is part of the element type. */
+         return declarator()->Type(PointerType::Create(depth(), type, type->sym(), loc()));
       }
    }
 
@@ -638,8 +692,38 @@
          /* This function is actually the RETURN TYPE of another function declared
           * _declarator()_. */
          return declarator()->Type(FunctionType::Create(type, param_types, type->sym(), loc()));
+
+      case Kind::DECLARATOR_ARRAY:
+         /* Who in their right mind would try to declare an array of functions?! */
+         const char *errmsgs[2] = {"who in their right mind would try to declare" \
+                                   " an array of functions?",
+                                   "please consider, well, uh, NOT declaring an array of " \
+                                   "functions?"};
+         g_semant_error(g_filename, this) << errmsgs[(intptr_t) this % 7 % 2] << std::endl;
+         return declarator()->Type(PointerType::Create(1, type, type->sym(), loc()));
       }
    }
+
+    ASTType *ArrayDeclarator::Type(ASTType *type) const {
+       /* NOTE: _type_ represents the (possibly partial) element type of this array. */
+       switch (declarator()->kind()) {
+       case Kind::DECLARATOR_BASIC:
+          return ArrayType::Create(type, count_expr(), type->sym(), loc());
+          
+       case Kind::DECLARATOR_POINTER:
+          /* Actually a pointer to an array. */
+          return declarator()->Type(ArrayType::Create(type, count_expr(), type->sym(), loc()));
+
+       case Kind::DECLARATOR_FUNCTION:
+          /* Functions can't return arrays. */
+          g_semant_error(g_filename, this) << "functions can't return arrays" << std::endl;
+          return declarator()->Type(PointerType::Create(1, type, type->sym(), loc()));
+
+       case Kind::DECLARATOR_ARRAY:
+          /* Swap array order. */
+          return declarator()->Type(ArrayType::Create(type, count_expr(), type->sym(), loc()));
+       }
+    }
 
    ASTType *Decl::Type() const {
       ASTType *init_type = specs();
@@ -668,6 +752,11 @@
     ASTType *StructType::Address() {
        return PointerType::Create(1, this, loc());
     }
+
+    ASTType *ArrayType::Address() {
+       return PointerType::Create(1, this, loc());
+    }
+          
     
     /*** DEREFERENCE TYPE ***/
     ASTType *PointerType::Dereference(SemantEnv *env) {
@@ -689,8 +778,7 @@
        }
        return nullptr;
     }
-    
-    
+
     /*** ENSCOPE ***/
     void TranslationUnit::Enscope(SemantEnv& env) const {
        env.EnterScope();

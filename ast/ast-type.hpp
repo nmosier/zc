@@ -18,13 +18,20 @@ namespace zc {
                        TYPE_INTEGRAL,
                        TYPE_POINTER,
                        TYPE_FUNCTION,
-                       TYPE_STRUCT};
+                       TYPE_STRUCT,
+                       TYPE_ARRAY};
       virtual Kind kind() const = 0;
       Symbol *sym() const { return sym_; }
       void set_sym(Symbol *sym) { sym_ = sym; }
 
       bool is_callable() const { return get_callable() != nullptr; }
-      virtual const FunctionType *get_callable() const = 0;
+      virtual const FunctionType *get_callable() const { return nullptr; }
+
+      /**
+       * Whether type contains another type (i.e. is a pointer or array).
+       */
+      bool is_container() const { return get_containee() != nullptr; }
+      virtual const ASTType *get_containee() const { return nullptr; }
 
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
 
@@ -90,6 +97,7 @@ namespace zc {
    public:
       virtual Kind kind() const override { return Kind::TYPE_POINTER; }
       virtual const FunctionType *get_callable() const override;
+      virtual const ASTType *get_containee() const override { return pointee(); }
       int depth() const { return depth_; }
       ASTType *pointee() const { return pointee_; }
       
@@ -153,7 +161,6 @@ namespace zc {
    class VoidType: public ASTType {
    public:
       virtual Kind kind() const override { return Kind::TYPE_VOID; }
-      virtual const FunctionType *get_callable() const override { return nullptr; }
       
       virtual void DumpNode(std::ostream& os) const override { os << "VoidType VOID"; }
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
@@ -185,7 +192,6 @@ namespace zc {
       enum class IntKind {SPEC_CHAR, SPEC_SHORT, SPEC_INT, SPEC_LONG, SPEC_LONG_LONG};
       virtual Kind kind() const override { return Kind::TYPE_INTEGRAL; }
       IntKind int_kind() const { return int_kind_; }
-      virtual const FunctionType *get_callable() const override { return nullptr; }
 
       virtual void DumpNode(std::ostream& os) const override;
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
@@ -215,7 +221,6 @@ namespace zc {
    class StructType: public ASTType {
    public:
       virtual Kind kind() const override { return Kind::TYPE_STRUCT; }
-      virtual const FunctionType *get_callable() const override { return nullptr; }
       Symbol *struct_id() const { return struct_id_; }
       Types *membs() const { return membs_; }
       int offset(const Symbol *sym);
@@ -242,6 +247,39 @@ namespace zc {
       template <typename... Args>
       StructType(Symbol *struct_id, Types *membs, Args... args):
          ASTType(args...), struct_id_(struct_id), membs_(membs) {}
+   };
+
+   class ArrayType: public ASTType {
+   public:
+      virtual Kind kind() const override { return Kind::TYPE_ARRAY; }
+      ASTType *elem() const { return elem_; }
+      ASTExpr *count() const { return count_; }
+      intmax_t int_count() const { return int_count_; }
+      virtual const ASTType *get_containee() const override { return elem(); }            
+
+      virtual void DumpNode(std::ostream& os) const override;
+
+      virtual bool TypeEq(const ASTType *other) const override;
+      virtual bool TypeCoerce(const ASTType *from) const override;
+      virtual void TypeCheck(SemantEnv& env, bool allow_void) override;
+
+      virtual ASTType *Address() override;
+      virtual ASTType *Dereference(SemantEnv *env) override { return elem(); }
+
+      virtual int bytes() const override;
+
+      template <typename... Args>
+      static ArrayType *Create(Args... args) { return new ArrayType(args...); }
+      
+   protected:
+      ASTType *elem_;
+      ASTExpr *count_; /*!< this expression must be constant */
+      intmax_t int_count_; /*!< result after @see count_ is converted to 
+                            * integer during semantic analysis */
+
+      template <typename... Args>
+      ArrayType(ASTType *elem, ASTExpr *count, Args... args):
+         ASTType(args...), elem_(elem), count_(count) {}
    };
 
    std::ostream& operator<<(std::ostream& os, IntegralType::IntKind kind);   

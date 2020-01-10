@@ -53,6 +53,8 @@ namespace zc {
    class FunctionImpl;
    class StructSpec;
 
+   typedef std::variant<intmax_t, std::string> ConstVal;   
+
 }
 
 #endif

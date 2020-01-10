@@ -5,7 +5,7 @@ Legend
 [~] -- in progress
 [ ] -- todo
 
-
+GENERAL
 [ ] remove IdentifierExpr
 [ ] finish TypeCheck() for all nodes
 [ ] add annotation for expressions for whether `lvalue' or `rvalue'
@@ -15,6 +15,7 @@ Legend
 [X] add "integral" method to decl
 [X] Least-upper bound of integer. Perhaps via integer sorting? 
 [ ] when first line is error, root is NULL, causing segfault
+[ ] create ``ASTCreatable'' template class that implements ``Create'' method
 
 PARSER
 [ ] Handle nested pointers properly, e.g. *(*id) -> **id
@@ -79,3 +80,9 @@ LANGUAGE FEATURES
 [~] sizeof operator
 [ ] void param decl
 [X] add struct access semantics
+
+
+
+WORKING STACK
+[ ] ArrayType TypeCheck
+[ ] constant expression evaluation during semantic analysis

@@ -18,5 +18,6 @@ namespace zc::z80 {
 #include "asm/asm-mode.hpp"
 #include "asm/asm-cond.hpp"
 #include "asm/asm-proto.hpp"
+#include "asm/asm-crt.hpp"
 
 #endif
