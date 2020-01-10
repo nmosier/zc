@@ -81,6 +81,7 @@
 %token STRUCT
 %token SIZEOF
 %token ARROW
+%token UNION
 
  /* CONTROL */
 %token RETURN
@@ -187,6 +188,8 @@ struct_spec:
         |       STRUCT ID {
                     $$ = zc::StructType::Create($2->id(), nullptr, @1);
                 }
+        |       UNION ID '{' struct_decl_list '}' { $$ = zc::UnionType::Create($2->id(), $4, @1); }
+        |       UNION ID { $$ = zc::UnionType::Create($2->id(), nullptr, @1); }
         ; /* incomplete */
 struct_decl_list:
                 struct_decl {

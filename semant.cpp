@@ -109,24 +109,28 @@
        params()->TypeCheck(env);
     }
 
-    void StructType::TypeCheck(SemantEnv& env, bool allow_void) {
+    void TaggedType::TypeCheck(SemantEnv& env, bool allow_void) {
        if (membs() != nullptr) {
           /* this struct is a complete definition */
           
           membs()->TypeCheck(env);
 
           /* enscope struct if it isn't anonymous */
-          if (struct_id() != nullptr) {
-             EnscopeStruct(env);
+          if (tag() != nullptr) {
+             EnscopeTag(env);
           }
        } else {
           /* struct cannot be anonymous by C syntax */
-          const StructType *type = env.structs().Lookup(struct_id());
+          const TaggedType *type = env.tagtab().Lookup(tag());
           if (type == nullptr) {
              /* forward-declare struct */
-             EnscopeStruct(env);
+             EnscopeTag(env);
+          } else if (type->tag_kind() != tag_kind()) {
+             /* tagged kinds (struct or union) do not match */
+             env.error()(g_filename, this) << "use of '" << *sym()
+                                           << "' with tag type that does "
+                                           << "not match previous declaration" << std::endl;
           } else {
-             /* inherit definition of members from already-declared struct */
              membs_ = type->membs_;
           }
        }
@@ -147,26 +151,32 @@
        }
     }
 
-    void StructType::EnscopeStruct(SemantEnv& env) {
-       assert(struct_id() != nullptr); /* ensure struct isn't anonymous */
+    void TaggedType::EnscopeTag(SemantEnv& env) {
+       assert(tag() != nullptr); /* ensure tagged type isn't anonymous */
 
-       StructType *type = env.structs().Lookup(struct_id());
+       TaggedType *type = env.tagtab().Lookup(tag());
        if (type == nullptr) {
-          /* first mention of struct */
-          env.structs().AddToScope(struct_id(), this);
+          /* first mention of tag */
+          env.tagtab().AddToScope(tag(), this);
+       } else if (kind() != type->kind()) {
+          /* tagged kinds (struct or union) do not match */
+          env.error()(g_filename, this) << "use of '" << *sym()
+                                        << "' with tag type that does "
+                                        << "not match previous declaration" << std::endl;
        } else if (type->membs() == nullptr) {
-          /* struct in table is incomplete */
-
+          /* tag in table is incomplete */
           if (membs() != nullptr) {
-             /* this struct is a full definition, so add members to existing enscoped struct */
+             /* this tag is a full definition, so add members to existing enscoped struct */
              type->membs_ = membs();
           }
        } else {
           if (membs() == nullptr) {
              membs_ = type->membs();
           } else {
-             if (env.structs().Probe(struct_id()) != nullptr) {
-                env.error()(g_filename, this) << "redefinition of struct '" << *struct_id()
+             if (env.tagtab().Probe(tag()) != nullptr) {
+                env.error()(g_filename, this) << "redefinition of "
+                                              << kind()
+                                              << "'" << *tag()
                                               << "'" << std::endl;
              }
           }
@@ -322,19 +332,21 @@
 
     void MembExpr::TypeCheck(SemantEnv& env) {
        expr()->TypeCheck(env);
-       if (expr()->type()->kind() != ASTType::Kind::TYPE_STRUCT) {
-          env.error()(g_filename, this) << "member access into non-struct type" << std::endl;
+       if (expr()->type()->kind() != ASTType::Kind::TYPE_TAGGED) {
+          env.error()(g_filename, this) << "member access into non-tagged type" << std::endl;
        }
-       const StructType *struct_type = dynamic_cast<const StructType *>(expr()->type());
-       if (struct_type->membs() == nullptr) {
-          env.error()(g_filename, this) << "member access into incomplete struct '"
-                                        << struct_type->struct_id() << "'" << std::endl;
+       const TaggedType *tagged_type = dynamic_cast<const TaggedType *>(expr()->type());
+       if (tagged_type->membs() == nullptr) {
+          env.error()(g_filename, this) << "member access into incomplete "
+                                        << tagged_type->kind() << "'"
+                                        << tagged_type->tag() << "'" << std::endl;
        } else {
-          Types *membs = struct_type->membs();
+          Types *membs = tagged_type->membs();
           ASTType *memb_decl = membs->Lookup(memb());
           if (memb_decl == nullptr) {
-             env.error()(g_filename, this) << "no member named '" << *memb() << "' in struct '"
-                                           << struct_type->struct_id() << "'" << std::endl;
+             env.error()(g_filename, this) << "no member named '" << *memb() << "' in "
+                                           << tagged_type->kind() << "'"
+                                           << tagged_type->tag() << "'" << std::endl;
           } else {
              type_ = memb_decl;
           }
@@ -556,16 +568,16 @@
        }
     }
 
-    bool StructType::TypeEq(const ASTType *other) const {
-       const StructType *st_other = dynamic_cast<const StructType *>(other);
-       if (st_other == nullptr) {
+    bool TaggedType::TypeEq(const ASTType *other) const {
+       const TaggedType *tagged_other = dynamic_cast<const TaggedType *>(other);
+       if (tagged_other == nullptr) {
           return false;
        } else {
-          return this->struct_id() != nullptr && st_other->struct_id() != nullptr &&
-             this->struct_id() == st_other->struct_id();
+          return this->tag() != nullptr && tagged_other->tag() != nullptr &&
+             this->tag() == tagged_other->tag();
        }
     }
-
+    
     bool Types::TypeEq(const Types *others) const {
        if (this->vec_.size() != others->vec_.size()) {
           return false;
@@ -614,7 +626,7 @@
       return TypeEq(from);
    }
 
-    bool StructType::TypeCoerce(const ASTType *from) const {
+    bool TaggedType::TypeCoerce(const ASTType *from) const {
        return TypeEq(from);
     }
     
@@ -749,7 +761,7 @@
        return this;
     }
 
-    ASTType *StructType::Address() {
+    ASTType *TaggedType::Address() {
        return PointerType::Create(1, this, loc());
     }
 
@@ -771,7 +783,7 @@
       return this; /* function types are infinitely dereferencable */
    }
 
-    ASTType *StructType::Dereference(SemantEnv *env) {
+    ASTType *TaggedType::Dereference(SemantEnv *env) {
        if (env) {
           env->error()(g_filename, this)
              << "do you really think you can dereference a struct?" << std::endl;

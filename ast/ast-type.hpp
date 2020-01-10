@@ -18,7 +18,7 @@ namespace zc {
                        TYPE_INTEGRAL,
                        TYPE_POINTER,
                        TYPE_FUNCTION,
-                       TYPE_STRUCT,
+                       TYPE_TAGGED,
                        TYPE_ARRAY};
       virtual Kind kind() const = 0;
       Symbol *sym() const { return sym_; }
@@ -218,35 +218,66 @@ namespace zc {
       IntegralType(IntKind int_kind, Args... args): ASTType(args...), int_kind_(int_kind) {}
    };
 
-   class StructType: public ASTType {
+   class TaggedType: public ASTType {
    public:
-      virtual Kind kind() const override { return Kind::TYPE_STRUCT; }
-      Symbol *struct_id() const { return struct_id_; }
+      Symbol *tag() const { return tag_; }
       Types *membs() const { return membs_; }
-      int offset(const Symbol *sym);
+      virtual Kind kind() const override { return Kind::TYPE_TAGGED; }
+      enum class TagKind {TAG_STRUCT, TAG_UNION};
+      virtual TagKind tag_kind() const = 0;
+
+      virtual void DumpNode(std::ostream& os) const override;      
+      virtual ASTType *Address() override;
+      virtual ASTType *Dereference(SemantEnv *env) override;
+      virtual bool TypeEq(const ASTType *other) const override;      
+      virtual bool TypeCoerce(const ASTType *from) const override;
+      virtual int bytes() const override;
+      virtual int offset(const Symbol *sym) const = 0;
+      virtual void TypeCheck(SemantEnv& env, bool allow_void) override;
+      void EnscopeTag(SemantEnv& env);      
+      
+   protected:
+      Symbol *tag_;
+      Types *membs_;
+
+      virtual const char *name() const = 0;
+
+      template <typename... Args>
+      TaggedType(Symbol *tag, Types *membs, Args... args):
+         ASTType(args...), tag_(tag), membs_(membs) {}
+   };
+   
+   class StructType: public TaggedType {
+   public:
+      virtual TagKind tag_kind() const override { return TagKind::TAG_STRUCT; }
 
       template <typename... Args>
       static StructType *Create(Args... args) { return new StructType(args...); }
 
-      virtual void DumpNode(std::ostream& os) const override;
+      virtual int offset(const Symbol *sym) const override;
 
-      virtual bool TypeEq(const ASTType *other) const override;
-      virtual bool TypeCoerce(const ASTType *from) const override;
-      virtual void TypeCheck(SemantEnv& env, bool allow_void) override;
-      void EnscopeStruct(SemantEnv& env);
-
-      virtual ASTType *Address() override;
-      virtual ASTType *Dereference(SemantEnv *env) override;
-
-      virtual int bytes() const override;
       
    protected:
-      Symbol *struct_id_;
-      Types *membs_;
+      virtual const char *name() const override { return "struct"; }
 
       template <typename... Args>
-      StructType(Symbol *struct_id, Types *membs, Args... args):
-         ASTType(args...), struct_id_(struct_id), membs_(membs) {}
+      StructType(Args... args): TaggedType(args...) {}
+   };
+
+   class UnionType: public TaggedType {
+   public:
+      virtual TagKind tag_kind() const override { return TagKind::TAG_UNION; }      
+
+      template <typename... Args>
+      static UnionType *Create(Args... args) { return new UnionType(args...); }
+
+      virtual int offset(const Symbol *sym) const override { return 0; }
+      
+   protected:
+      virtual const char *name() const override { return "union"; }
+
+      template <typename... Args>
+      UnionType(Args... args): TaggedType(args...) {}
    };
 
    class ArrayType: public ASTType {
@@ -282,7 +313,8 @@ namespace zc {
          ASTType(args...), elem_(elem), count_(count) {}
    };
 
-   std::ostream& operator<<(std::ostream& os, IntegralType::IntKind kind);   
+   std::ostream& operator<<(std::ostream& os, IntegralType::IntKind kind);
+   std::ostream& operator<<(std::ostream& os, TaggedType::TagKind kind);
 
 }
    

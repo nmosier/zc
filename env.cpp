@@ -11,16 +11,16 @@ namespace zc {
    template <typename A, typename B, class C>
    void Env<A,B,C>::EnterScope() {
       symtab_.EnterScope();
-      structs_.EnterScope();
+      tagtab_.EnterScope();
    }
 
    template <typename A, typename B, class C>   
    void Env<A,B,C>::ExitScope() {
       symtab_.EnterScope();
-      structs_.EnterScope();
+      tagtab_.EnterScope();
    }
 
-   template class Env<ASTType, StructType, SymbolEnv>;
-   template class Env<SymInfo, StructInfo, CgenExtEnv>;
+   template class Env<ASTType, TaggedType, SymbolEnv>;
+   template class Env<SymInfo, TagInfo, CgenExtEnv>;
    
 }

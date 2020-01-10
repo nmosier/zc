@@ -50,10 +50,10 @@ namespace zc {
       os << ")";
    }
 
-   void StructType::DumpNode(std::ostream& os) const {
-      os << "struct ";
-      if (struct_id() != nullptr) {
-         os << struct_id();
+   void TaggedType::DumpNode(std::ostream& os) const {
+      os << name();
+      if (tag() != nullptr) {
+         os << tag();
       }
       os << " { ";
       if (membs() != nullptr) {
@@ -76,15 +76,26 @@ namespace zc {
 
    std::ostream& operator<<(std::ostream& os, ASTType::Kind kind) {
       using Kind = ASTType::Kind;
-      std::unordered_map<Kind,const char *> map
-         {{Kind::TYPE_VOID, "VOID"},
-          {Kind::TYPE_INTEGRAL, "INTEGRAL"},
-          {Kind::TYPE_POINTER, "POINTER"},
-          {Kind::TYPE_FUNCTION, "FUNCTION"},
-          {Kind::TYPE_STRUCT, "STRUCT"}
-         };
+      os << [](Kind kind) {
+               switch (kind) {
+               case Kind::TYPE_VOID: return "void";
+               case Kind::TYPE_INTEGRAL: return "INTEGRAL";
+               case Kind::TYPE_POINTER: return "POINTER";
+               case Kind::TYPE_FUNCTION: return "FUNCTION";
+               case Kind::TYPE_TAGGED: return "TAGGED";
+               case Kind::TYPE_ARRAY: return "ARRAY";
+               }
+            }(kind);
+      return os;
+   }
 
-      return os << map[kind];
+   std::ostream& operator<<(std::ostream& os, TaggedType::TagKind kind) {
+      using Kind = TaggedType::TagKind;
+      switch (kind) {
+      case Kind::TAG_STRUCT: os << "struct"; break;
+      case Kind::TAG_UNION: os << "union"; break;
+      }
+      return os;
    }
    
    void IntegralType::DumpNode(std::ostream& os) const {

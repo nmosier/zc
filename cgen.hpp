@@ -45,14 +45,14 @@ namespace zc {
       const Value *addr_;
    };
 
-   class StructInfo {
+   class TagInfo {
    public:
-      const StructType *type() const { return type_; }
+      const TaggedType *type() const { return type_; }
 
-      StructInfo(const StructType *type): type_(type) {}
+      TagInfo(const TaggedType *type): type_(type) {}
       
    private:
-      const StructType *type_;
+      const TaggedType *type_;
    };
 
    class StackFrame {
@@ -239,14 +239,14 @@ namespace zc {
    };
 
    
-   class CgenEnv: public Env<SymInfo, StructInfo, CgenExtEnv> {
+   class CgenEnv: public Env<SymInfo, TagInfo, CgenExtEnv> {
    public:
       const StringConstants& strconsts() const { return strconsts_; }
       StringConstants& strconsts() { return strconsts_; }
       const FunctionImpls& impls() const { return impls_; }
       FunctionImpls& impls() { return impls_; }
 
-      CgenEnv(): Env<SymInfo, StructInfo, CgenExtEnv>(), strconsts_(), impls_() {}
+      CgenEnv(): Env<SymInfo, TagInfo, CgenExtEnv>(), strconsts_(), impls_() {}
 
       void DumpAsm(std::ostream& os) const;
       

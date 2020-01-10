@@ -43,18 +43,18 @@ namespace zc {
       
    };
 
-   template <typename SymtabValue, typename StructValue, class ExtEnv>
+   template <typename SymtabValue, typename TaggedTypeValue, class ExtEnv>
    class Env {
    public:
       typedef ScopedTable<Symbol *, SymtabValue> ScopedSymtab;
-      typedef ScopedTable<Symbol *, StructValue> ScopedStructs;
+      typedef ScopedTable<Symbol *, TaggedTypeValue> ScopedTagtab;
 
       /* Accessors */
       ScopedSymtab& symtab() { return symtab_; }
       const ScopedSymtab& symtab() const { return symtab_; }
       
-      ScopedStructs& structs() { return structs_; }
-      const ScopedStructs& structs() const { return structs_; }
+      ScopedTagtab& tagtab() { return tagtab_; }
+      const ScopedTagtab& tagtab() const { return tagtab_; }
       
       ExtEnv& ext_env() { return ext_env_; }
       const ExtEnv& ext_env() const { return ext_env_; }
@@ -65,10 +65,8 @@ namespace zc {
       
    protected:
       ScopedSymtab symtab_;
-      ScopedStructs structs_;
+      ScopedTagtab tagtab_;
       ExtEnv ext_env_;
-      
-      Env(): symtab_(), structs_(), ext_env_() {}
    };
 
 }

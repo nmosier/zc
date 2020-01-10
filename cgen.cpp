@@ -1301,7 +1301,7 @@ namespace zc {
       return map[int_kind()];
    }
 
-   int StructType::bytes() const {
+   int TaggedType::bytes() const {
       return membs()->bytes();
    }
 
@@ -1309,7 +1309,7 @@ namespace zc {
       return elem()->bytes() * int_count();
    }
 
-   int StructType::offset(const Symbol *sym) {
+   int StructType::offset(const Symbol *sym) const {
       auto it = std::find_if(membs()->vec().begin(), membs()->vec().end(),
                              [&](const ASTType *type) -> bool {
                                 return type->sym() == sym;
