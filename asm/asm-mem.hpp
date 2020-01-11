@@ -28,7 +28,7 @@ namespace zc::z80 {
       void EmitDef(std::ostream& os) const;
 
       Label(const std::string& name): name_(name) {}
-      
+
    protected:
       const std::string name_;
    };

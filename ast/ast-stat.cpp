@@ -11,6 +11,18 @@ namespace zc {
       decls_->Dump(os, level, with_types);
       stats_->Dump(os, level, with_types);
    }
-   
-   
+
+   void GotoStat::DumpNode(std::ostream& os) const {
+      os << "GotoStat '" << *label_id()->id() << "'";
+   }
+
+   void LabelDefStat::DumpNode(std::ostream& os) const {
+      os << "LabelDefStat '" << *label_id()->id() << "'";
+   }
+
+   void LabeledStat::DumpChildren(std::ostream& os, int level, bool with_types) const {
+      stat()->Dump(os, level, with_types);
+   }
+
+
 }

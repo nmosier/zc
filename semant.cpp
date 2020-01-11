@@ -22,6 +22,10 @@
        root->Descope(g_semant_env);
     }
 
+    bool SemantExtEnv::LabelCompare::operator()(const Identifier *lhs, const Identifier *rhs) const {
+       return lhs->id() < rhs->id();
+    }
+
     std::ostream& SemantError::operator()(const char *filename, const ASTNode *node) {
        return SemantError::operator()(filename, node->loc());
     }
@@ -30,6 +34,35 @@
        errors_++;
        os_ << filename << ":" << loc << ": ";
        return os_;
+    }
+
+    void SemantExtEnv::Enter(Symbol *sym) {
+       sym_env_.Enter(sym);
+       label_refs_.clear();
+       label_defs_.clear();
+    }
+
+    void SemantExtEnv::Exit(SemantError& err) {
+       std::vector<const Identifier *> undefined_labels;
+       std::set_difference(label_refs_.begin(), label_refs_.end(),
+                           label_defs_.begin(), label_defs_.end(),
+                           std::back_inserter(undefined_labels),
+                           LabelCompare());
+       for (const Identifier *label : undefined_labels) {
+          err(g_filename, label) << "use of undeclared label '" << *label->id() << "'" << std::endl;
+       }
+    }
+
+    void SemantExtEnv::LabelRef(const Identifier *id) {
+      label_refs_.insert(id);
+   }
+
+    void SemantExtEnv::LabelDef(SemantError& err, const Identifier *id) {
+       if (label_defs_.find(id) != label_defs_.end()) {
+          err(g_filename, id) << "redefinition of label '" << *id->id() << "'" << std::endl;
+       } else {
+          label_defs_.insert(id);
+       }
     }
 
     static IntegralType::IntKind token_to_intspec(int token) {
@@ -263,6 +296,19 @@
     void WhileStat::TypeCheck(SemantEnv& env) {
        pred()->TypeCheck(env);
        body()->TypeCheck(env);
+    }
+
+    void GotoStat::TypeCheck(SemantEnv& env) {
+       env.ext_env().LabelRef(label_id());
+    }
+
+    void LabeledStat::TypeCheck(SemantEnv& env) {
+       stat()->TypeCheck(env);
+    }
+    
+    void LabelDefStat::TypeCheck(SemantEnv& env) {
+       env.ext_env().LabelDef(env.error(), label_id());
+       LabeledStat::TypeCheck(env);
     }
 
     void ExprStat::TypeCheck(SemantEnv& env) {
@@ -824,7 +870,7 @@
      }
 
      void ExternalDecl::Descope(SemantEnv& env) const {
-        env.ext_env().Exit();
+        env.ext_env().Exit(env.error());
      }
 
      void FunctionDef::Enscope(SemantEnv& env) const {
@@ -849,6 +895,7 @@
     }
 
     void FunctionDef::Descope(SemantEnv& env) const {
+       ExternalDecl::Descope(env);
        env.ExitScope();
     }
 

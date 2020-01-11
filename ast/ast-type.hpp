@@ -231,7 +231,7 @@ namespace zc {
       virtual ASTType *Dereference(SemantEnv *env) override;
       virtual bool TypeEq(const ASTType *other) const override;      
       virtual bool TypeCoerce(const ASTType *from) const override;
-      virtual int bytes() const override;
+      virtual int bytes() const override = 0;
       virtual int offset(const Symbol *sym) const = 0;
       virtual void TypeCheck(SemantEnv& env, bool allow_void) override;
       void EnscopeTag(SemantEnv& env);      
@@ -254,9 +254,9 @@ namespace zc {
       template <typename... Args>
       static StructType *Create(Args... args) { return new StructType(args...); }
 
+      virtual int bytes() const override;
       virtual int offset(const Symbol *sym) const override;
 
-      
    protected:
       virtual const char *name() const override { return "struct"; }
 
@@ -271,6 +271,7 @@ namespace zc {
       template <typename... Args>
       static UnionType *Create(Args... args) { return new UnionType(args...); }
 
+      virtual int bytes() const override;
       virtual int offset(const Symbol *sym) const override { return 0; }
       
    protected:

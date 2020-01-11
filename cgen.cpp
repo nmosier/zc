@@ -33,6 +33,12 @@ namespace zc {
       sym_env_.Exit();
    }
 
+   LabelValue *CgenExtEnv::LabelGen(const Symbol *id) const {
+      std::string name = std::string("__CLABEL_") + *id;
+      Label *label = new Label(*id);
+      return new LabelValue(label);
+   }
+   
    SymInfo::SymInfo(const ExternalDecl *ext_decl) {
       type_ = ext_decl->Type();
       Label *label = new Label(std::string("_") + *ext_decl->sym());
@@ -244,6 +250,30 @@ namespace zc {
       pred_block->transitions().vec().push_back(new JumpTransition(join_block, Cond::ANY));
 
       return join_block;
+   }
+
+   Block *GotoStat::CodeGen(CgenEnv& env, Block *block) {
+      /* obtain label */
+      const LabelValue *lv = env.ext_env().LabelGen(label_id()->id());
+      block->instrs().push_back(new JumpInstruction(lv));
+      return block;
+   }
+
+   Block *LabeledStat::CodeGen(CgenEnv& env, Block *block) {
+      return stat()->CodeGen(env, block);
+   }
+   
+   Block *LabelDefStat::CodeGen(CgenEnv& env, Block *block) {
+      /* obtain label */
+      const LabelValue *lv = env.ext_env().LabelGen(label_id()->id());
+      
+      /* create new block */
+      Block *labeled_block = new Block(lv->label());
+
+      /* link current block to labeled block */
+      block->transitions().vec().push_back(new JumpTransition(labeled_block, Cond::ANY));
+      block = labeled_block;
+      return LabeledStat::CodeGen(env, block);
    }
 
    Block *AssignmentExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
@@ -766,7 +796,7 @@ namespace zc {
       block = expr()->CodeGen(env, block, ExprKind::EXPR_LVALUE);
       
       /* get internal offset */
-      int offset = dynamic_cast<StructType *>(expr()->type())->offset(memb());
+      int offset = dynamic_cast<TaggedType *>(expr()->type())->offset(memb());
       ImmediateValue *imm = new ImmediateValue(offset, long_size);
       block->instrs().push_back(new LoadInstruction(&rv_de, imm));
       block->instrs().push_back(new AddInstruction(&rv_hl, &rv_de));
@@ -1290,19 +1320,29 @@ namespace zc {
    }
 
    int IntegralType::bytes() const {
-      using IntKind = IntegralType::IntKind;
-      std::unordered_map<IntKind,int> map
-         {{IntKind::SPEC_CHAR, byte_size},
-          {IntKind::SPEC_SHORT, word_size},
-          {IntKind::SPEC_INT, long_size},
-          {IntKind::SPEC_LONG_LONG, long_size},
-          {IntKind::SPEC_LONG_LONG, long_size},          
-         };
-      return map[int_kind()];
+      using Kind = IntegralType::IntKind;
+      switch (int_kind()) {
+      case Kind::SPEC_CHAR: return byte_size;
+      case Kind::SPEC_SHORT: return word_size;
+      case Kind::SPEC_INT:
+      case Kind::SPEC_LONG:
+      case Kind::SPEC_LONG_LONG:
+         return long_size;
+      }
    }
 
-   int TaggedType::bytes() const {
-      return membs()->bytes();
+   int StructType::bytes() const {
+      return std::accumulate(membs()->vec().begin(), membs()->vec().end(), 0,
+                             [](int acc, const ASTType *memb) -> int {
+                                return acc + memb->bytes();
+                             });
+   }
+
+   int UnionType::bytes() const {
+      std::vector<int> sizes;
+      std::transform(membs()->vec().begin(), membs()->vec().end(), std::back_inserter(sizes),
+                     [](const ASTType *memb) { return memb->bytes(); });
+      return *std::max_element(sizes.begin(), sizes.end());
    }
 
    int ArrayType::bytes() const {

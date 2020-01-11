@@ -87,6 +87,8 @@ namespace zc {
       void Enter(Symbol *sym, const Types *args);
       void Exit();
 
+      LabelValue *LabelGen(const Symbol *id) const;
+
    private:
       SymbolEnv sym_env_;
       StackFrame frame_;

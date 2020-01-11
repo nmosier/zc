@@ -69,7 +69,26 @@ Next, I wrote a couple tests for the arrow operator, which is when I started to 
 
 01/10/2020
 
-[4 hrs] I added both array 
-Good news: pointers to arrays don't decay into double pointers, thankfully.
+[4 hrs] I added partial support for arrays. What _does_ work, confirmed by tests:
+   (i) declaring arrays with an explicit, contant-expression size, like ```char buf[100];```
+       or ```char buf[100+20-30/4%2+3^2&1];```
+   (ii) indexing arrays as lvalues and rvalues, like ```
+           int a;
+           a = buf[2];```
+        or ```buf[a] = a;```
+   What should work, but hasn't been tested:
+   (i) implicitly casting an array to pointer, like ```
+       char *ptr;
+       ptr = buf;```
+   (ii) indexing pointers, like ```
+        ptr[2] = 'c';```
+   What doesn't work:
+   (i) Variable-length arrays (this is an optional C feature, anyway)
+   (ii) Initializing an array (or any variable, for that matter)
+   (iii) Declaring an array without specifying the size, as in `int main(int argc, char *argv[])`.
 
-unions
+[3 hrs] I added unions. This wasn't too difficult since their grammar is identical to structs. I created a new abstract type 'TaggedType', from which both StructType and UnionType inherit. I moved most of the old StructType code over to TaggedType; the only significant different between StructType and UnionType is how they assign offsets to members: the offset of the _n_th member in a struct is the offset of the (_n_-1)th member plus the size of that member in bytes (or 0 if _n_ = 0); the offset of the _n_th member in a union is just 0. 
+
+[2 hrs] Implemented GOTO.
+
+NEXT: enums.

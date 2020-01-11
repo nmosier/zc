@@ -82,6 +82,7 @@
 %token SIZEOF
 %token ARROW
 %token UNION
+%token GOTO
 
  /* CONTROL */
 %token RETURN
@@ -98,7 +99,7 @@
 %type  <pointer>       pointer
 %type  <type>    param_decl
 %type  <types>   param_type_list optional_param_type_list param_list
-%type  <stat>          stat jump_stat selection_stat iteration_stat
+%type  <stat>          stat jump_stat selection_stat iteration_stat labeled_stat
 %type  <stats>         optional_stat_list stat_list
 %type  <compound_stat> compound_stat
 %type  <expr_stat>     exp_stat
@@ -265,6 +266,7 @@ stat:           exp_stat { $$ = $1; }
         |       jump_stat { $$ = $1; }
         |       selection_stat { $$ = $1; }
         |       iteration_stat{ $$ = $1; }
+        |       labeled_stat { $$ = $1; }
         ; /* incomplete */
 optional_stat_list:
                 /* empty */ { $$ = zc::ASTStats::Create(@$); @$ = 0; }
@@ -277,7 +279,10 @@ compound_stat:  '{' optional_decl_list optional_stat_list '}' {
                     $$ = zc::CompoundStat::Create($2, $3, @1);
                 }
         ;
+labeled_stat:   ID ':' stat { $$ = zc::LabelDefStat::Create($1, $3, @1); }
+        ;
 jump_stat:      RETURN optional_exp ';' { $$ = zc::ReturnStat::Create($2, @1); }
+        |       GOTO ID ';' { $$ = zc::GotoStat::Create($2, @1); }
         ;
 selection_stat: IF '(' exp ')' stat { $$ = zc::IfStat::Create($3, $5, nullptr, @1); }
         |       IF '(' exp ')' stat ELSE stat { $$ = zc::IfStat::Create($3, $5, $7, @1); }

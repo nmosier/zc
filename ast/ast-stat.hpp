@@ -178,7 +178,69 @@ namespace zc {
       template <typename... Args>
       WhileStat(Args... args): IterationStat(args...) {}
    };
-   
+
+   class GotoStat: public ASTStat {
+   public:
+      Identifier *label_id() const { return label_id_; }
+      
+      template <typename... Args>
+      static GotoStat *Create(Args... args) {
+         return new GotoStat(args...);
+      }
+
+      virtual void DumpNode(std::ostream& os) const override;
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
+      virtual void TypeCheck(SemantEnv& env) override;
+      virtual Block *CodeGen(CgenEnv& env, Block *block) override;
+      virtual void FrameGen(StackFrame& env) const override {}
+      
+   private:
+      Identifier *label_id_;
+      
+      template <typename... Args>
+      GotoStat(Identifier *label_id, Args... args): ASTStat(args...), label_id_(label_id) {}
+   };
+
+   /**
+    * Abstract class representing a labeled statement.
+    */
+   class LabeledStat: public ASTStat {
+   public:
+      ASTStat *stat() const { return stat_; }
+
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
+      virtual void TypeCheck(SemantEnv& env) override;
+      virtual Block *CodeGen(CgenEnv& env, Block *block) override;
+      
+   protected:
+      ASTStat *stat_;
+
+      template <typename... Args>
+      LabeledStat(ASTStat *stat, Args... args): ASTStat(args...), stat_(stat) {}
+   };
+
+   class LabelDefStat: public LabeledStat {
+   public:
+      Identifier *label_id() const { return label_id_; }
+      
+      template <typename... Args>
+      static LabelDefStat *Create(Args... args) {
+         return new LabelDefStat(args...);
+      }
+
+      virtual void DumpNode(std::ostream& os) const override;
+      virtual void TypeCheck(SemantEnv& env) override;
+      virtual Block *CodeGen(CgenEnv& env, Block *block) override;
+      virtual void FrameGen(StackFrame& env) const override {}
+      
+   private:
+      Identifier *label_id_;
+
+      template <typename... Args>
+      LabelDefStat(Identifier *label_id, Args... args): LabeledStat(args...), label_id_(label_id) {}
+   };
+
+
 }
 
 #endif

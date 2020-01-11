@@ -11,3 +11,8 @@ c.tab.hpp
 .DS_Store
 cgen-main*
 *.output
+*.c
+*.lab
+*.z80
+*.s
+*.8xp

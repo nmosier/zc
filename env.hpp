@@ -1,6 +1,8 @@
 #ifndef __ENV_HPP
 #define __ENV_HPP
 
+#include <set>
+
 #include "scopedtab.hpp"
 #include "symtab.hpp"
 
@@ -25,6 +27,8 @@ namespace zc {
       void Exit() {
          sym_ = nullptr;
       }
+
+      
 
    private:
       Symbol *sym_;

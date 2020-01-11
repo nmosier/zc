@@ -51,6 +51,7 @@ E  [Ee][+-]?{D}+
 "struct" { return STRUCT; }
 "union" { return UNION; }
 "sizeof" { return SIZEOF; }
+"goto" { return GOTO; }
 
 "return" { return RETURN; }
 

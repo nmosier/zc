@@ -3,6 +3,7 @@
 
 #include "env.hpp"
 #include "ast.hpp"
+#include "semant.hpp"
 #include "cgen.hpp"
 
 namespace zc {
@@ -18,9 +19,9 @@ namespace zc {
    void Env<A,B,C>::ExitScope() {
       symtab_.EnterScope();
       tagtab_.EnterScope();
-   }
+   }   
 
-   template class Env<ASTType, TaggedType, SymbolEnv>;
+   template class Env<ASTType, TaggedType, SemantExtEnv>;
    template class Env<SymInfo, TagInfo, CgenExtEnv>;
    
 }

@@ -74,10 +74,31 @@ namespace zc {
 
    extern SemantError g_semant_error;
 
-   class TaggedType;
-   class SemantEnv: public Env<ASTType, TaggedType, SymbolEnv> {
+   
+   class SemantExtEnv {
+      struct LabelCompare {
+         bool operator()(const Identifier *lhs, const Identifier *rhs) const;
+      };
+      typedef std::set<const Identifier *, LabelCompare> Labels;
    public:
-      SemantEnv(SemantError& error): Env<ASTType, TaggedType, SymbolEnv>(), error_(error) {}
+      Symbol *sym() const { return sym_env_.sym(); }
+
+      void Enter(Symbol *sym);
+      void Exit(SemantError& err);
+      
+      void LabelRef(const Identifier *id);
+      void LabelDef(SemantError& err, const Identifier *id);
+
+   private:
+      SymbolEnv sym_env_;
+      Labels label_refs_;
+      Labels label_defs_;
+   };
+
+   class TaggedType;
+   class SemantEnv: public Env<ASTType, TaggedType, SemantExtEnv> {
+   public:
+      SemantEnv(SemantError& error): Env<ASTType, TaggedType, SemantExtEnv>(), error_(error) {}
       SemantError& error() { return error_; }
 
    private:
