@@ -796,7 +796,7 @@ namespace zc {
       block = expr()->CodeGen(env, block, ExprKind::EXPR_LVALUE);
       
       /* get internal offset */
-      int offset = dynamic_cast<TaggedType *>(expr()->type())->offset(memb());
+      int offset = dynamic_cast<CompoundType *>(expr()->type())->offset(memb());
       ImmediateValue *imm = new ImmediateValue(offset, long_size);
       block->instrs().push_back(new LoadInstruction(&rv_de, imm));
       block->instrs().push_back(new AddInstruction(&rv_hl, &rv_de));

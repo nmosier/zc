@@ -50,6 +50,7 @@ E  [Ee][+-]?{D}+
 "long" { return LONG; }
 "struct" { return STRUCT; }
 "union" { return UNION; }
+"enum" { return ENUM; }
 "sizeof" { return SIZEOF; }
 "goto" { return GOTO; }
 

@@ -50,7 +50,7 @@ namespace zc {
       os << ")";
    }
 
-   void TaggedType::DumpNode(std::ostream& os) const {
+   void CompoundType::DumpNode(std::ostream& os) const {
       os << name();
       if (tag() != nullptr) {
          os << tag();
@@ -94,6 +94,7 @@ namespace zc {
       switch (kind) {
       case Kind::TAG_STRUCT: os << "struct"; break;
       case Kind::TAG_UNION: os << "union"; break;
+      case Kind::TAG_ENUM: os << "enum"; break;
       }
       return os;
    }
@@ -156,6 +157,29 @@ namespace zc {
       return it == vec().end() ? nullptr : *it;
    }
 
+   void CompoundType::define(const TaggedType *other) {
+      const CompoundType *comp_other = dynamic_cast<const CompoundType *>(other);
+      if (comp_other == nullptr) {
+         throw std::logic_error("attempted to complete definition of type with different tag");
+      } else {
+         membs_ = comp_other->membs();
+      }
+   }
 
+   void Enumerator::DumpNode(std::ostream& os) const {
+      os << "'" << *id()->id() << "'";
+   }
+
+   void Enumerator::DumpChildren(std::ostream& os, int level, bool with_types) const {
+      if (val() != nullptr) {
+         val()->Dump(os, level, with_types);
+      }
+   }
+
+   void EnumType::DumpChildren(std::ostream& os, int level, bool with_types) const {
+      for (auto pair : enumerators_) {
+         pair.second->Dump(os, level, with_types);
+      }
+   }
    
  }

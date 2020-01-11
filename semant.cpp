@@ -143,10 +143,9 @@
     }
 
     void TaggedType::TypeCheck(SemantEnv& env, bool allow_void) {
-       if (membs() != nullptr) {
-          /* this struct is a complete definition */
-          
-          membs()->TypeCheck(env);
+       if (is_defined()) {
+          /* this tagged type is a complete definition */
+          TypeCheckMembs(env);
 
           /* enscope struct if it isn't anonymous */
           if (tag() != nullptr) {
@@ -159,12 +158,13 @@
              /* forward-declare struct */
              EnscopeTag(env);
           } else if (type->tag_kind() != tag_kind()) {
-             /* tagged kinds (struct or union) do not match */
+             /* tagged kinds do not match */
              env.error()(g_filename, this) << "use of '" << *sym()
                                            << "' with tag type that does "
                                            << "not match previous declaration" << std::endl;
           } else {
-             membs_ = type->membs_;
+             /* otherwise, define this type with other defined type */
+             define(type);
           }
        }
     }
@@ -187,35 +187,60 @@
     void TaggedType::EnscopeTag(SemantEnv& env) {
        assert(tag() != nullptr); /* ensure tagged type isn't anonymous */
 
-       TaggedType *type = env.tagtab().Lookup(tag());
-       if (type == nullptr) {
+       TaggedType *tagged_type = env.tagtab().Lookup(tag());
+       if (tagged_type == nullptr) {
           /* first mention of tag */
           env.tagtab().AddToScope(tag(), this);
-       } else if (kind() != type->kind()) {
-          /* tagged kinds (struct or union) do not match */
+       } else if (kind() != tagged_type->kind()) {
+          /* tagged kinds do not match */
           env.error()(g_filename, this) << "use of '" << *sym()
                                         << "' with tag type that does "
                                         << "not match previous declaration" << std::endl;
-       } else if (type->membs() == nullptr) {
+       } else if (!tagged_type->is_defined()) {
           /* tag in table is incomplete */
-          if (membs() != nullptr) {
-             /* this tag is a full definition, so add members to existing enscoped struct */
-             type->membs_ = membs();
+          if (is_defined()) {
+             /* this tagged type has a full definition, so add members to existing enscoped struct */
+             tagged_type->define(this);
           }
-       } else {
-          if (membs() == nullptr) {
-             membs_ = type->membs();
+       } else { // tagged_type is defined
+          if (!is_defined()) {
+             define(tagged_type);
           } else {
              if (env.tagtab().Probe(tag()) != nullptr) {
+                /* redefined in same scope -- error */
                 env.error()(g_filename, this) << "redefinition of "
                                               << kind()
                                               << "'" << *tag()
                                               << "'" << std::endl;
+             } else {
+                /* redefinition in different scope -- OK */
+                env.tagtab().AddToScope(tag(), this);
              }
           }
        }
     }
 
+   void EnumType::Insert(SemantError& err, Enumerator *enumerator) {
+      const Symbol *sym = enumerator->id()->id();
+      if (enumerators_.find(sym) != enumerators_.end()) {
+         err(g_filename, this) << "duplicate enumeration constant '" << *sym << "'" << std::endl;
+      } else {
+         enumerators_[sym] = enumerator;
+      }
+   }
+
+    void EnumType::EnscopeEnumerators(SemantEnv& env) {
+       for (auto pair : enumerators_) {
+          Enumerator *e = pair.second;
+          Symbol *sym = e->id()->id();
+          if (env.symtab().Probe(sym) != nullptr) {
+             env.error()(g_filename, this) << "redefinition of '" << *sym
+                                           << "' as different kind of symbol" << std::endl;
+          } else {
+             env.symtab().AddToScope(sym, this);
+          }
+       }
+    }
 
     void Types::TypeCheck(SemantEnv& env) {
        ASTNodeVec::TypeCheck(env);
@@ -381,18 +406,18 @@
        if (expr()->type()->kind() != ASTType::Kind::TYPE_TAGGED) {
           env.error()(g_filename, this) << "member access into non-tagged type" << std::endl;
        }
-       const TaggedType *tagged_type = dynamic_cast<const TaggedType *>(expr()->type());
-       if (tagged_type->membs() == nullptr) {
+       const CompoundType *compound_type = dynamic_cast<const CompoundType *>(expr()->type());
+       if (compound_type->membs() == nullptr) {
           env.error()(g_filename, this) << "member access into incomplete "
-                                        << tagged_type->kind() << "'"
-                                        << tagged_type->tag() << "'" << std::endl;
+                                        << compound_type->kind() << "'"
+                                        << compound_type->tag() << "'" << std::endl;
        } else {
-          Types *membs = tagged_type->membs();
+          Types *membs = compound_type->membs();
           ASTType *memb_decl = membs->Lookup(memb());
           if (memb_decl == nullptr) {
              env.error()(g_filename, this) << "no member named '" << *memb() << "' in "
-                                           << tagged_type->kind() << "'"
-                                           << tagged_type->tag() << "'" << std::endl;
+                                           << compound_type->kind() << "'"
+                                           << compound_type->tag() << "'" << std::endl;
           } else {
              type_ = memb_decl;
           }
@@ -672,8 +697,12 @@
       return TypeEq(from);
    }
 
-    bool TaggedType::TypeCoerce(const ASTType *from) const {
+    bool CompoundType::TypeCoerce(const ASTType *from) const {
        return TypeEq(from);
+    }
+
+    bool EnumType::TypeCoerce(const ASTType *from) const {
+       return int_type_->TypeCoerce(from);
     }
     
    /*** JOIN POINTERS ***/
@@ -832,7 +861,7 @@
     ASTType *TaggedType::Dereference(SemantEnv *env) {
        if (env) {
           env->error()(g_filename, this)
-             << "do you really think you can dereference a struct?" << std::endl;
+             << "attempt to dereference a tagged type" << std::endl;
        }
        return nullptr;
     }

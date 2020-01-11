@@ -51,6 +51,8 @@
     zc::Types *types;
     int token;
     std::unordered_multiset<int> *token_multiset;
+    std::vector<zc::Enumerator *> *enumerators;
+    zc::Enumerator *enumerator;
 }
 
 %initial-action {
@@ -83,6 +85,7 @@
 %token ARROW
 %token UNION
 %token GOTO
+%token ENUM
 
  /* CONTROL */
 %token RETURN
@@ -111,7 +114,9 @@
 %type   <token>         integral_spec
 %type   <token_multiset>        integral_spec_list
 %type   <token>          void_spec
-%type   <type>    type_specs struct_spec
+%type   <type>    type_specs struct_spec enum_spec
+%type   <enumerators> enumerator_list
+%type   <enumerator>    enumerator
                         
 %%
 
@@ -170,6 +175,7 @@ type_specs:     void_spec { $$ = zc::VoidType::Create(@1); }
                     $$ = zc::combine_integral_type_specs(*$1, zc::g_semant_error, @1);
                 }
         |       struct_spec
+        |       enum_spec
         ;
 void_spec:      VOID { $$ = VOID; }
         ;
@@ -184,13 +190,13 @@ integral_spec:  CHAR { $$ = CHAR; }
         ;
 struct_spec:
                 STRUCT ID '{' struct_decl_list '}' {
-                    $$ = zc::StructType::Create($2->id(), $4, @1);
+                    $$ = zc::StructType::Create($4, $2->id(), @1);
                 }
         |       STRUCT ID {
-                    $$ = zc::StructType::Create($2->id(), nullptr, @1);
+                    $$ = zc::StructType::Create(nullptr, $2->id(), @1);
                 }
-        |       UNION ID '{' struct_decl_list '}' { $$ = zc::UnionType::Create($2->id(), $4, @1); }
-        |       UNION ID { $$ = zc::UnionType::Create($2->id(), nullptr, @1); }
+        |       UNION ID '{' struct_decl_list '}' { $$ = zc::UnionType::Create($4, $2->id(), @1); }
+        |       UNION ID { $$ = zc::UnionType::Create(nullptr, $2->id(), @1); }
         ; /* incomplete */
 struct_decl_list:
                 struct_decl {
@@ -219,6 +225,23 @@ struct_declarator_list:
 struct_declarator:
                 declarator
         ; /* incomplete (bit fields) */
+enum_spec:      ENUM ID '{' enumerator_list '}' {
+                    $$ = zc::EnumType::Create(zc::g_semant_error, $4->begin(),
+                                              $4->end(), $2->id(), @1);
+                }
+        |       ENUM '{' enumerator_list '}' {
+                    $$ = zc::EnumType::Create(zc::g_semant_error, $3->begin(),
+                                              $3->end(), nullptr, @1);
+                }
+        |       ENUM ID { $$ = zc::EnumType::Create($2->id(), @1); }
+        ;
+enumerator_list:
+                enumerator { $$ = new std::vector<zc::Enumerator *> {$1}; }
+        |       enumerator_list ',' enumerator { $$ = $1; $$->push_back($3); }
+        ;
+enumerator:     ID { $$ = zc::Enumerator::Create($1, nullptr, @1); }
+        |       ID '=' const_exp { $$ = zc::Enumerator::Create($1, $3, @1); }
+        ;
 optional_init_declarator_list:
                 /* empty */ { $$ = zc::ASTDeclarators::Create(@$); @$ = 0; }
         |       init_declarator_list

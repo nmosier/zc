@@ -80,9 +80,7 @@ LANGUAGE FEATURES
 [~] sizeof operator
 [ ] void param decl
 [X] add struct access semantics
+[ ] some id's ARE constant expressions, e.g. when they are enums
 
-
-
-WORKING STACK
-[ ] ArrayType TypeCheck
-[ ] constant expression evaluation during semantic analysis
+BUGS
+[ ] distinguishing between tagged types declared at different scopes

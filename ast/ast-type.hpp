@@ -220,34 +220,64 @@ namespace zc {
 
    class TaggedType: public ASTType {
    public:
-      Symbol *tag() const { return tag_; }
-      Types *membs() const { return membs_; }
-      virtual Kind kind() const override { return Kind::TYPE_TAGGED; }
-      enum class TagKind {TAG_STRUCT, TAG_UNION};
+      Symbol *tag() const { return tag_; }      
+      enum class TagKind {TAG_STRUCT, TAG_UNION, TAG_ENUM};
       virtual TagKind tag_kind() const = 0;
+      virtual Kind kind() const override { return Kind::TYPE_TAGGED; }
 
-      virtual void DumpNode(std::ostream& os) const override;      
+      /**
+       * Determine whether tagged type has been defined (not just declared).
+       */
+      virtual bool is_defined() const = 0;
+
+      /**
+       * Complete the definition of this tagged type instance given the definition of another
+       * instance.
+       * NOTE: Expects that @param other be of same derived type as this.
+       */
+      virtual void define(const TaggedType *def) = 0;
+
       virtual ASTType *Address() override;
       virtual ASTType *Dereference(SemantEnv *env) override;
-      virtual bool TypeEq(const ASTType *other) const override;      
-      virtual bool TypeCoerce(const ASTType *from) const override;
-      virtual int bytes() const override = 0;
-      virtual int offset(const Symbol *sym) const = 0;
+      virtual void EnscopeTag(SemantEnv& env);      
       virtual void TypeCheck(SemantEnv& env, bool allow_void) override;
-      void EnscopeTag(SemantEnv& env);      
+      virtual bool TypeEq(const ASTType *other) const override;      
+      virtual void TypeCheckMembs(SemantEnv& env) = 0;
       
    protected:
       Symbol *tag_;
-      Types *membs_;
 
       virtual const char *name() const = 0;
 
       template <typename... Args>
-      TaggedType(Symbol *tag, Types *membs, Args... args):
-         ASTType(args...), tag_(tag), membs_(membs) {}
+      TaggedType(Symbol *tag, Args... args): ASTType(args...), tag_(tag) {}
+   };
+
+   /**
+    * Abstract tagged type that has members (i.e. struct or union).
+    */
+   class CompoundType: public TaggedType {
+   public:
+      Types *membs() const { return membs_; }
+      virtual bool is_defined() const override { return membs_ != nullptr; }
+      virtual void define(const TaggedType *other) override;
+      
+      virtual void TypeCheckMembs(SemantEnv& env) override { membs()->TypeCheck(env); }
+      virtual bool TypeCoerce(const ASTType *from) const override;
+      virtual void DumpNode(std::ostream& os) const override;
+
+      virtual int bytes() const override = 0;
+      virtual int offset(const Symbol *sym) const = 0;
+      
+   protected:
+      Types *membs_;
+
+      template <typename... Args>
+      CompoundType(Types *membs, Args... args):
+         TaggedType(args...), membs_(membs) {}
    };
    
-   class StructType: public TaggedType {
+   class StructType: public CompoundType {
    public:
       virtual TagKind tag_kind() const override { return TagKind::TAG_STRUCT; }
 
@@ -261,10 +291,10 @@ namespace zc {
       virtual const char *name() const override { return "struct"; }
 
       template <typename... Args>
-      StructType(Args... args): TaggedType(args...) {}
+      StructType(Args... args): CompoundType(args...) {}
    };
 
-   class UnionType: public TaggedType {
+   class UnionType: public CompoundType {
    public:
       virtual TagKind tag_kind() const override { return TagKind::TAG_UNION; }      
 
@@ -278,7 +308,70 @@ namespace zc {
       virtual const char *name() const override { return "union"; }
 
       template <typename... Args>
-      UnionType(Args... args): TaggedType(args...) {}
+      UnionType(Args... args): CompoundType(args...) {}
+   };
+
+   class Enumerator;
+   class EnumType: public TaggedType {
+      typedef std::unordered_map<const Symbol *, Enumerator *> Enumerators;
+   public:
+      virtual TagKind tag_kind() const override {return TagKind::TAG_ENUM; }
+      virtual bool is_defined() const override { return enumerators_.empty(); }
+      virtual void define(const TaggedType *def) override {
+         enumerators_ = dynamic_cast<const EnumType *>(def)->enumerators_;
+      }
+
+      virtual void DumpNode(std::ostream& os) const override { os << "EnumType"; }
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
+      
+      void Insert(SemantError& err, Enumerator *enumerator);
+
+      void EnscopeEnumerators(SemantEnv& env);
+      virtual void TypeCheckMembs(SemantEnv& env) override { EnscopeEnumerators(env); }
+      virtual bool TypeCoerce(const ASTType *other) const override;
+
+      virtual int bytes() const override { return int_type_->bytes(); }
+
+      template <typename... Args>
+      static EnumType *Create(Args... args) { return new EnumType(args...); }
+      
+   protected:
+      IntegralType *int_type_;
+      Enumerators enumerators_;
+      
+      virtual const char *name() const override { return "enum"; }
+      
+      template <typename... Args> EnumType(Args... args): TaggedType(args...) {
+         int_type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, 0);
+      }
+
+      template <typename InputIterator, typename... Args>
+      EnumType(SemantError& err, InputIterator begin, InputIterator end, Args... args):
+         TaggedType(args...) {
+         int_type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, 0);      
+         for (; begin != end; ++begin) {
+            Insert(err, *begin);
+         }
+      }
+   };
+
+   class Enumerator: public ASTNode {
+   public:
+      Identifier *id() const { return id_; }
+      ASTExpr *val() const { return val_; }
+
+      virtual void DumpNode(std::ostream& os) const override;
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
+      
+      template <typename... Args>
+      static Enumerator *Create(Args... args) { return new Enumerator(args...); }
+      
+   private:
+      Identifier *id_;
+      ASTExpr *val_;
+
+      template <typename... Args>
+      Enumerator(Identifier *id, ASTExpr *val, Args... args): ASTNode(args...), id_(id), val_(val) {}
    };
 
    class ArrayType: public ASTType {
@@ -315,7 +408,8 @@ namespace zc {
    };
 
    std::ostream& operator<<(std::ostream& os, IntegralType::IntKind kind);
-   std::ostream& operator<<(std::ostream& os, TaggedType::TagKind kind);
+   std::ostream& operator<<(std::ostream& os, CompoundType::TagKind kind);
+   
 
 }
    
