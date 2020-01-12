@@ -46,28 +46,10 @@ namespace zc {
       return_type()->DumpNode(os);
       os << ")";
       os << "(";
-      params()->DumpNode(os);
+      for (auto param : *params()) {
+         param->DumpNode(os);
+      }
       os << ")";
-   }
-
-   void CompoundType::DumpNode(std::ostream& os) const {
-      os << name();
-      if (tag() != nullptr) {
-         os << tag();
-      }
-      os << " { ";
-      if (membs() != nullptr) {
-         membs()->DumpNode(os);
-      }
-      os << " }";
-   }
-
-   void Types::DumpNode(std::ostream& os) const {
-      std::for_each(vec_.begin(), vec_.end(),
-                    [&](const ASTType *type) {
-                       type->DumpNode(os);
-                       os << ", ";
-                    });
    }
 
    const FunctionType *PointerType::get_callable() const {
@@ -143,29 +125,6 @@ namespace zc {
       return PointerType::Create(1, this, loc());
    }
 
-   void Types::Enscope(SemantEnv& env) {
-      for (ASTType *type : vec()) {
-         type->Enscope(env);
-      }
-   }
-
-   ASTType *Types::Lookup(const Symbol *sym) const {
-      auto it = std::find_if(vec().begin(), vec().end(),
-                             [&](const ASTType *type) -> bool {
-                                return type->sym() == sym;
-                             });
-      return it == vec().end() ? nullptr : *it;
-   }
-
-   void CompoundType::define(const TaggedType *other) {
-      const CompoundType *comp_other = dynamic_cast<const CompoundType *>(other);
-      if (comp_other == nullptr) {
-         throw std::logic_error("attempted to complete definition of type with different tag");
-      } else {
-         membs_ = comp_other->membs();
-      }
-   }
-
    void Enumerator::DumpNode(std::ostream& os) const {
       os << "'" << *id()->id() << "'";
    }
@@ -180,6 +139,10 @@ namespace zc {
       for (auto pair : enumerators_) {
          pair.second->Dump(os, level, with_types);
       }
+   }
+
+   void TaggedType::DumpNode(std::ostream& os) const {
+      os << tag_kind() << "'" << *tag() << "'";
    }
    
  }

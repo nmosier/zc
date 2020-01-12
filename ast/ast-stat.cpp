@@ -8,7 +8,9 @@ namespace zc {
    }
 
    void CompoundStat::DumpChildren(std::ostream& os, int level, bool with_types) const {
-      decls_->Dump(os, level, with_types);
+      for (auto decl : *decls_) {
+         decl->Dump(os, level, with_types);
+      }
       stats_->Dump(os, level, with_types);
    }
 

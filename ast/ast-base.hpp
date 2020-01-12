@@ -76,6 +76,10 @@ namespace zc {
          vec_.resize(other->vec().size());
          std::transform(other->vec().begin(), other->vec().end(), vec_.begin(), func);
       }
+      template <class InputIt, typename Func, typename... Args>
+      ASTNodeVec(InputIt begin, InputIt end, Func func, Args... args): ASTNode(args...) {
+         std::transform(begin, end, std::back_inserter(vec_), func);
+      }
       template <typename... Args> ASTNodeVec(Args... args): ASTNode(args...) {}
       
    };

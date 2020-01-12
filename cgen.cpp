@@ -118,7 +118,7 @@ namespace zc {
       FrameGen(env.ext_env().frame());
 
       /* assign argument stack locations */
-      for (const ASTType *type : Type()->get_callable()->params()->vec()) {
+      for (const ASTType *type : *Type()->get_callable()->params()) {
          SymInfo *info = env.ext_env().frame().next_arg(type);
          env.symtab().AddToScope(type->sym(), info);
       }
@@ -147,7 +147,7 @@ namespace zc {
          env.EnterScope();
       }
 
-      for (ASTType *decl : decls()->vec()) {
+      for (ASTType *decl : *decls()) {
          decl->CodeGen(env);
       }
 
@@ -1245,7 +1245,7 @@ namespace zc {
       base_bytes_(long_size * 2), locals_bytes_(0), args_bytes_(0), next_local_addr_(nullptr),
       next_arg_addr_(nullptr) /* saved FP, RA */ {
       /* add size for each param */
-      args_bytes_ = params->vec().size() * long_size;
+      args_bytes_ = params->size() * long_size;
    }
 
    int StackFrame::bytes() const { return base_bytes_ + locals_bytes_ + args_bytes_; }
@@ -1275,7 +1275,7 @@ namespace zc {
    }
 
    void CompoundStat::FrameGen(StackFrame& frame) const {
-      for (const ASTType *decl : decls()->vec()) {
+      for (const ASTType *decl : *decls()) {
          decl->FrameGen(frame);
       }
       for (const ASTStat *stat : stats()->vec()) {
@@ -1297,16 +1297,6 @@ namespace zc {
    }
 
 
-   /*** TYPE SIZES ***/
-   int Types::bytes() const {
-      std::vector<int> byte_vec(vec().size());
-      std::transform(vec().begin(), vec().end(), byte_vec.begin(),
-                     [](const ASTType *type) -> int {
-                        return type->bytes();
-                     });
-      return std::accumulate(byte_vec.begin(), byte_vec.end(), 0);
-   }
-   
    int PointerType::bytes() const {
       return long_size;
    }
@@ -1332,16 +1322,16 @@ namespace zc {
    }
 
    int StructType::bytes() const {
-      return std::accumulate(membs()->vec().begin(), membs()->vec().end(), 0,
-                             [](int acc, const ASTType *memb) -> int {
-                                return acc + memb->bytes();
+      return std::accumulate(membs()->begin(), membs()->end(), 0,
+                             [](int acc, auto pair) -> int {
+                                return acc + pair.second->bytes();
                              });
    }
 
    int UnionType::bytes() const {
       std::vector<int> sizes;
-      std::transform(membs()->vec().begin(), membs()->vec().end(), std::back_inserter(sizes),
-                     [](const ASTType *memb) { return memb->bytes(); });
+      std::transform(membs()->begin(), membs()->end(), std::back_inserter(sizes),
+                     [](auto pair) { return pair.second->bytes(); });
       return *std::max_element(sizes.begin(), sizes.end());
    }
 
@@ -1350,13 +1340,13 @@ namespace zc {
    }
 
    int StructType::offset(const Symbol *sym) const {
-      auto it = std::find_if(membs()->vec().begin(), membs()->vec().end(),
-                             [&](const ASTType *type) -> bool {
-                                return type->sym() == sym;
+      auto it = std::find_if(membs()->begin(), membs()->end(),
+                             [&](auto pair) -> bool {
+                                return pair.second->sym() == sym;
                              });
-      return std::accumulate(membs()->vec().begin(), it, 0,
-                             [](int acc, const ASTType *type) -> int {
-                                return acc + type->bytes();
+      return std::accumulate(membs()->begin(), it, 0,
+                             [](int acc, auto pair) -> int {
+                                return acc + pair.second->bytes();
                              });
    }
    

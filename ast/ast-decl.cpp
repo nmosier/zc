@@ -30,7 +30,9 @@ namespace zc {
 
    void FunctionDeclarator::DumpChildren(std::ostream& os, int level, bool with_types) const  {
       declarator_->Dump(os, level, with_types);
-      params_->Dump(os, level, with_types);
+      for (auto param : *params_) {
+         param->Dump(os, level, with_types);
+      }
    }
 
    void Decl::DumpChildren(std::ostream& os, int level, bool with_types) const {

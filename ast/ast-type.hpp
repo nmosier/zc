@@ -5,12 +5,20 @@
 #ifndef __AST_TYPE_HPP
 #define __AST_TYPE_HPP
 
+#include <vector>
+
 #include "ast-decl.hpp"
+
+extern const char *g_filename;
 
 namespace zc {
 
+
    class FunctionType;
    class ASTType;
+   typedef std::vector<ASTType *> Types;
+
+   bool TypeEq(const Types *lhs, const Types *rhs);   
 
    class ASTType: public ASTNode {
    public:
@@ -67,31 +75,6 @@ namespace zc {
 
    std::ostream& operator<<(std::ostream& os, ASTType::Kind kind);
 
-
-   class Types: public ASTNodeVec<ASTType> {
-   public:
-      template <typename... Args>
-      static Types *Create(Args... args) {
-         return new Types(args...);
-      }
-
-      virtual void DumpNode(std::ostream& os) const override;
-      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
-
-      ASTType *Lookup(const Symbol *sym) const;
-      
-      bool TypeEq(const Types *others) const;
-      void TypeCheck(SemantEnv& env);
-      void Enscope(SemantEnv& env);
-
-      int bytes() const;
-
-   protected:
-      template <typename... Args>
-      Types(Args... args): ASTNodeVec<ASTType>(args...) {}
-      Types(Vec vec, const SourceLoc& loc): ASTNodeVec<ASTType>(vec, loc) {}
-      
-   };
 
    class PointerType: public ASTType {
    public:
@@ -228,15 +211,17 @@ namespace zc {
       /**
        * Determine whether tagged type has been defined (not just declared).
        */
-      virtual bool is_defined() const = 0;
+      virtual bool is_complete() const = 0;
 
       /**
        * Complete the definition of this tagged type instance given the definition of another
        * instance.
        * NOTE: Expects that @param other be of same derived type as this.
        */
-      virtual void define(const TaggedType *def) = 0;
+      virtual void complete(const TaggedType *def) = 0;
 
+      virtual void DumpNode(std::ostream& os) const override;
+      
       virtual ASTType *Address() override;
       virtual ASTType *Dereference(SemantEnv *env) override;
       virtual void EnscopeTag(SemantEnv& env);      
@@ -253,28 +238,67 @@ namespace zc {
       TaggedType(Symbol *tag, Args... args): ASTType(args...), tag_(tag) {}
    };
 
+   template <typename Memb>
+   class TaggedType_aux: public TaggedType {
+   public:
+      typedef std::unordered_map<Symbol *, Memb *> Membs;
+      Membs *membs() const { return membs_; }
+      virtual bool is_complete() const override { return membs() != nullptr; }
+      virtual void complete(const TaggedType *other) override {
+         membs_ = dynamic_cast<const TaggedType_aux<Memb> *>(other)->membs();
+      }
+
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {
+         if (membs() != nullptr) {
+            for (auto pair : *membs()) {
+               pair.second->Dump(os, level, with_types);
+            }
+         }
+      }
+      
+      virtual void TypeCheckMembs(SemantEnv& env) override {
+         if (membs() != nullptr) {
+            for (auto pair : *membs()) {
+               pair.second->TypeCheck(env);
+            }
+         }
+      }
+      
+   protected:
+      Membs *membs_;
+
+      template <typename InputIt, typename... Args>
+      TaggedType_aux(SemantError& err, InputIt membs_begin, InputIt membs_end,
+                     Args... args):
+         TaggedType(args...), membs_(new Membs()) {
+         for (; membs_begin != membs_end; ++membs_begin) {
+            auto it = membs_->find((*membs_begin)->sym());
+            if (it != membs_->end()) {
+               err(g_filename, it->second) << "duplicate member '" << *it->second->sym() << "'"
+                                           << std::endl;
+            } else {
+               (*membs_)[(*membs_begin)->sym()] = *membs_begin;
+            }
+         }
+      }
+
+      template <typename... Args>
+      TaggedType_aux(Args... args): TaggedType(args...), membs_(nullptr) {}
+   };
+
    /**
     * Abstract tagged type that has members (i.e. struct or union).
     */
-   class CompoundType: public TaggedType {
+   class CompoundType: public TaggedType_aux<ASTType> {
    public:
-      Types *membs() const { return membs_; }
-      virtual bool is_defined() const override { return membs_ != nullptr; }
-      virtual void define(const TaggedType *other) override;
-      
-      virtual void TypeCheckMembs(SemantEnv& env) override { membs()->TypeCheck(env); }
       virtual bool TypeCoerce(const ASTType *from) const override;
-      virtual void DumpNode(std::ostream& os) const override;
 
       virtual int bytes() const override = 0;
       virtual int offset(const Symbol *sym) const = 0;
       
    protected:
-      Types *membs_;
-
       template <typename... Args>
-      CompoundType(Types *membs, Args... args):
-         TaggedType(args...), membs_(membs) {}
+      CompoundType(Args... args): TaggedType_aux<ASTType>(args...) {}
    };
    
    class StructType: public CompoundType {
@@ -316,8 +340,8 @@ namespace zc {
       typedef std::unordered_map<const Symbol *, Enumerator *> Enumerators;
    public:
       virtual TagKind tag_kind() const override {return TagKind::TAG_ENUM; }
-      virtual bool is_defined() const override { return enumerators_.empty(); }
-      virtual void define(const TaggedType *def) override {
+      virtual bool is_complete() const override { return enumerators_.empty(); }
+      virtual void complete(const TaggedType *def) override {
          enumerators_ = dynamic_cast<const EnumType *>(def)->enumerators_;
       }
 
@@ -358,6 +382,7 @@ namespace zc {
    class Enumerator: public ASTNode {
    public:
       Identifier *id() const { return id_; }
+      Symbol *sym() const { return id()->id(); }
       ASTExpr *val() const { return val_; }
 
       virtual void DumpNode(std::ostream& os) const override;

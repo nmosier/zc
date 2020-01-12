@@ -18,6 +18,7 @@ namespace zc {
    template <class Node> class ASTNodeVec;
    template <class Spec> class ASTSpecs;
    class ASTType;
+   typedef std::vector<ASTType *> Types;
    
    class TranslationUnit;
    class Decl;

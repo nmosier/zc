@@ -10,22 +10,21 @@
 namespace zc {
 
    class ASTType;
-   class Types;
 
-  class ExternalDecl: public ASTNode {
+   class ExternalDecl: public ASTNode {
    public:
-     ASTType *decl() const { return decl_; }
-     Symbol *sym() const;
-     
-     template <typename... Args>
-     static ExternalDecl *Create(Args... args) {
+      ASTType *decl() const { return decl_; }
+      Symbol *sym() const;
+      
+      template <typename... Args>
+      static ExternalDecl *Create(Args... args) {
          return new ExternalDecl(args...);
       }
-
+      
       virtual void DumpNode(std::ostream& os) const override { os << "ExternalDecl"; }
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
-
-     /* Semantic Analysis */
+      
+      /* Semantic Analysis */
       virtual void TypeCheck(SemantEnv& env);
       ASTType *Type() const;
       virtual void Enscope(SemantEnv& env) const;
@@ -114,6 +113,7 @@ namespace zc {
          ASTNode(loc), specs_(specs), declarator_(declarator) {}
    };
 
+#if 0
    class Decls: public ASTNodeVec<Decl> {
    public:
       static Decls *Create(const SourceLoc& loc) { return new Decls(loc); }
@@ -133,7 +133,8 @@ namespace zc {
    protected:
       template <typename... Args> Decls(Args... args): ASTNodeVec<Decl>(args...) {}
    };
-
+#endif
+   
 
 #if 0
    /* NOTE: Abstract class. */

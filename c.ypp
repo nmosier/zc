@@ -51,8 +51,8 @@
     zc::Types *types;
     int token;
     std::unordered_multiset<int> *token_multiset;
-    std::vector<zc::Enumerator *> *enumerators;
     zc::Enumerator *enumerator;
+    std::vector<zc::Enumerator *> *enum_membs;
 }
 
 %initial-action {
@@ -99,6 +99,7 @@
 %type  <types>         optional_decl_list decl_list decl struct_decl_list struct_decl
 %type  <declarators>   init_declarator_list optional_init_declarator_list struct_declarator_list
 %type  <declarator>    init_declarator declarator direct_declarator optional_abstract_declarator abstract_declarator direct_abstract_declarator struct_declarator
+%type   <enum_membs>    enumerator_list
 %type  <pointer>       pointer
 %type  <type>    param_decl
 %type  <types>   param_type_list optional_param_type_list param_list
@@ -115,7 +116,6 @@
 %type   <token_multiset>        integral_spec_list
 %type   <token>          void_spec
 %type   <type>    type_specs struct_spec enum_spec
-%type   <enumerators> enumerator_list
 %type   <enumerator>    enumerator
                         
 %%
@@ -134,9 +134,12 @@ translation_unit:
                                            $2->vec().end());
                 }
         ;
-external_decl:  function_definition { $$ = zc::ExternalDecls::Create((zc::ExternalDecl *) $1, @1); }
+external_decl:  function_definition {
+                    $$ = zc::ExternalDecls::Create(@1);
+                    $$->vec().push_back($1);
+                }
         |       decl { $$ = zc::ExternalDecls::Create
-                        ((zc::ASTNodeVec<zc::ASTType> *) $1,
+                        ($1->begin(), $1->end(),
                          [&](zc::ASTType *decl) -> zc::ExternalDecl * {
                             return zc::ExternalDecl::Create(decl, @1);
                         }, @1); }
@@ -150,22 +153,23 @@ function_definition:
                 }
         ; /* incomplete */
 optional_decl_list:
-                /* empty */ { $$ = zc::Types::Create(@$); }
+                /* empty */ { $$ = new zc::Types(); }
         |       decl_list { $$ = $1; }
         ;
 
 decl_list:      decl
-        |       decl_list decl { $1->vec().insert($1->vec().end(), $2->vec().begin(), $2->vec().end()); }
-
+        |       decl_list decl {
+                    $$ = $1; $$->insert($1->end(), $2->begin(), $2->end());
+                }
         ;
 decl:           type_specs optional_init_declarator_list ';' {
-                    $$ = zc::Types::Create(@1);
+                    $$ = new zc::Types();
                     if ($2->vec().empty()) {
-                        $$->vec().push_back($1); /* just in case type_specs contains a struct
+                        $$->push_back($1); /* just in case type_specs contains a struct
                                                   * definition */
                     } else {
                         for (auto decl : $2->vec()) {
-                            $$->vec().push_back(zc::ASTType::Create($1, decl, @1));
+                            $$->push_back(zc::ASTType::Create($1, decl, @1));
                         }
                     }
                 }
@@ -190,28 +194,32 @@ integral_spec:  CHAR { $$ = CHAR; }
         ;
 struct_spec:
                 STRUCT ID '{' struct_decl_list '}' {
-                    $$ = zc::StructType::Create($4, $2->id(), @1);
+                    $$ = zc::StructType::Create(zc::g_semant_error, $4->begin(), $4->end(),
+                                                $2->id(), @1);
                 }
         |       STRUCT ID {
-                    $$ = zc::StructType::Create(nullptr, $2->id(), @1);
+                    $$ = zc::StructType::Create($2->id(), @1);
                 }
-        |       UNION ID '{' struct_decl_list '}' { $$ = zc::UnionType::Create($4, $2->id(), @1); }
-        |       UNION ID { $$ = zc::UnionType::Create(nullptr, $2->id(), @1); }
+        |       UNION ID '{' struct_decl_list '}' {
+                    $$ = zc::UnionType::Create(zc::g_semant_error, $4->begin(),
+                                               $4->end(), $2->id(), @1);
+                }
+        |       UNION ID { $$ = zc::UnionType::Create($2->id(), @1); }
         ; /* incomplete */
 struct_decl_list:
                 struct_decl {
-                         $$ = zc::Types::Create(@1);
-                         $$->vec().insert($$->vec().end(), $1->vec().begin(), $1->vec().end());
+                         $$ = new zc::Types();
+                         $$->insert($$->end(), $1->begin(), $1->end());
                 }
         |       struct_decl_list struct_decl {
                      $$ = $1;
-                     $$->vec().insert($$->vec().end(), $2->vec().begin(), $2->vec().end());
+                     $$->insert($$->end(), $2->begin(), $2->end());
                 }
         ;
 struct_decl:    type_specs struct_declarator_list ';' {
-                    $$ = zc::Types::Create(@1);
+                    $$ = new zc::Types();
                     for (zc::ASTDeclarator *declarator : $2->vec()) {
-                        $$->vec().push_back(zc::ASTType::Create($1, declarator, @1));
+                        $$->push_back(zc::ASTType::Create($1, declarator, @1));
                     }
                 }           
         ;
@@ -273,14 +281,14 @@ pointer:        '*' { $$ = 1; }
         |       '*' pointer { $$ = $2 + 1; }
         ;
 optional_param_type_list:
-                /* empty */ { $$ = zc::Types::Create(0); }
+                /* empty */ { $$ = new zc::Types(); }
         |       param_type_list { $$ = $1; }
         ;
 param_type_list:
                 param_list
         ; /* incomplete */
-param_list:     param_decl { $$ = zc::Types::Create(@1); $$->vec().push_back($1); }
-        |       param_list ',' param_decl { $$ = $1; $$->vec().push_back($3); }
+param_list:     param_decl { $$ = new zc::Types(); $$->push_back($1); }
+        |       param_list ',' param_decl { $$ = $1; $$->push_back($3); }
         ;
 param_decl:     type_specs declarator { $$ = zc::ASTType::Create($1, $2, @1); }
         ; /* incomplete */

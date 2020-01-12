@@ -139,11 +139,13 @@
           return_type_ = PointerType::Create(1, return_type(), return_type()->loc());
        }
        return_type()->TypeCheck(env, true);
-       params()->TypeCheck(env);
+       for (auto param : *params()) {
+          param->TypeCheck(env);
+       }
     }
 
     void TaggedType::TypeCheck(SemantEnv& env, bool allow_void) {
-       if (is_defined()) {
+       if (is_complete()) {
           /* this tagged type is a complete definition */
           TypeCheckMembs(env);
 
@@ -164,7 +166,7 @@
                                            << "not match previous declaration" << std::endl;
           } else {
              /* otherwise, define this type with other defined type */
-             define(type);
+             complete(type);
           }
        }
     }
@@ -196,15 +198,16 @@
           env.error()(g_filename, this) << "use of '" << *sym()
                                         << "' with tag type that does "
                                         << "not match previous declaration" << std::endl;
-       } else if (!tagged_type->is_defined()) {
+       } else if (!tagged_type->is_complete()) {
           /* tag in table is incomplete */
-          if (is_defined()) {
-             /* this tagged type has a full definition, so add members to existing enscoped struct */
-             tagged_type->define(this);
+          if (is_complete()) {
+             /* this tagged type has a full definition, 
+              * so add members to existing enscoped struct */
+             tagged_type->complete(this);
           }
        } else { // tagged_type is defined
-          if (!is_defined()) {
-             define(tagged_type);
+          if (!is_complete()) {
+             complete(tagged_type);
           } else {
              if (env.tagtab().Probe(tag()) != nullptr) {
                 /* redefined in same scope -- error */
@@ -242,10 +245,6 @@
        }
     }
 
-    void Types::TypeCheck(SemantEnv& env) {
-       ASTNodeVec::TypeCheck(env);
-    }
- 
     void TranslationUnit::TypeCheck(SemantEnv& env) {
        Enscope(env);
        decls()->TypeCheck(env);
@@ -271,7 +270,9 @@
 
     void FunctionDeclarator::TypeCheck(SemantEnv& env) {
        declarator()->TypeCheck(env);
-       params()->TypeCheck(env);
+       for (auto param : *params()) {
+          param->TypeCheck(env);
+       }
     }
 
     void ArrayDeclarator::TypeCheck(SemantEnv& env) {
@@ -283,13 +284,17 @@
     }
     
    void CompoundStat::TypeCheck(SemantEnv& env, bool scoped) {
-      decls()->TypeCheck(env);
+      for (auto decl : *decls()) {
+         decl->TypeCheck(env);
+      }
 
       if (scoped) {
          env.EnterScope();
       }
 
-      decls()->Enscope(env);      
+      for (auto decl : *decls()) {
+         decl->Enscope(env);
+      }
       stats()->TypeCheck(env);
 
       if (scoped) {
@@ -377,16 +382,16 @@
        type_ = type->return_type();
        
        /* verify that argument parameters can be coerced to function parameter types */
-       if (type->params()->vec().size() != params()->vec().size()) {
+       if (type->params()->size() != params()->vec().size()) {
           env.error()(g_filename, this) << "incorrect number of arguments given (expected"
-                                        << type->params()->vec().size() << " but got "
+                                        << type->params()->size() << " but got "
                                         << params()->vec().size() << ")" << std::endl;
           return;
        }
 
        /* coerce types one-by-one */
-       auto type_it = type->params()->vec().begin();
-       auto type_end = type->params()->vec().end();
+       auto type_it = type->params()->begin();
+       auto type_end = type->params()->end();
        auto arg_it = params()->vec().begin();
        auto arg_end = params()->vec().end();
        for (int i = 1; type_it != type_end; ++type_it, ++arg_it, ++i) {
@@ -411,15 +416,16 @@
           env.error()(g_filename, this) << "member access into incomplete "
                                         << compound_type->kind() << "'"
                                         << compound_type->tag() << "'" << std::endl;
+          type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());
        } else {
-          Types *membs = compound_type->membs();
-          ASTType *memb_decl = membs->Lookup(memb());
-          if (memb_decl == nullptr) {
+          auto pair = compound_type->membs()->find(memb());
+          if (pair == compound_type->membs()->end()) {
              env.error()(g_filename, this) << "no member named '" << *memb() << "' in "
                                            << compound_type->kind() << "'"
                                            << compound_type->tag() << "'" << std::endl;
+             type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());
           } else {
-             type_ = memb_decl;
+             type_ = pair->second;
           }
        }
     }
@@ -635,7 +641,7 @@
           return false;
        } else {
           return return_type()->TypeEq(fn_other->return_type()) &&
-             params()->TypeEq(fn_other->params());
+             ::zc::TypeEq(params(), fn_other->params());
        }
     }
 
@@ -649,15 +655,15 @@
        }
     }
     
-    bool Types::TypeEq(const Types *others) const {
-       if (this->vec_.size() != others->vec_.size()) {
+    bool TypeEq(const Types *lhs, const Types *rhs) {
+       if (lhs->size() != rhs->size()) {
           return false;
        }
-    
-       for (auto this_it = this->vec_.begin(), others_it = others->vec_.begin();
-            this_it != this->vec_.end();
-            ++this_it, ++others_it) {
-          if (!(*this_it)->TypeEq(*others_it)) {
+
+       for (auto lhs_it = lhs->begin(), rhs_it = rhs->begin();
+            lhs_it != lhs->end();
+            ++lhs_it, ++rhs_it) {
+          if (!(*lhs_it)->TypeEq(*rhs_it)) {
              return false;
           }
        }
@@ -720,13 +726,6 @@
 
    void FunctionDeclarator::JoinPointers() {
       declarator()->JoinPointers();
-   }
-
-   void Decls::JoinPointers() {
-      std::for_each(vec_.begin(), vec_.end(),
-                    [](Decl *decl) {
-                       decl->JoinPointers();
-                    });
    }
 
    void Decl::JoinPointers() {
@@ -816,15 +815,6 @@
       ASTType *init_type = specs();
       init_type->set_sym(sym());
       return declarator()->Type(init_type);
-   }
-
-   Types *Decls::Type() const {
-      Types::Vec type_vec(vec_.size());
-      std::transform(vec_.begin(), vec_.end(), type_vec.begin(),
-                     [](Decl *decl) -> ASTType * {
-                        return decl->Type();
-                     });
-      return Types::Create(type_vec, loc());
    }
 
     /*** ADDRESS OF TYPE ***/
@@ -917,7 +907,7 @@
        }
 
        Types *params = type->params();
-       std::for_each(params->vec().begin(), params->vec().end(),
+       std::for_each(params->begin(), params->end(),
                      [&](ASTType *param) {
                         param->Enscope(env);
                      });
