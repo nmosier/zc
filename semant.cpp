@@ -145,6 +145,8 @@
     }
 
     void TaggedType::TypeCheck(SemantEnv& env, bool allow_void) {
+       AssignUniqueID(env);
+       
        if (is_complete()) {
           /* this tagged type is a complete definition */
           TypeCheckMembs(env);
@@ -168,6 +170,11 @@
              /* otherwise, define this type with other defined type */
              complete(type);
           }
+       }
+
+       /* set unique ID */
+       if (unique_id() < 0) {
+          unique_id_ = env.tagtab().Lookup(tag())->unique_id();
        }
     }
 
@@ -204,6 +211,7 @@
        if (tagged_type == nullptr) {
           /* first mention of tag */
           env.tagtab().AddToScope(tag(), this);
+          unique_id_ = unique_id_counter_++;
        } else if (kind() != tagged_type->kind()) {
           /* tagged kinds do not match */
           env.error()(g_filename, this) << "use of '" << *sym()
@@ -231,6 +239,18 @@
                 env.tagtab().AddToScope(tag(), this);
              }
           }
+       }
+    }
+
+    void TaggedType::AssignUniqueID(SemantEnv& env) {
+       auto lookup_type = env.tagtab().Lookup(tag());
+       auto probe_type = env.tagtab().Probe(tag());
+       if (lookup_type == nullptr) { /* first declaration of tag */
+          unique_id_ = unique_id_counter_++;
+       } else if (probe_type == nullptr && is_complete()) { /* scoped redefinition of tag */
+          unique_id_ = unique_id_counter_++;
+       } else { /* reference to previously declared tag */
+          unique_id_ = lookup_type->unique_id();
        }
     }
 
@@ -652,8 +672,7 @@
        if (tagged_other == nullptr) {
           return false;
        } else {
-          return this->tag() != nullptr && tagged_other->tag() != nullptr &&
-             this->tag() == tagged_other->tag();
+          return unique_id() == tagged_other->unique_id();
        }
     }
     

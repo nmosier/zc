@@ -9,6 +9,8 @@ extern const char *g_filename;
 
 namespace zc {
 
+   int TaggedType::unique_id_counter_ = 0;
+
    std::ostream& operator<<(std::ostream& os, IntegralType::IntKind kind) {
       using IntKind = IntegralType::IntKind;
       std::unordered_map<IntegralType::IntKind,const char *> map

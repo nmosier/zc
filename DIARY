@@ -91,4 +91,12 @@ Next, I wrote a couple tests for the arrow operator, which is when I started to 
 
 [2 hrs] Implemented GOTO.
 
-NEXT: enums.
+01/11/2020
+
+I spent today working on adding enums. Enums are a 3rd (and last) kind of ``tagged type'' (along with structs and unions). Tagged types are qualified with a 'struct', 'union', or 'enum' and followed by an optional identifier. (Tagged types without tags are called anonymous.) Because of the similarities between how structs, unions, and enums behave, I created a new base class for these three types, 'TaggedType'. The TaggedType class has a 'tag()' property and it specifies an interface for tagged types:
+  - TagKind tag_kind(): what kind of tag this is (TAG_STRUCT, TAG_UNION, or TAG_ENUM)
+  - bool is_complete(): whether this tagged type carries a complete definition
+  - void complete(const TaggedType *other): complete this type's definition given a complete instance of this type
+An auxiliary template class 'template <typename Memb> TaggedType_aux' inherits from TaggedType and implements TaggedType's interface. This auxiliary class defines a member 'membs', an pointer to an unordered map from Symbol * (which are the member identifiers) to Memb *, the template parameter. complete()'ing the definition of a type simply involves copying the member map pointer from the given complete type.
+Further, the new 'CompoundType' class inherits from 'TaggedType_aux<ASTType>', representing types that hold multiple other types, namely structs and unions. This defines its own small interface, specifically 'offset()', which finds the offset of a given member ID within the compound type.
+The enum type EnumType inherits from TaggedType_aux<Enumerator>, where 'Enumerator' is a new AST node representing a single enumerator declaration in an enum.

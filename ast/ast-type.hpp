@@ -203,7 +203,17 @@ namespace zc {
 
    class TaggedType: public ASTType {
    public:
-      Symbol *tag() const { return tag_; }      
+      /**
+       * The (not necessarily unique) tag name for this tagged type.
+       */
+      Symbol *tag() const { return tag_; }
+
+      /**
+       * The unique, scope-independent identifier for this tagged type.
+       * All instances of this type shall have the same unique_id.
+       */
+      int unique_id() const { return unique_id_; }
+      
       enum class TagKind {TAG_STRUCT, TAG_UNION, TAG_ENUM};
       virtual TagKind tag_kind() const = 0;
       virtual Kind kind() const override { return Kind::TYPE_TAGGED; }
@@ -231,11 +241,18 @@ namespace zc {
       
    protected:
       Symbol *tag_;
+      int unique_id_;
+      static int unique_id_counter_;
 
       virtual const char *name() const = 0;
+      void AssignUniqueID(SemantEnv& env);
 
       template <typename... Args>
-      TaggedType(Symbol *tag, Args... args): ASTType(args...), tag_(tag) {}
+      TaggedType(Symbol *tag, Args... args): ASTType(args...), tag_(tag), unique_id_(-1) {}
+
+      template <typename... Args>
+      TaggedType(Symbol *tag, int unique_id, Args... args):
+         ASTType(args...), tag_(tag), unique_id_(unique_id) {}
    };
 
    template <typename Memb>
