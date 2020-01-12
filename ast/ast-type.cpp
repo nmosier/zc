@@ -135,12 +135,6 @@ namespace zc {
       }
    }
 
-   void EnumType::DumpChildren(std::ostream& os, int level, bool with_types) const {
-      for (auto pair : enumerators_) {
-         pair.second->Dump(os, level, with_types);
-      }
-   }
-
    void TaggedType::DumpNode(std::ostream& os) const {
       os << tag_kind() << "'" << *tag() << "'";
    }

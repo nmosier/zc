@@ -148,7 +148,7 @@ int main(int argc, char *argv[]) {
 
   if (out_filename.empty()) {
      g_outpath = std::string("<stdout>");
-     Semant(g_AST_root);
+     // Semant(g_AST_root);
      Cgen(g_AST_root, std::cout, g_outpath.c_str());
      exit(0);
   } 

@@ -161,13 +161,24 @@
              EnscopeTag(env);
           } else if (type->tag_kind() != tag_kind()) {
              /* tagged kinds do not match */
-             env.error()(g_filename, this) << "use of '" << *sym()
+             env.error()(g_filename, this) << "use of '" << *tag()
                                            << "' with tag type that does "
                                            << "not match previous declaration" << std::endl;
           } else {
              /* otherwise, define this type with other defined type */
              complete(type);
           }
+       }
+    }
+
+    void Enumerator::TypeCheck(SemantEnv& env) {
+       val()->TypeCheck(env);
+       
+       if (!val()->is_const()) {
+          env.error()(g_filename, this) << "enumerator value for '"
+                                        << *sym()
+                                        << "' is not constant"
+                                        << std::endl;
        }
     }
 
@@ -212,8 +223,8 @@
              if (env.tagtab().Probe(tag()) != nullptr) {
                 /* redefined in same scope -- error */
                 env.error()(g_filename, this) << "redefinition of "
-                                              << kind()
-                                              << "'" << *tag()
+                                              << tag_kind()
+                                              << " '" << *tag()
                                               << "'" << std::endl;
              } else {
                 /* redefinition in different scope -- OK */
@@ -223,17 +234,8 @@
        }
     }
 
-   void EnumType::Insert(SemantError& err, Enumerator *enumerator) {
-      const Symbol *sym = enumerator->id()->id();
-      if (enumerators_.find(sym) != enumerators_.end()) {
-         err(g_filename, this) << "duplicate enumeration constant '" << *sym << "'" << std::endl;
-      } else {
-         enumerators_[sym] = enumerator;
-      }
-   }
-
     void EnumType::EnscopeEnumerators(SemantEnv& env) {
-       for (auto pair : enumerators_) {
+       for (auto pair : *membs()) {
           Enumerator *e = pair.second;
           Symbol *sym = e->id()->id();
           if (env.symtab().Probe(sym) != nullptr) {
@@ -868,8 +870,6 @@
      void ASTType::Enscope(SemantEnv& env) { 
         /* check for previous declarations in scope */
         if (sym() == nullptr) {
-           // env.error()(g_filename, this) << "declaration is missing identifier" << std::endl;
-           /* NOTE: this actually shouldn't be an error. Some compilers generate it as a warning. */
            return;
         }
      

@@ -336,19 +336,9 @@ namespace zc {
    };
 
    class Enumerator;
-   class EnumType: public TaggedType {
-      typedef std::unordered_map<const Symbol *, Enumerator *> Enumerators;
+   class EnumType: public TaggedType_aux<Enumerator> {
    public:
       virtual TagKind tag_kind() const override {return TagKind::TAG_ENUM; }
-      virtual bool is_complete() const override { return enumerators_.empty(); }
-      virtual void complete(const TaggedType *def) override {
-         enumerators_ = dynamic_cast<const EnumType *>(def)->enumerators_;
-      }
-
-      virtual void DumpNode(std::ostream& os) const override { os << "EnumType"; }
-      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
-      
-      void Insert(SemantError& err, Enumerator *enumerator);
 
       void EnscopeEnumerators(SemantEnv& env);
       virtual void TypeCheckMembs(SemantEnv& env) override { EnscopeEnumerators(env); }
@@ -361,21 +351,11 @@ namespace zc {
       
    protected:
       IntegralType *int_type_;
-      Enumerators enumerators_;
       
       virtual const char *name() const override { return "enum"; }
       
-      template <typename... Args> EnumType(Args... args): TaggedType(args...) {
+      template <typename... Args> EnumType(Args... args): TaggedType_aux<Enumerator>(args...) {
          int_type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, 0);
-      }
-
-      template <typename InputIterator, typename... Args>
-      EnumType(SemantError& err, InputIterator begin, InputIterator end, Args... args):
-         TaggedType(args...) {
-         int_type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, 0);      
-         for (; begin != end; ++begin) {
-            Insert(err, *begin);
-         }
       }
    };
 
@@ -387,6 +367,8 @@ namespace zc {
 
       virtual void DumpNode(std::ostream& os) const override;
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
+
+      virtual void TypeCheck(SemantEnv& env);
       
       template <typename... Args>
       static Enumerator *Create(Args... args) { return new Enumerator(args...); }
