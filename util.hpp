@@ -1,9 +1,14 @@
-#include <iostream>
 
 #ifndef __UTIL_HPP
 #define __UTIL_HPP
 
+
+#include <iostream>
+#include <vector>
+#include <unordered_map>
+
 #include "c.tab.hpp"
+
 
 namespace zc {
 
@@ -20,16 +25,8 @@ namespace zc {
       return out;
    }
 
-   /*** VISITATION & VARIANTS ***/
-#if 0
-   template <class ...Fs>
-   struct visitor : Fs... {
-      visitor(Fs const&... fs): Fs{fs}... {}
-      using Fs::operator()...;
-   };
-#endif
 
-   
+   /*** VISITATION & VARIANTS ***/
    template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
    template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
    

@@ -7,6 +7,7 @@
 
 #include <vector>
 
+#include "uniq_vector.hpp"
 #include "ast-decl.hpp"
 
 extern const char *g_filename;
@@ -52,7 +53,7 @@ namespace zc {
       virtual ASTType *Address() = 0;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) = 0;
 
-      void CodeGen(CgenEnv& env);
+      virtual void CodeGen(CgenEnv& env);
       virtual int bytes() const = 0;
       void FrameGen(StackFrame& frame) const;
 
@@ -257,8 +258,9 @@ namespace zc {
 
    template <typename Memb>
    class TaggedType_aux: public TaggedType {
+      struct GetSym { Symbol *operator()(Memb *memb) { return memb->sym(); } };
+      typedef uniq_vector<Memb *, Symbol *, GetSym> Membs;
    public:
-      typedef std::unordered_map<Symbol *, Memb *> Membs;
       Membs *membs() const { return membs_; }
       virtual bool is_complete() const override { return membs() != nullptr; }
       virtual void complete(const TaggedType *other) override {
@@ -267,16 +269,16 @@ namespace zc {
 
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {
          if (membs() != nullptr) {
-            for (auto pair : *membs()) {
-               pair.second->Dump(os, level, with_types);
+            for (auto memb : *membs()) {
+               memb->Dump(os, level, with_types);
             }
          }
       }
       
       virtual void TypeCheckMembs(SemantEnv& env) override {
          if (membs() != nullptr) {
-            for (auto pair : *membs()) {
-               pair.second->TypeCheck(env);
+            for (auto memb : *membs()) {
+               memb->TypeCheck(env);
             }
          }
       }
@@ -285,19 +287,14 @@ namespace zc {
       Membs *membs_;
 
       template <typename InputIt, typename... Args>
-      TaggedType_aux(SemantError& err, InputIt membs_begin, InputIt membs_end,
-                     Args... args):
-         TaggedType(args...), membs_(new Membs()) {
-         for (; membs_begin != membs_end; ++membs_begin) {
-            auto it = membs_->find((*membs_begin)->sym());
-            if (it != membs_->end()) {
-               err(g_filename, it->second) << "duplicate member '" << *it->second->sym() << "'"
-                                           << std::endl;
-            } else {
-               (*membs_)[(*membs_begin)->sym()] = *membs_begin;
-            }
-         }
-      }
+      TaggedType_aux(SemantError& err, InputIt membs_begin, InputIt membs_end, Args... args):
+         TaggedType(args...),
+         membs_(new Membs(membs_begin, membs_end,
+                [&](Memb *first, Memb *second) {
+                   err(g_filename, second) << "duplicate member '" << *second->sym() << "'"
+                                               << std::endl;
+
+                })) {}
 
       template <typename... Args>
       TaggedType_aux(Args... args): TaggedType(args...), membs_(nullptr) {}
@@ -360,6 +357,8 @@ namespace zc {
 
       virtual bool TypeCoerce(const ASTType *other) const override;
 
+      virtual void CodeGen(CgenEnv& env) override;
+
       virtual int bytes() const override { return int_type_->bytes(); }
 
       template <typename... Args>
@@ -383,6 +382,18 @@ namespace zc {
       Symbol *sym() const { return id()->id(); }
       ASTExpr *val() const { return val_; }
       EnumType *enum_type() const { return enum_type_; }
+
+      intmax_t eval() const {
+         if (val() == nullptr) {
+            if (prev_ == nullptr) {
+               return 0;
+            } else {
+               return prev_->eval() + 1;
+            }
+         } else {
+            return val()->int_const();
+         }
+      }
 
       virtual void DumpNode(std::ostream& os) const override;
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;

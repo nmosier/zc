@@ -171,6 +171,16 @@ namespace zc {
       }
    }
 
+   void EnumType::CodeGen(CgenEnv& env) {
+      for (auto memb : *membs()) {
+         const auto imm = new ImmediateValue(memb->eval(), bytes());
+         auto info = new SymInfo(this, imm, nullptr);
+         env.symtab().AddToScope(memb->sym(), info);
+      }
+
+      ASTType::CodeGen(env);
+   }
+
    Block *ReturnStat::CodeGen(CgenEnv& env, Block *block) {
       /* generate returned expression 
        * For now, assume result will be in %a or %hl. */
@@ -723,7 +733,12 @@ namespace zc {
          
       case ExprKind::EXPR_RVALUE:
          {
-            const Value *id_rval = id_info->val();
+            const Value *id_rval;
+            if (is_const()) {
+               id_rval = new ImmediateValue(int_const(), type()->bytes());
+            } else {
+               id_rval = id_info->val();
+            }
             const RegisterValue *rv;
             switch (type()->bytes()) {
             case byte_size:
@@ -1323,15 +1338,15 @@ namespace zc {
 
    int StructType::bytes() const {
       return std::accumulate(membs()->begin(), membs()->end(), 0,
-                             [](int acc, auto pair) -> int {
-                                return acc + pair.second->bytes();
+                             [](int acc, auto it) -> int {
+                                return acc + it->bytes();
                              });
    }
 
    int UnionType::bytes() const {
       std::vector<int> sizes;
       std::transform(membs()->begin(), membs()->end(), std::back_inserter(sizes),
-                     [](auto pair) { return pair.second->bytes(); });
+                     [](auto it) { return it->bytes(); });
       return *std::max_element(sizes.begin(), sizes.end());
    }
 
@@ -1341,12 +1356,12 @@ namespace zc {
 
    int StructType::offset(const Symbol *sym) const {
       auto it = std::find_if(membs()->begin(), membs()->end(),
-                             [&](auto pair) -> bool {
-                                return pair.second->sym() == sym;
+                             [&](auto it) -> bool {
+                                return it->sym() == sym;
                              });
       return std::accumulate(membs()->begin(), it, 0,
-                             [](int acc, auto pair) -> int {
-                                return acc + pair.second->bytes();
+                             [](int acc, auto it) -> int {
+                                return acc + it->bytes();
                              });
    }
    

@@ -181,7 +181,7 @@
     void EnumType::TypeCheckMembs(SemantEnv& env) {
        if (membs_ != nullptr) {
           for (auto enumerator : *membs_) {
-             enumerator.second->TypeCheck(env, this);
+             enumerator->TypeCheck(env, this);
           }
        }
     }
@@ -189,21 +189,19 @@
     void Enumerator::TypeCheck(SemantEnv& env, EnumType *enum_type) {
        enum_type_ = enum_type;
        
-       if (val() == nullptr) {
-          return;
-       }
-       
-       val()->TypeCheck(env);
-       if (!enum_type->TypeCoerce(val()->type())) {
-          env.error()(g_filename, this) << "value assigned to enumerator '" << *sym()
-                                        << "' is not coercible to enum type"
-                                        << std::endl;
-       }
-       if (!val()->is_const()) {
-          env.error()(g_filename, this) << "enumerator value for '"
-                                        << *sym()
-                                        << "' is not constant"
-                                        << std::endl;
+       if (val() != nullptr) {
+          val()->TypeCheck(env);
+          if (!enum_type->TypeCoerce(val()->type())) {
+             env.error()(g_filename, this) << "value assigned to enumerator '" << *sym()
+                                           << "' is not coercible to enum type"
+                                           << std::endl;
+          }
+          if (!val()->is_const()) {
+             env.error()(g_filename, this) << "enumerator value for '"
+                                           << *sym()
+                                           << "' is not constant"
+                                           << std::endl;
+          }
        }
 
        /* NOTE: an enumerator can be assigned a previous enumerator, 
@@ -220,6 +218,8 @@
     void ArrayType::TypeCheck(SemantEnv& env, bool allow_void) {
        /* For now, assert that size parameter for arrays must always be given. */
        elem()->TypeCheck(env, false);
+
+       count()->TypeCheck(env);
 
        if (count()->is_const()) {
           if ((int_count_ = count()->int_const()) < 0) {
@@ -453,14 +453,14 @@
                                         << compound_type->tag() << "'" << std::endl;
           type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());
        } else {
-          auto pair = compound_type->membs()->find(memb());
-          if (pair == compound_type->membs()->end()) {
+          auto it = compound_type->membs()->find(memb());
+          if (it == compound_type->membs()->end()) {
              env.error()(g_filename, this) << "no member named '" << *memb() << "' in "
                                            << compound_type->kind() << "'"
                                            << compound_type->tag() << "'" << std::endl;
              type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());
           } else {
-             type_ = pair->second;
+             type_ = *it;
           }
        }
     }
@@ -595,7 +595,7 @@
          env.error()(g_filename, this) << "use of undeclared identifier '" << *id()->id()
                                        << "'" << std::endl;
          type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());         
-      }
+      } 
    }
 
     void NoExpr::TypeCheck(SemantEnv& env) {
@@ -658,6 +658,16 @@
 
     ASTExpr::ExprKind IdentifierExpr::expr_kind() const {
        return ExprKind::EXPR_LVALUE;
+    }
+
+    intmax_t IdentifierExpr::int_const() const {
+       /* TODO -- improve this */
+       auto enum_type = dynamic_cast<const EnumType *>(type());
+       auto it = enum_type->membs()->find(id()->id());
+       if (it == enum_type->membs()->end()) {
+          throw std::logic_error("enumerator not found");
+       }
+       return (*it)->eval();
     }
 
     /*** TYPE EQUALITY ***/

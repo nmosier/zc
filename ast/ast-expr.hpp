@@ -166,7 +166,8 @@ namespace zc {
    public:
       Identifier *id() const { return id_; }
       virtual ExprKind expr_kind() const override;
-      virtual bool is_const() const override { return false; }
+      virtual bool is_const() const override { return is_const_; }
+      virtual intmax_t int_const() const override;
       
       static IdentifierExpr *Create(Identifier *id, const SourceLoc& loc) {
          return new IdentifierExpr(id, loc);
@@ -181,7 +182,10 @@ namespace zc {
       
    protected:
       Identifier *id_;
-      IdentifierExpr(Identifier *id, const SourceLoc& loc): ASTExpr(loc), id_(id) {}
+      bool is_const_;
+      
+      IdentifierExpr(Identifier *id, const SourceLoc& loc):
+         ASTExpr(loc), id_(id), is_const_(false) {}
    };
 
    class NoExpr: public ASTExpr {
