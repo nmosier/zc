@@ -47,4 +47,15 @@ namespace zc {
       count_expr()->Dump(os, level, with_types);
    }
 
+   void Declaration::DumpNode(std::ostream& os) const {
+      os << "Declaration " << *sym();
+      if (is_const()) {
+         os << " (const)";
+      }
+   }
+
+   void Declaration::DumpChildren(std::ostream& os, int level, bool with_types) const {
+      type()->Dump(os, level, with_types);
+   }
+
 }

@@ -69,6 +69,28 @@ namespace zc {
          ExternalDecl(args...), comp_stat_(comp_stat) {}
       
    };
+
+   class Declaration: public ASTNode {
+   public:
+      ASTType *type() const { return type_; }
+      Symbol *sym() const { return sym_; }
+      bool is_const() const { return is_const_; }
+
+      virtual void DumpNode(std::ostream& os) const override;
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
+
+      template <typename... Args>
+      static Declaration *Create(Args... args) { return new Declaration(args...); }
+
+   private:
+      ASTType *type_;
+      Symbol *sym_;
+      bool is_const_;
+
+      template <typename... Args>
+      Declaration(ASTType *type, Symbol *sym, bool is_const, Args... args):
+         ASTNode(args...), type_(type), sym_(sym), is_const_(is_const) {}
+   };
    
    class ASTDeclarator: public ASTNode {
    public:
