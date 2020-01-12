@@ -280,7 +280,7 @@ namespace zc {
             }
          }
       }
-      
+
    protected:
       Membs *membs_;
 
@@ -356,9 +356,8 @@ namespace zc {
    class EnumType: public TaggedType_aux<Enumerator> {
    public:
       virtual TagKind tag_kind() const override {return TagKind::TAG_ENUM; }
+      IntegralType *int_type() const { return int_type_; }
 
-      void EnscopeEnumerators(SemantEnv& env);
-      virtual void TypeCheckMembs(SemantEnv& env) override { EnscopeEnumerators(env); }
       virtual bool TypeCoerce(const ASTType *other) const override;
 
       virtual int bytes() const override { return int_type_->bytes(); }
@@ -370,6 +369,8 @@ namespace zc {
       IntegralType *int_type_;
       
       virtual const char *name() const override { return "enum"; }
+
+      virtual void TypeCheckMembs(SemantEnv& env) override;
       
       template <typename... Args> EnumType(Args... args): TaggedType_aux<Enumerator>(args...) {
          int_type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, 0);
@@ -381,11 +382,13 @@ namespace zc {
       Identifier *id() const { return id_; }
       Symbol *sym() const { return id()->id(); }
       ASTExpr *val() const { return val_; }
+      EnumType *enum_type() const { return enum_type_; }
 
       virtual void DumpNode(std::ostream& os) const override;
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
 
-      virtual void TypeCheck(SemantEnv& env);
+      virtual void TypeCheck(SemantEnv& env) { TypeCheck(env, nullptr); }
+      virtual void TypeCheck(SemantEnv& env, EnumType *enum_type);
       
       template <typename... Args>
       static Enumerator *Create(Args... args) { return new Enumerator(args...); }
@@ -393,9 +396,12 @@ namespace zc {
    private:
       Identifier *id_;
       ASTExpr *val_;
-
+      const Enumerator *prev_; /*!< Previous enumerator. Used for assigning values. */
+      EnumType *enum_type_; /*!< Type, which shall be assigned during semantic analysis. */
+      
       template <typename... Args>
-      Enumerator(Identifier *id, ASTExpr *val, Args... args): ASTNode(args...), id_(id), val_(val) {}
+      Enumerator(Identifier *id, ASTExpr *val, const Enumerator *prev, Args... args):
+         ASTNode(args...), id_(id), val_(val), prev_(prev), enum_type_(nullptr) {}
    };
 
    class ArrayType: public ASTType {

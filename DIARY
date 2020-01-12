@@ -100,3 +100,15 @@ I spent today working on adding enums. Enums are a 3rd (and last) kind of ``tagg
 An auxiliary template class 'template <typename Memb> TaggedType_aux' inherits from TaggedType and implements TaggedType's interface. This auxiliary class defines a member 'membs', an pointer to an unordered map from Symbol * (which are the member identifiers) to Memb *, the template parameter. complete()'ing the definition of a type simply involves copying the member map pointer from the given complete type.
 Further, the new 'CompoundType' class inherits from 'TaggedType_aux<ASTType>', representing types that hold multiple other types, namely structs and unions. This defines its own small interface, specifically 'offset()', which finds the offset of a given member ID within the compound type.
 The enum type EnumType inherits from TaggedType_aux<Enumerator>, where 'Enumerator' is a new AST node representing a single enumerator declaration in an enum.
+
+01/12/2020
+[1 hr] I fixed a bug relating to the scoped redeclaration of scoped tagged types. The compiler was overly permissive when a tagged type, e.g. struct, was redefined and then an expression of that new tagged type could be assigned to an lvalue of the previous definition of the tagged type. I fixed this by adding a unique identifier to each class of declarations of the same tagged type. That is, in the following code snippet
+   [1] struct coords;
+   [2] struct coords { int x,y; }
+       int main(void) {
+   [3]   struct coords;
+   [4]   struct coords { int x,y; }
+       }
+structs on [1], [2], [3] share the same unique ID, while [4] has a different unique ID. This resolved the bug, and I confirmed it with tests.
+
+[1 hr]

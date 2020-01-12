@@ -86,9 +86,9 @@ namespace zc {
       bool is_logical() const;
       virtual bool is_const() const override;
       virtual intmax_t int_const() const override;      
-      
-      static BinaryExpr *Create(Kind kind, ASTExpr *lhs, ASTExpr *rhs, const SourceLoc& loc)
-      { return new BinaryExpr(kind, lhs, rhs, loc); }
+
+      template <typename... Args>
+      static BinaryExpr *Create(Args... args) { return new BinaryExpr(args...); }
 
       const char *kindstr() const;
       virtual ExprKind expr_kind() const override;      
@@ -100,8 +100,10 @@ namespace zc {
       
    protected:
       Kind kind_;
-      BinaryExpr(Kind kind, ASTExpr *lhs, ASTExpr *rhs, const SourceLoc& loc):
-         ASTBinaryExpr(lhs, rhs, loc), kind_(kind) {}
+
+      template <typename... Args>
+      BinaryExpr(Kind kind, Args... args):
+         ASTBinaryExpr(args...), kind_(kind) {}
    };
 
    

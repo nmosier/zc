@@ -178,15 +178,43 @@
        }
     }
 
-    void Enumerator::TypeCheck(SemantEnv& env) {
-       val()->TypeCheck(env);
+    void EnumType::TypeCheckMembs(SemantEnv& env) {
+       if (membs_ != nullptr) {
+          for (auto enumerator : *membs_) {
+             enumerator.second->TypeCheck(env, this);
+          }
+       }
+    }
+
+    void Enumerator::TypeCheck(SemantEnv& env, EnumType *enum_type) {
+       enum_type_ = enum_type;
        
+       if (val() == nullptr) {
+          return;
+       }
+       
+       val()->TypeCheck(env);
+       if (!enum_type->TypeCoerce(val()->type())) {
+          env.error()(g_filename, this) << "value assigned to enumerator '" << *sym()
+                                        << "' is not coercible to enum type"
+                                        << std::endl;
+       }
        if (!val()->is_const()) {
           env.error()(g_filename, this) << "enumerator value for '"
                                         << *sym()
                                         << "' is not constant"
                                         << std::endl;
        }
+
+       /* NOTE: an enumerator can be assigned a previous enumerator, 
+        * so enscoping each enumerator after typechecking is necessary. */
+       if (env.symtab().Probe(sym()) != nullptr) {
+          env.error()(g_filename, this) << "redefinition of '" << *sym()
+                                        << "' as different kind of symbol" << std::endl;
+       } else {
+          env.symtab().AddToScope(sym(), enum_type);
+       }
+
     }
 
     void ArrayType::TypeCheck(SemantEnv& env, bool allow_void) {
@@ -254,19 +282,6 @@
        }
     }
 
-    void EnumType::EnscopeEnumerators(SemantEnv& env) {
-       for (auto pair : *membs()) {
-          Enumerator *e = pair.second;
-          Symbol *sym = e->id()->id();
-          if (env.symtab().Probe(sym) != nullptr) {
-             env.error()(g_filename, this) << "redefinition of '" << *sym
-                                           << "' as different kind of symbol" << std::endl;
-          } else {
-             env.symtab().AddToScope(sym, this);
-          }
-       }
-    }
-
     void TranslationUnit::TypeCheck(SemantEnv& env) {
        Enscope(env);
        decls()->TypeCheck(env);
@@ -306,17 +321,15 @@
     }
     
    void CompoundStat::TypeCheck(SemantEnv& env, bool scoped) {
-      for (auto decl : *decls()) {
-         decl->TypeCheck(env);
-      }
-
       if (scoped) {
          env.EnterScope();
       }
 
       for (auto decl : *decls()) {
+         decl->TypeCheck(env);
          decl->Enscope(env);
       }
+      
       stats()->TypeCheck(env);
 
       if (scoped) {
