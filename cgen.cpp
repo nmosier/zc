@@ -38,8 +38,8 @@ namespace zc {
       Label *label = new Label(*id);
       return new LabelValue(label);
    }
-   
-   SymInfo::SymInfo(const ExternalDecl *ext_decl) {
+
+   VarSymInfo::VarSymInfo(const ExternalDecl *ext_decl): SymInfo() {
       type_ = ext_decl->Type();
       Label *label = new Label(std::string("_") + *ext_decl->sym());
       LabelValue *label_val = new LabelValue(label);
@@ -55,18 +55,12 @@ namespace zc {
       }
    }
 
-   SymInfo::SymInfo(const ASTType *type, const Value *val, const Value *addr):
-      type_(type), val_(val), addr_(addr) {
-      assert(dynamic_cast<const MemoryValue *>(addr) == nullptr);
+   VarSymInfo::VarSymInfo(const Value *addr, const ASTType *type): SymInfo() {
+      auto loc = new MemoryLocation(addr);
+      auto val = new MemoryValue(loc, type->bytes());
+      val_ = val;
    }
    
-   SymInfo::SymInfo(const ASTType *type, const Value *addr): type_(type), addr_(addr) {
-      // assert(dynamic_cast<const MemoryValue *>(addr) == nullptr);
-      
-      MemoryLocation *mem_loc = new MemoryLocation(addr);
-      val_ = new MemoryValue(mem_loc, type->bytes());
-   }
-
    /*** STRING CONSTANTS ***/
    void StringConstants::Insert(const std::string& str) {
       if (strs_.find(str) == strs_.end()) {
@@ -99,14 +93,14 @@ namespace zc {
    void ExternalDecl::CodeGen(CgenEnv& env) {
       /* enter global variable declaration into global scope */
       if (sym()) {
-         SymInfo *info = new SymInfo(this);
+         SymInfo *info = new VarSymInfo(this);
          env.symtab().AddToScope(sym(), info);
       }
    }
 
    void FunctionDef::CodeGen(CgenEnv& env) {
       /* enter function into global scope */
-      SymInfo *info = new SymInfo(this);
+      VarSymInfo *info = new VarSymInfo(this);
       const Types *args = Type()->get_callable()->params();
       env.symtab().AddToScope(sym(), info);
       env.ext_env().Enter(sym(), args);
@@ -119,7 +113,7 @@ namespace zc {
 
       /* assign argument stack locations */
       for (const ASTType *type : *Type()->get_callable()->params()) {
-         SymInfo *info = env.ext_env().frame().next_arg(type);
+         VarSymInfo *info = env.ext_env().frame().next_arg(type);
          env.symtab().AddToScope(type->sym(), info);
       }
       
@@ -174,7 +168,7 @@ namespace zc {
    void EnumType::CodeGen(CgenEnv& env) {
       for (auto memb : *membs()) {
          const auto imm = new ImmediateValue(memb->eval(), bytes());
-         auto info = new SymInfo(this, imm, nullptr);
+         auto info = new ConstSymInfo(this, imm);
          env.symtab().AddToScope(memb->sym(), info);
       }
 
@@ -718,27 +712,24 @@ namespace zc {
       return block;
    }
 
+
+   
    Block *IdentifierExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
       const SymInfo *id_info = env.symtab().Lookup(id()->id());
-      
+
       switch (mode) {
       case ExprKind::EXPR_NONE: abort();
       case ExprKind::EXPR_LVALUE:
          {
             /* obtain address of identifier */
-            const Value *id_addr = id_info->addr();
+            const Value *id_addr = dynamic_cast<const VarSymInfo *>(id_info)->addr();
             block->instrs().push_back(new LeaInstruction(&rv_hl, id_addr));
          }
          break;
          
       case ExprKind::EXPR_RVALUE:
          {
-            const Value *id_rval;
-            if (is_const()) {
-               id_rval = new ImmediateValue(int_const(), type()->bytes());
-            } else {
-               id_rval = id_info->val();
-            }
+            const Value *id_rval = id_info->val();
             const RegisterValue *rv;
             switch (type()->bytes()) {
             case byte_size:
@@ -1267,20 +1258,20 @@ namespace zc {
    
    void StackFrame::add_local(const ASTType *type) { add_local(type->bytes()); }
 
-   SymInfo *StackFrame::next_arg(const ASTType *type) {
+   VarSymInfo *StackFrame::next_arg(const ASTType *type) {
       if (next_arg_addr_ == nullptr) {
          next_arg_addr_ = FP_idxval.Add(locals_bytes_ + base_bytes_);
       }
-      SymInfo *info = new SymInfo(type, next_arg_addr_);
+      VarSymInfo *info = new VarSymInfo(next_arg_addr_, type);
       next_arg_addr_ = next_arg_addr_->Add(long_size);
       return info;
    }
 
-   SymInfo *StackFrame::next_local(const ASTType *type) {
+   VarSymInfo *StackFrame::next_local(const ASTType *type) {
       if (next_local_addr_ == nullptr) {
          next_local_addr_ = &FP_idxval;
       }
-      SymInfo *info = new SymInfo(type, next_local_addr_);
+      VarSymInfo *info = new VarSymInfo(next_local_addr_, type);
       next_local_addr_ = next_local_addr_->Add(type->bytes());
       return info;
    }

@@ -69,103 +69,6 @@ namespace zc {
          ExternalDecl(args...), comp_stat_(comp_stat) {}
       
    };
-
-   class Decl: public ASTNode {
-   public:
-      ASTType *specs() const { return specs_; }
-      ASTDeclarator *declarator() const { return declarator_; }
-      Identifier *id() const;
-      Symbol *sym() const;
-
-      template <typename... Args>
-      static Decl *Create(Args... args) {
-         return new Decl(args...);
-      }
-
-      virtual void DumpNode(std::ostream& os) const override { os << "Decl"; }
-      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
-      virtual void DumpType(std::ostream& os) const override;
-
-      /* Semantic Analysis */
-      
-      /**
-       * Perform semantic analysis on a declaration.
-       * @param env semantic environment
-       * @param enscope whether to declare in scope.
-       */
-      void TypeCheck(SemantEnv& env);
-
-      /** Convert declaration to type.
-       */
-      ASTType *Type() const;
-
-      void JoinPointers();
-
-      /* Code Generation */
-      void CodeGen(CgenEnv& env);
-      void FrameGen(StackFrame& frame) const;
-
-   protected:
-      ASTType *specs_;
-      ASTDeclarator *declarator_;
-      
-      Decl(ASTType *specs, ASTDeclarator *declarator, const SourceLoc& loc):
-         ASTNode(loc), specs_(specs), declarator_(declarator) {}
-   };
-
-#if 0
-   class Decls: public ASTNodeVec<Decl> {
-   public:
-      static Decls *Create(const SourceLoc& loc) { return new Decls(loc); }
-
-      virtual void DumpNode(std::ostream& os) const override { os << "Decls"; }
-
-      void TypeCheck(SemantEnv& env) {
-         ASTNodeVec<Decl>::TypeCheck(env);
-      }
-      bool TypeEq(const Decls *other) const;
-      bool TypeCoerce(const Decls *from) const;
-      Types *Type() const;
-      void Enscope(SemantEnv& env) const;
-
-      void JoinPointers();
-      
-   protected:
-      template <typename... Args> Decls(Args... args): ASTNodeVec<Decl>(args...) {}
-   };
-#endif
-   
-
-#if 0
-   /* NOTE: Abstract class. */
-   class TypeSpec: public ASTNode {
-   public:
-      enum class Kind {SPEC_VOID, SPEC_INTEGRAL, SPEC_STRUCT};
-      virtual Kind kind() const = 0;
-
-      virtual bool Eq(const TypeSpec *other) const = 0;
-
-      virtual void TypeCheck(SemantEnv& env, bool allow_void) = 0;
-
-   protected:
-      template <typename... Args>
-      TypeSpec(Args... args): ASTNode(args...) {}
-   };
-
-
-   class TypeSpecs: public ASTNodeVec<TypeSpec> {
-   public:
-      static TypeSpecs *Create(const SourceLoc& loc) { return new TypeSpecs(loc); }
-      
-      TypeSpec *TypeCombine() const;
-      TypeSpec *TypeCombine(SemantEnv *env) const;
-      
-      void TypeCheck(SemantEnv& env);
-      
-   protected:
-      TypeSpecs(const SourceLoc& loc): ASTNodeVec<TypeSpec>(loc) {}
-   };
-#endif
    
    class ASTDeclarator: public ASTNode {
    public:
@@ -175,6 +78,7 @@ namespace zc {
                        DECLARATOR_FUNCTION,
                        DECLARATOR_ARRAY};
       virtual Identifier *id() const = 0;
+      Symbol *sym() const;
       virtual Kind kind() const = 0;
 
       virtual ASTType *Type(ASTType *init_type) const = 0;

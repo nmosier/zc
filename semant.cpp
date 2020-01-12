@@ -299,11 +299,6 @@
        comp_stat()->TypeCheck(env, false); /* function body doesn't get new scope */
        Descope(env);
     }
-    
-    void Decl::TypeCheck(SemantEnv& env) {
-       specs()->TypeCheck(env);
-       declarator()->TypeCheck(env);
-    }
 
     void FunctionDeclarator::TypeCheck(SemantEnv& env) {
        declarator()->TypeCheck(env);
@@ -595,7 +590,7 @@
          env.error()(g_filename, this) << "use of undeclared identifier '" << *id()->id()
                                        << "'" << std::endl;
          type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());         
-      } 
+      }
    }
 
     void NoExpr::TypeCheck(SemantEnv& env) {
@@ -772,10 +767,6 @@
       declarator()->JoinPointers();
    }
 
-   void Decl::JoinPointers() {
-      declarator()->JoinPointers();
-   }
-
     ASTType *ExternalDecl::Type() const {
        return decl();
     }
@@ -854,12 +845,6 @@
           return declarator()->Type(ArrayType::Create(type, count_expr(), type->sym(), loc()));
        }
     }
-
-   ASTType *Decl::Type() const {
-      ASTType *init_type = specs();
-      init_type->set_sym(sym());
-      return declarator()->Type(init_type);
-   }
 
     /*** ADDRESS OF TYPE ***/
     ASTType *PointerType::Address() {

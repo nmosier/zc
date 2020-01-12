@@ -6,6 +6,10 @@ namespace zc {
 
    template <> const char *ExternalDecls::name() const { return "ExternalDecls"; }      
 
+   Symbol *ASTDeclarator::sym() const {
+      return id() ? id()->id() : nullptr;
+   }
+   
    void ExternalDecl::DumpChildren(std::ostream& os, int level, bool with_types) const {
       decl()->Dump(os, level, with_types);
    }
@@ -35,25 +39,8 @@ namespace zc {
       }
    }
 
-   void Decl::DumpChildren(std::ostream& os, int level, bool with_types) const {
-      specs_->Dump(os, level, with_types);
-      declarator_->Dump(os, level, with_types);
-   }
-
-   void Decl::DumpType(std::ostream& os) const {
-      Type()->DumpNode(os);
-   }
-
-   Identifier *Decl::id() const { return declarator_->id(); }
-
    Symbol *ExternalDecl::sym() const { return decl()->sym(); }
-   Symbol *Decl::sym() const {
-      if (id() != nullptr) {
-         return id()->id();
-      } else {
-         return nullptr;
-      }
-   }
+
 
    void ArrayDeclarator::DumpChildren(std::ostream& os, int level, bool with_types) const {
       declarator()->Dump(os, level, with_types);

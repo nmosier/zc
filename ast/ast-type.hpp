@@ -57,9 +57,9 @@ namespace zc {
       virtual int bytes() const = 0;
       void FrameGen(StackFrame& frame) const;
 
-      template <typename... Args>
-      static ASTType *Create(Args... args) {
-         return Decl::Create(args...)->Type();
+      static ASTType *Create(ASTType *specs, ASTDeclarator *declarator) {
+         specs->set_sym(declarator->sym());
+         return declarator->Type(specs);         
       }
       
    protected:
@@ -68,10 +68,7 @@ namespace zc {
       template <typename... Args>
       ASTType(Args... args): ASTNode(args...), sym_(nullptr) {}
       template <typename... Args>
-      ASTType(const Decl *decl, Args... args): ASTNode(args...), sym_(decl->id()->id()) {}
-      template <typename... Args>
       ASTType(Symbol *sym, Args... args): ASTNode(args...), sym_(sym) {}
-
    };
 
    std::ostream& operator<<(std::ostream& os, ASTType::Kind kind);

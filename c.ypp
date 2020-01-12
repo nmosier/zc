@@ -146,7 +146,7 @@ function_definition:
                 type_specs declarator compound_stat {
                     $$ = zc::FunctionDef::Create
                         ($3,
-                         zc::ASTType::Create($1, $2, @1),                         
+                         zc::ASTType::Create($1, $2),                         
                          @1);
                 }
         ; /* incomplete */
@@ -166,8 +166,8 @@ decl:           type_specs optional_init_declarator_list ';' {
                         $$->push_back($1); /* just in case type_specs contains a struct
                                                   * definition */
                     } else {
-                        for (auto decl : $2->vec()) {
-                            $$->push_back(zc::ASTType::Create($1, decl, @1));
+                        for (auto declarator : $2->vec()) {
+                            $$->push_back(zc::ASTType::Create($1, declarator));
                         }
                     }
                 }
@@ -217,7 +217,7 @@ struct_decl_list:
 struct_decl:    type_specs struct_declarator_list ';' {
                     $$ = new zc::Types();
                     for (zc::ASTDeclarator *declarator : $2->vec()) {
-                        $$->push_back(zc::ASTType::Create($1, declarator, @1));
+                        $$->push_back(zc::ASTType::Create($1, declarator));
                     }
                 }           
         ;
@@ -294,7 +294,7 @@ param_type_list:
 param_list:     param_decl { $$ = new zc::Types(); $$->push_back($1); }
         |       param_list ',' param_decl { $$ = $1; $$->push_back($3); }
         ;
-param_decl:     type_specs declarator { $$ = zc::ASTType::Create($1, $2, @1); }
+param_decl:     type_specs declarator { $$ = zc::ASTType::Create($1, $2); }
         ; /* incomplete */
 stat:           exp_stat { $$ = $1; }
         |       compound_stat { $$ = $1; }
@@ -404,9 +404,7 @@ cast_exp:       unary_exp { $$ = $1; }
                 }   
         ;
 type_name:      type_specs optional_abstract_declarator {
-                    zc::Decl *decl = zc::Decl::Create($1, $2, @1);
-                    decl->TypeCheck(zc::g_semant_env);
-                    $$ = decl->Type();
+                    $$ = zc::ASTType::Create($1, $2);
                 }
         ;
 optional_abstract_declarator:

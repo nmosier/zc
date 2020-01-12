@@ -22,28 +22,45 @@ namespace zc {
    
    class SymInfo {
    public:
+      enum class Kind {SYM_CONST, SYM_VAR};
+      virtual Kind kind() const = 0;
+      
       const ASTType *type() const { return type_; }
-
-      /**
-       * The lvalue and rvalue of this symbol. If it is a variable, it points to its storage
-       * location. If it's a function, then it is the address of the function.
-       */
       const Value *val() const { return val_; }
 
-      /**
-       * (Optional) The address of this symbol.
-       */
-      const Value *addr() const { return addr_; }
-
-      SymInfo(const ExternalDecl *ext_decl);
-      SymInfo(const ASTType *type, const Value *val, const Value *addr);
-      SymInfo(const ASTType *type, const Value *addr);
-      
    protected:
       const ASTType *type_;
-      const Value *val_;
+      const Value *val_;      
+
+      SymInfo(): type_(nullptr), val_(nullptr) {}
+      SymInfo(const ASTType *type, const Value *val): type_(type), val_(val) {}
+   };
+
+   class ConstSymInfo: public SymInfo {
+   public:
+      virtual Kind kind() const override { return Kind::SYM_CONST; }
+
+      ConstSymInfo(const ASTType *type, const ImmediateValue *imm): SymInfo(type, imm) {}
+      
+   private:
+   };
+
+   class VarSymInfo: public SymInfo {
+   public:
+      virtual Kind kind() const override { return Kind::SYM_VAR; }
+
+      const Value *addr() const { return addr_; }
+
+      VarSymInfo(const Value *addr, const ASTType *type);
+      VarSymInfo(const ExternalDecl *ext_decl);
+
+   private:
       const Value *addr_;
    };
+
+
+
+   
 
    class TagInfo {
    public:
@@ -63,8 +80,8 @@ namespace zc {
       void add_local(const ASTType *type);
       void add_local(int bs) { locals_bytes_ += bs; }
 
-      SymInfo *next_arg(const ASTType *type);
-      SymInfo *next_local(const ASTType *type);
+      VarSymInfo *next_arg(const ASTType *type);
+      VarSymInfo *next_local(const ASTType *type);
 
       StackFrame();
       StackFrame(const Types *params);
