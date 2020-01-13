@@ -1,5 +1,6 @@
 #include "ast.hpp"
 #include "util.hpp"
+#include "cgen.hpp"
 
 namespace zc {
 
@@ -28,6 +29,18 @@ namespace zc {
       os << "Identifier " << "\"" << *id_ << "\"";
    }
 
+   void Declaration::DumpChildren(std::ostream& os, int level, bool with_types) const {
+      type()->Dump(os, level, with_types);
+   }
+
+   void VarDeclaration::DumpNode(std::ostream& os) const {
+      os << "VarDeclaration";
+   }
+
+   void TypeDeclaration::DumpNode(std::ostream& os) const {
+      os << "TypeDeclaration";
+   }
+
    void BasicDeclarator::DumpChildren(std::ostream& os, int level, bool with_types) const {
       id_->Dump(os, level, with_types);
    }
@@ -39,23 +52,27 @@ namespace zc {
       }
    }
 
-   Symbol *ExternalDecl::sym() const { return decl()->sym(); }
-
-
    void ArrayDeclarator::DumpChildren(std::ostream& os, int level, bool with_types) const {
       declarator()->Dump(os, level, with_types);
       count_expr()->Dump(os, level, with_types);
    }
 
-   void Declaration::DumpNode(std::ostream& os) const {
-      os << "Declaration " << *sym();
-      if (is_const()) {
-         os << " (const)";
+   void FunctionDeclarator::get_declarables(Declarations* output) const {
+#if 0
+      for (auto param : *params()) {
+         param->get_declarables(output);
       }
+#endif
    }
 
-   void Declaration::DumpChildren(std::ostream& os, int level, bool with_types) const {
-      type()->Dump(os, level, with_types);
+   TypeDeclaration::TypeDeclaration(DeclarableType *type): Declaration(type, type->loc()) {}
+
+   int VarDeclaration::bytes() const { return type()->bytes(); }
+
+   Symbol *ExternalDecl::sym() const {
+      const auto var = dynamic_cast<const VarDeclaration *>(decl());
+      return var ? var->sym() : nullptr;
    }
+
 
 }

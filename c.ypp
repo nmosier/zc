@@ -52,6 +52,9 @@
     int token;
     std::unordered_multiset<int> *token_multiset;
     std::vector<zc::Enumerator *> *enum_membs;
+    zc::Declarations *declarations;
+    zc::VarDeclarations *var_declarations;
+    zc::VarDeclaration *var_declaration;
 }
 
 %initial-action {
@@ -95,13 +98,13 @@
 %type  <translation_unit> translation_unit
 %type  <external_decls> external_decl
 %type  <function_def>  function_definition
-%type  <types>         optional_decl_list decl_list decl struct_decl_list struct_decl
+%type  <declarations>         optional_decl_list decl_list decl struct_decl_list struct_decl
 %type  <declarators>   init_declarator_list optional_init_declarator_list struct_declarator_list
 %type  <declarator>    init_declarator declarator direct_declarator optional_abstract_declarator abstract_declarator direct_abstract_declarator struct_declarator
 %type   <enum_membs>    enumerator_list
 %type  <pointer>       pointer
-%type  <type>    param_decl
-%type  <types>   param_type_list optional_param_type_list param_list
+%type  <var_declaration>    param_decl
+%type  <var_declarations>   param_type_list optional_param_type_list param_list
 %type  <stat>          stat jump_stat selection_stat iteration_stat labeled_stat
 %type  <stats>         optional_stat_list stat_list
 %type  <compound_stat> compound_stat
@@ -138,7 +141,7 @@ external_decl:  function_definition {
                 }
         |       decl { $$ = zc::ExternalDecls::Create
                         ($1->begin(), $1->end(),
-                         [&](zc::ASTType *decl) -> zc::ExternalDecl * {
+                         [&](zc::Declaration *decl) -> zc::ExternalDecl * {
                             return zc::ExternalDecl::Create(decl, @1);
                         }, @1); }
         ;
@@ -146,12 +149,12 @@ function_definition:
                 type_specs declarator compound_stat {
                     $$ = zc::FunctionDef::Create
                         ($3,
-                         zc::ASTType::Create($1, $2),                         
-                         @1);
+                         zc::VarDeclaration::Create($2->sym(), false,
+                                                    zc::ASTType::Create($1, $2), @1), @1);
                 }
         ; /* incomplete */
 optional_decl_list:
-                /* empty */ { $$ = new zc::Types(); }
+                /* empty */ { $$ = new zc::Declarations(); }
         |       decl_list { $$ = $1; }
         ;
 
@@ -161,14 +164,13 @@ decl_list:      decl
                 }
         ;
 decl:           type_specs optional_init_declarator_list ';' {
-                    $$ = new zc::Types();
-                    if ($2->vec().empty()) {
-                        $$->push_back($1); /* just in case type_specs contains a struct
-                                                  * definition */
-                    } else {
-                        for (auto declarator : $2->vec()) {
-                            $$->push_back(zc::ASTType::Create($1, declarator));
-                        }
+                    $$ = new zc::Declarations();
+                    $1->get_declarables($$);
+                    for (auto declarator : $2->vec()) {
+                        declarator->get_declarables($$);
+                        auto type = zc::ASTType::Create($1, declarator);
+                        $$->push_back(zc::VarDeclaration::Create(declarator->sym(), false,
+                                                                 type, @1));
                     }
                 }
         ;
@@ -199,25 +201,29 @@ struct_spec:
                     $$ = zc::StructType::Create($2->id(), @1);
                 }
         |       UNION ID '{' struct_decl_list '}' {
-                    $$ = zc::UnionType::Create(zc::g_semant_error, $4->begin(),
-                                               $4->end(), $2->id(), @1);
+                   $$ = zc::UnionType::Create(zc::g_semant_error, $4->begin(),
+                                              $4->end(), $2->id(), @1);
                 }
         |       UNION ID { $$ = zc::UnionType::Create($2->id(), @1); }
         ; /* incomplete */
-struct_decl_list:
+struct_decl_list: 
                 struct_decl {
-                         $$ = new zc::Types();
+                         $$ = new zc::Declarations();
                          $$->insert($$->end(), $1->begin(), $1->end());
                 }
         |       struct_decl_list struct_decl {
-                     $$ = $1;
+                     $$ = $1;;
                      $$->insert($$->end(), $2->begin(), $2->end());
                 }
         ;
 struct_decl:    type_specs struct_declarator_list ';' {
-                    $$ = new zc::Types();
-                    for (zc::ASTDeclarator *declarator : $2->vec()) {
-                        $$->push_back(zc::ASTType::Create($1, declarator));
+                    $$ = new zc::Declarations();
+                    $1->get_declarables($$);
+                    for (auto declarator : $2->vec()) {
+                        declarator->get_declarables($$);
+                        $$->push_back
+                            (zc::VarDeclaration::Create(declarator->sym(), false,
+                                                        zc::ASTType::Create($1, declarator), @1));
                     }
                 }           
         ;
@@ -232,6 +238,9 @@ struct_declarator:
                 declarator
         ; /* incomplete (bit fields) */
 enum_spec:      ENUM ID '{' enumerator_list '}' {
+                    $$ = zc::EnumType::Create(zc::g_semant_error, $4->begin(), $4->end(),
+                                                $2->id(), @1);
+                    
                     $$ = zc::EnumType::Create(zc::g_semant_error, $4->begin(),
                                               $4->end(), $2->id(), @1);
                 }
@@ -285,16 +294,19 @@ pointer:        '*' { $$ = 1; }
         |       '*' pointer { $$ = $2 + 1; }
         ;
 optional_param_type_list:
-                /* empty */ { $$ = new zc::Types(); }
+                /* empty */ { $$ = new zc::VarDeclarations(); }
         |       param_type_list { $$ = $1; }
         ;
 param_type_list:
                 param_list
         ; /* incomplete */
-param_list:     param_decl { $$ = new zc::Types(); $$->push_back($1); }
+param_list:     param_decl { $$ = new zc::VarDeclarations(); $$->push_back($1); }
         |       param_list ',' param_decl { $$ = $1; $$->push_back($3); }
         ;
-param_decl:     type_specs declarator { $$ = zc::ASTType::Create($1, $2); }
+param_decl:     type_specs declarator {
+                    auto type = zc::ASTType::Create($1, $2);
+                    $$ = zc::VarDeclaration::Create($2->sym(), false, type, @1);
+                }
         ; /* incomplete */
 stat:           exp_stat { $$ = $1; }
         |       compound_stat { $$ = $1; }

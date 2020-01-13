@@ -25,22 +25,23 @@ namespace zc {
       enum class Kind {SYM_CONST, SYM_VAR};
       virtual Kind kind() const = 0;
       
-      const ASTType *type() const { return type_; }
+      const VarDeclaration *decl() const { return decl_; }
       const Value *val() const { return val_; }
 
    protected:
-      const ASTType *type_;
+      const VarDeclaration *decl_;
       const Value *val_;      
 
-      SymInfo(): type_(nullptr), val_(nullptr) {}
-      SymInfo(const ASTType *type, const Value *val): type_(type), val_(val) {}
+      SymInfo(): decl_(nullptr), val_(nullptr) {}
+      SymInfo(const VarDeclaration *decl, const Value *val): decl_(decl), val_(val) {}
    };
 
    class ConstSymInfo: public SymInfo {
    public:
       virtual Kind kind() const override { return Kind::SYM_CONST; }
 
-      ConstSymInfo(const ASTType *type, const ImmediateValue *imm): SymInfo(type, imm) {}
+      template <typename... Args>
+      ConstSymInfo(Args... args): SymInfo(args...) {}
       
    private:
    };
@@ -51,7 +52,7 @@ namespace zc {
 
       const Value *addr() const { return addr_; }
 
-      VarSymInfo(const Value *addr, const ASTType *type);
+      VarSymInfo(const Value *addr, const VarDeclaration *decl);
       VarSymInfo(const ExternalDecl *ext_decl);
 
    private:
@@ -61,7 +62,7 @@ namespace zc {
 
 
    
-
+#if 0
    class TagInfo {
    public:
       const TaggedType *type() const { return type_; }
@@ -71,20 +72,21 @@ namespace zc {
    private:
       const TaggedType *type_;
    };
+   #endif
 
    class StackFrame {
    public:
       int bytes() const;
       int locals_bytes() const { return locals_bytes_; }
 
-      void add_local(const ASTType *type);
+      void add_local(const VarDeclaration *type);
       void add_local(int bs) { locals_bytes_ += bs; }
 
-      VarSymInfo *next_arg(const ASTType *type);
-      VarSymInfo *next_local(const ASTType *type);
+      VarSymInfo *next_arg(const VarDeclaration *type);
+      VarSymInfo *next_local(const VarDeclaration *type);
 
       StackFrame();
-      StackFrame(const Types *params);
+      StackFrame(const VarDeclarations *params);
       
    protected:
       int base_bytes_;
@@ -101,7 +103,7 @@ namespace zc {
       const StackFrame& frame() const { return frame_; }
       StackFrame& frame()  { return frame_; }
 
-      void Enter(Symbol *sym, const Types *args);
+      void Enter(Symbol *sym, const VarDeclarations *args);
       void Exit();
 
       LabelValue *LabelGen(const Symbol *id) const;
@@ -258,14 +260,14 @@ namespace zc {
    };
 
    
-   class CgenEnv: public Env<SymInfo, TagInfo, CgenExtEnv> {
+   class CgenEnv: public Env<SymInfo, TaggedType, CgenExtEnv> {
    public:
       const StringConstants& strconsts() const { return strconsts_; }
       StringConstants& strconsts() { return strconsts_; }
       const FunctionImpls& impls() const { return impls_; }
       FunctionImpls& impls() { return impls_; }
 
-      CgenEnv(): Env<SymInfo, TagInfo, CgenExtEnv>(), strconsts_(), impls_() {}
+      CgenEnv(): Env<SymInfo, TaggedType, CgenExtEnv>(), strconsts_(), impls_() {}
 
       void DumpAsm(std::ostream& os) const;
       

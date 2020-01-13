@@ -11,7 +11,7 @@ namespace zc {
 
    class CompoundStat: public ASTStat {
    public:
-      Types *decls() const { return decls_; }
+      Declarations *decls() const { return decls_; }
       ASTStats *stats() const { return stats_; }
 
       template <typename... Args>
@@ -34,10 +34,10 @@ namespace zc {
       virtual void FrameGen(StackFrame& env) const override;
       
    protected:
-      Types *decls_;
+      Declarations *decls_;
       ASTStats *stats_;
       
-      CompoundStat(Types *decls, ASTStats *stats, SourceLoc& loc):
+      CompoundStat(Declarations *decls, ASTStats *stats, const SourceLoc& loc):
          ASTStat(loc), decls_(decls), stats_(stats) {}
    };
    

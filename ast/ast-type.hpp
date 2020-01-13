@@ -30,11 +30,18 @@ namespace zc {
                        TYPE_TAGGED,
                        TYPE_ARRAY};
       virtual Kind kind() const = 0;
+#if TYPE_SYM
       Symbol *sym() const { return sym_; }
       void set_sym(Symbol *sym) { sym_ = sym; }
+#endif
 
       bool is_callable() const { return get_callable() != nullptr; }
       virtual const FunctionType *get_callable() const { return nullptr; }
+
+      /**
+       * Add all declarable types to list.
+       */
+      virtual void get_declarables(Declarations* output) const = 0;
 
       /**
        * Whether type contains another type (i.e. is a pointer or array).
@@ -53,22 +60,31 @@ namespace zc {
       virtual ASTType *Address() = 0;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) = 0;
 
-      virtual void CodeGen(CgenEnv& env);
+      // virtual void CodeGen(CgenEnv& env);
       virtual int bytes() const = 0;
       void FrameGen(StackFrame& frame) const;
 
       static ASTType *Create(ASTType *specs, ASTDeclarator *declarator) {
+#if TYPE_SYM         
          specs->set_sym(declarator->sym());
+#endif
          return declarator->Type(specs);         
       }
       
    protected:
+#if TYPE_SYM
       Symbol *sym_;
+#endif
 
+#if TYPE_SYM
       template <typename... Args>
       ASTType(Args... args): ASTNode(args...), sym_(nullptr) {}
       template <typename... Args>
       ASTType(Symbol *sym, Args... args): ASTNode(args...), sym_(sym) {}
+#else
+      template <typename... Args>
+      ASTType(Args... args): ASTNode(args...) {}
+#endif
    };
 
    std::ostream& operator<<(std::ostream& os, ASTType::Kind kind);
@@ -86,6 +102,8 @@ namespace zc {
       static PointerType *Create(Args... args) {
          return new PointerType(args...);
       }
+
+      virtual void get_declarables(Declarations* output) const override;
 
       virtual void DumpNode(std::ostream& os) const override;
 
@@ -112,13 +130,15 @@ namespace zc {
       virtual Kind kind() const override { return Kind::TYPE_FUNCTION; }
       virtual const FunctionType *get_callable() const override { return this; }
       ASTType *return_type() const { return return_type_; }
-      Types *params() const { return params_; }
+      VarDeclarations *params() const { return params_; }
       
       template <typename... Args>
       static FunctionType *Create(Args... args) {
          return new FunctionType(args...);
       }
 
+      virtual void get_declarables(Declarations* output) const override;
+      
       virtual void DumpNode(std::ostream& os) const override;
 
       virtual bool TypeEq(const ASTType *other) const override;
@@ -132,16 +152,18 @@ namespace zc {
       
    protected:
       ASTType *return_type_;
-      Types *params_;
+      VarDeclarations *params_;
 
       template <typename... Args>
-      FunctionType(ASTType *return_type, Types *params, Args... args):
+      FunctionType(ASTType *return_type, VarDeclarations *params, Args... args):
          ASTType(args...), return_type_(return_type), params_(params) {}
    };
 
    class VoidType: public ASTType {
    public:
       virtual Kind kind() const override { return Kind::TYPE_VOID; }
+
+      virtual void get_declarables(Declarations* output) const override {}
       
       virtual void DumpNode(std::ostream& os) const override { os << "VoidType VOID"; }
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
@@ -174,6 +196,8 @@ namespace zc {
       virtual Kind kind() const override { return Kind::TYPE_INTEGRAL; }
       IntKind int_kind() const { return int_kind_; }
 
+      virtual void get_declarables(Declarations* output) const override {}      
+
       virtual void DumpNode(std::ostream& os) const override;
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
 
@@ -199,12 +223,31 @@ namespace zc {
       IntegralType(IntKind int_kind, Args... args): ASTType(args...), int_kind_(int_kind) {}
    };
 
-   class TaggedType: public ASTType {
+   /**
+    * A type that can be declared.
+    * NOTE: abstract.
+    */
+   class DeclarableType: public ASTType {
+   public:
+      virtual void get_declarables(Declarations* output) const override;
+
+      virtual Symbol *get_declarable_sym() const = 0;
+      
+      virtual void Declare(SemantEnv& env) = 0;
+      virtual void Declare(CgenEnv& env) = 0;
+      
+   protected:
+      template <typename... Args>
+      DeclarableType(Args... args): ASTType(args...) {}
+   };
+
+   class TaggedType: public DeclarableType {
    public:
       /**
        * The (not necessarily unique) tag name for this tagged type.
        */
       Symbol *tag() const { return tag_; }
+      virtual Symbol *get_declarable_sym() const override { return tag(); }      
 
       /**
        * The unique, scope-independent identifier for this tagged type.
@@ -227,6 +270,9 @@ namespace zc {
        * NOTE: Expects that @param other be of same derived type as this.
        */
       virtual void complete(const TaggedType *def) = 0;
+      
+      virtual void Declare(SemantEnv& env) override;
+      virtual void Declare(CgenEnv& env) override {}
 
       virtual void DumpNode(std::ostream& os) const override;
       
@@ -234,8 +280,9 @@ namespace zc {
       virtual ASTType *Dereference(SemantEnv *env) override;
       virtual void EnscopeTag(SemantEnv& env);      
       virtual void TypeCheck(SemantEnv& env, bool allow_void) override;
-      virtual bool TypeEq(const ASTType *other) const override;      
       virtual void TypeCheckMembs(SemantEnv& env) = 0;
+      virtual bool TypeEq(const ASTType *other) const override;      
+      virtual void DeclareMembs(SemantEnv& env) = 0;
       
    protected:
       Symbol *tag_;
@@ -245,17 +292,19 @@ namespace zc {
       virtual const char *name() const = 0;
       void AssignUniqueID(SemantEnv& env);
 
-      template <typename... Args>
-      TaggedType(Symbol *tag, Args... args): ASTType(args...), tag_(tag), unique_id_(-1) {}
+      TaggedType(Symbol *tag, const SourceLoc& loc):
+         DeclarableType(loc), tag_(tag), unique_id_(-1) {}
 
-      template <typename... Args>
-      TaggedType(Symbol *tag, int unique_id, Args... args):
-         ASTType(args...), tag_(tag), unique_id_(unique_id) {}
+      //template <typename... Args>
+      //TaggedType(Symbol *tag, int unique_id, Args... args):
+      //DeclarableType(args...), tag_(tag), unique_id_(unique_id) {}
    };
 
    template <typename Memb>
    class TaggedType_aux: public TaggedType {
-      struct GetSym { Symbol *operator()(Memb *memb) { return memb->sym(); } };
+      struct GetSym {
+         Symbol *operator()(Memb *memb) { return memb->sym(); }
+      };
       typedef uniq_vector<Memb *, Symbol *, GetSym> Membs;
    public:
       Membs *membs() const { return membs_; }
@@ -272,20 +321,24 @@ namespace zc {
          }
       }
       
-      virtual void TypeCheckMembs(SemantEnv& env) override {
+      virtual void DeclareMembs(SemantEnv& env) override {
          if (membs() != nullptr) {
             for (auto memb : *membs()) {
-               memb->TypeCheck(env);
+               memb->Declare(env);
             }
          }
       }
-
+      
    protected:
       Membs *membs_;
 
-      template <typename InputIt, typename... Args>
-      TaggedType_aux(SemantError& err, InputIt membs_begin, InputIt membs_end, Args... args):
-         TaggedType(args...),
+      template <typename... Args>
+      TaggedType_aux(Args... args): TaggedType(args...), membs_(nullptr) {}      
+
+      template <typename InputIt>
+      TaggedType_aux(SemantError& err, InputIt membs_begin, InputIt membs_end,
+                     Symbol *tag, const SourceLoc& loc):
+         TaggedType(tag, loc),
          membs_(new Membs(membs_begin, membs_end,
                 [&](Memb *first, Memb *second) {
                    err(g_filename, second) << "duplicate member '" << *second->sym() << "'"
@@ -293,23 +346,68 @@ namespace zc {
 
                 })) {}
 
-      template <typename... Args>
-      TaggedType_aux(Args... args): TaggedType(args...), membs_(nullptr) {}
+      template <typename InputIt, typename Func, typename... Args>
+      TaggedType_aux(SemantError& err, InputIt begin, InputIt end,
+                     Func func, Args... args): TaggedType(args...), membs_(nullptr) {
+         /* convert */
+         std::vector<Memb *> vec;
+         for (; begin != end; ++begin) {
+            auto memb = func(err, begin);
+            if (memb != nullptr) {
+               vec.push_back(memb);
+            }
+         }
+
+         membs_ = new Membs(vec.begin(), vec.end(),
+                            [&](Memb *first, Memb *second) {
+                               err(g_filename, second) << "duplicate member '" << *second->sym() << "'"
+                                                       << std::endl;
+                               
+                            });
+      }
    };
 
    /**
     * Abstract tagged type that has members (i.e. struct or union).
     */
-   class CompoundType: public TaggedType_aux<ASTType> {
+   class VarDeclaration;
+   class CompoundType: public TaggedType_aux<VarDeclaration> {
    public:
+      virtual void get_declarables(Declarations* output) const override;
+      
       virtual bool TypeCoerce(const ASTType *from) const override;
 
       virtual int bytes() const override = 0;
       virtual int offset(const Symbol *sym) const = 0;
+
+      virtual void TypeCheckMembs(SemantEnv& env) override {
+         if (membs()) {
+            for (auto decl : *membs()) {
+               decl->TypeCheck(env);
+            }
+         }
+      }
+
+      virtual void DeclareMembs(SemantEnv& env) override;
       
    protected:
       template <typename... Args>
-      CompoundType(Args... args): TaggedType_aux<ASTType>(args...) {}
+      CompoundType(Args... args): TaggedType_aux<VarDeclaration>(args...) {}
+
+      template <typename InputIt, typename... Args>
+      CompoundType(SemantError& err, InputIt begin, InputIt end, Args... args):
+         TaggedType_aux<VarDeclaration>
+         (err, begin, end,
+          [&](SemantError& err, InputIt it) -> VarDeclaration * {
+             auto var_decl = dynamic_cast<VarDeclaration *>(*it);
+             if (var_decl == nullptr) {
+                err(g_filename, this) << "declaration not allowed here" << std::endl;
+             }
+             return var_decl;
+          }, args...) {}
+
+         
+      
    };
    
    class StructType: public CompoundType {
@@ -346,39 +444,16 @@ namespace zc {
       UnionType(Args... args): CompoundType(args...) {}
    };
 
-   class Enumerator;
-   class EnumType: public TaggedType_aux<Enumerator> {
-   public:
-      virtual TagKind tag_kind() const override {return TagKind::TAG_ENUM; }
-      IntegralType *int_type() const { return int_type_; }
-
-      virtual bool TypeCoerce(const ASTType *other) const override;
-
-      virtual void CodeGen(CgenEnv& env) override;
-
-      virtual int bytes() const override { return int_type_->bytes(); }
-
-      template <typename... Args>
-      static EnumType *Create(Args... args) { return new EnumType(args...); }
-      
-   protected:
-      IntegralType *int_type_;
-      
-      virtual const char *name() const override { return "enum"; }
-
-      virtual void TypeCheckMembs(SemantEnv& env) override;
-      
-      template <typename... Args> EnumType(Args... args): TaggedType_aux<Enumerator>(args...) {
-         int_type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, 0);
-      }
-   };
-
+   class EnumType;
    class Enumerator: public ASTNode {
    public:
       Identifier *id() const { return id_; }
       Symbol *sym() const { return id()->id(); }
       ASTExpr *val() const { return val_; }
       EnumType *enum_type() const { return enum_type_; }
+
+      void Declare(SemantEnv& env);
+      void Declare(CgenEnv& env);
 
       intmax_t eval() const {
          if (val() == nullptr) {
@@ -395,8 +470,7 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override;
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
 
-      virtual void TypeCheck(SemantEnv& env) { TypeCheck(env, nullptr); }
-      virtual void TypeCheck(SemantEnv& env, EnumType *enum_type);
+      void TypeCheck(SemantEnv& env, EnumType *enum_type);
       
       template <typename... Args>
       static Enumerator *Create(Args... args) { return new Enumerator(args...); }
@@ -411,6 +485,57 @@ namespace zc {
       Enumerator(Identifier *id, ASTExpr *val, const Enumerator *prev, Args... args):
          ASTNode(args...), id_(id), val_(val), prev_(prev), enum_type_(nullptr) {}
    };
+   
+
+   class Enumerator;
+   class EnumType: public TaggedType_aux<Enumerator> {
+   public:
+      virtual TagKind tag_kind() const override {return TagKind::TAG_ENUM; }
+      IntegralType *int_type() const { return int_type_; }
+      
+      virtual void TypeCheckMembs(SemantEnv& env) override;
+      virtual bool TypeCoerce(const ASTType *other) const override;
+
+      // virtual void CodeGen(CgenEnv& env) override;
+      virtual void Declare(SemantEnv& env) override;
+      virtual void Declare(CgenEnv& env) override;
+      
+      virtual int bytes() const override { return int_type_->bytes(); }
+
+      template <typename... Args>
+      static EnumType *Create(Args... args) { return new EnumType(args...); }
+      
+   protected:
+      IntegralType *int_type_;
+      
+      virtual const char *name() const override { return "enum"; }
+
+      virtual void DeclareMembs(SemantEnv& env) override;
+
+#if 1
+      template <typename InputIt>
+      EnumType(SemantError& err, InputIt begin, InputIt end, Symbol *tag, const SourceLoc& loc):
+         TaggedType_aux<Enumerator>(err, begin, end, tag, loc) {
+         int_type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, 0);
+         #if 0
+         for (auto memb : *membs()) {
+            // memb->set_enum_type(this);
+         }
+         #endif
+      }
+
+      EnumType(Symbol *tag, const SourceLoc& loc):
+         TaggedType_aux<Enumerator>(tag, loc) {
+         int_type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, 0);
+      }
+
+#else
+      template <typename... Args> EnumType(Args... args): TaggedType_aux<Enumerator>(args...) {
+         int_type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, 0);
+      }
+#endif
+   };
+
 
    class ArrayType: public ASTType {
    public:
@@ -420,6 +545,8 @@ namespace zc {
       intmax_t int_count() const { return int_count_; }
       virtual ASTType *get_containee() const override { return elem(); }            
 
+      virtual void get_declarables(Declarations* output) const override;
+      
       virtual void DumpNode(std::ostream& os) const override;
 
       virtual bool TypeEq(const ASTType *other) const override;
@@ -447,6 +574,8 @@ namespace zc {
 
    std::ostream& operator<<(std::ostream& os, IntegralType::IntKind kind);
    std::ostream& operator<<(std::ostream& os, CompoundType::TagKind kind);
+
+   
    
 
 }

@@ -21,7 +21,7 @@ namespace zc {
       tagtab_.EnterScope();
    }   
 
-   template class Env<ASTType, TaggedType, SemantExtEnv>;
-   template class Env<SymInfo, TagInfo, CgenExtEnv>;
+   template class Env<VarDeclaration, TaggedType, SemantExtEnv>;
+   template class Env<SymInfo, TaggedType, CgenExtEnv>;
    
 }

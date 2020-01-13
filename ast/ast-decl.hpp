@@ -10,10 +10,12 @@
 namespace zc {
 
    class ASTType;
+   class Declaration;
+   typedef std::vector<Declaration *> Declarations;
 
    class ExternalDecl: public ASTNode {
    public:
-      ASTType *decl() const { return decl_; }
+      Declaration *decl() const { return decl_; }
       Symbol *sym() const;
       
       template <typename... Args>
@@ -34,10 +36,10 @@ namespace zc {
       virtual void CodeGen(CgenEnv& env);
       
    protected:
-      ASTType *decl_;
+      Declaration *decl_;
 
       template <typename... Args>
-      ExternalDecl(ASTType *decl, Args... args): ASTNode(args...), decl_(decl) {}
+      ExternalDecl(Declaration *decl, Args... args): ASTNode(args...), decl_(decl) {}
    };
    
    template <> const char *ExternalDecls::name() const;
@@ -70,26 +72,73 @@ namespace zc {
       
    };
 
+   /**
+    * NOTE: Abstract.
+    */
    class Declaration: public ASTNode {
    public:
       ASTType *type() const { return type_; }
-      Symbol *sym() const { return sym_; }
-      bool is_const() const { return is_const_; }
 
-      virtual void DumpNode(std::ostream& os) const override;
+      virtual void Declare(SemantEnv& env) = 0;
+      virtual void Declare(CgenEnv& env) = 0;
+
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
 
-      template <typename... Args>
-      static Declaration *Create(Args... args) { return new Declaration(args...); }
+      virtual void FrameGen(StackFrame& frame) const = 0;
 
-   private:
+   protected:
       ASTType *type_;
-      Symbol *sym_;
+
+      template <typename... Args>
+      Declaration(ASTType *type, Args... args):
+         ASTNode(args...), type_(type) {}
+   };
+ 
+   class VarDeclaration: public Declaration {
+   public:
+      Symbol *sym() const { return sym_; }            
+      bool is_const() const { return is_const_; }
+      bool is_valid() const { return sym() != nullptr; }
+
+      virtual void Declare(SemantEnv& env) override;
+      virtual void Declare(CgenEnv& env) override;
+      void TypeCheck(SemantEnv& env);
+
+      virtual void DumpNode(std::ostream& os) const override;
+
+      
+      virtual void FrameGen(StackFrame& frame) const override; /* TODO */
+
+      int bytes() const;
+
+      template <typename... Args>
+      static VarDeclaration *Create(Args... args) { return new VarDeclaration(args...); }
+      
+   private: 
+      Symbol *sym_;     
       bool is_const_;
 
       template <typename... Args>
-      Declaration(ASTType *type, Symbol *sym, bool is_const, Args... args):
-         ASTNode(args...), type_(type), sym_(sym), is_const_(is_const) {}
+      VarDeclaration(Symbol *sym, bool is_const, Args... args):
+         Declaration(args...), sym_(sym), is_const_(is_const) {}
+   };
+
+   class TypeDeclaration: public Declaration {
+   public:
+      virtual void Declare(SemantEnv& env) override;
+      virtual void Declare(CgenEnv& env) override;
+
+      virtual void DumpNode(std::ostream& os) const override;
+
+      virtual void FrameGen(StackFrame& frame) const override {}
+
+      template <typename... Args>
+      static TypeDeclaration *Create(Args... args) { return new TypeDeclaration(args...); }
+      
+   private:
+      template <typename... Args>
+      TypeDeclaration(Args... args): Declaration(args...) {}
+      TypeDeclaration(DeclarableType *type);
    };
    
    class ASTDeclarator: public ASTNode {
@@ -103,6 +152,8 @@ namespace zc {
       Symbol *sym() const;
       virtual Kind kind() const = 0;
 
+      virtual void get_declarables(Declarations* output) const {}
+
       virtual ASTType *Type(ASTType *init_type) const = 0;
 
       /**
@@ -110,10 +161,10 @@ namespace zc {
        * @param env semantic environment
        * @param level abstaction level. @see Decl::TypeCheck(Semantic&, int)
        */
-      virtual void TypeCheck(SemantEnv& env) = 0;
+      // virtual void TypeCheck(SemantEnv& env) = 0;
 
       /** Unwrap a type during Decl -> Type conversion. */
-      virtual void JoinPointers() = 0;      
+      virtual void JoinPointers() = 0;
       
    protected:
       
@@ -133,7 +184,7 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override { os << "BasicDeclarator"; }
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
 
-      virtual void TypeCheck(SemantEnv& env) override {}
+      // virtual void TypeCheck(SemantEnv& env) override {}
 
       virtual ASTType *Type(ASTType *init_type) const override;
 
@@ -163,9 +214,9 @@ namespace zc {
          declarator_->Dump(os, level, with_types);
       }
 
-      virtual void TypeCheck(SemantEnv& env) override {
+      /* virtual void TypeCheck(SemantEnv& env) override {
          declarator()->TypeCheck(env);
-      }
+         } */
       
       virtual ASTType *Type(ASTType *init_type) const override;
       
@@ -182,7 +233,7 @@ namespace zc {
    class FunctionDeclarator: public ASTDeclarator {
    public:
       ASTDeclarator *declarator() const { return declarator_; }
-      Types *params() const { return params_; }
+      VarDeclarations *params() const { return params_; }
       virtual Identifier *id() const override { return declarator_->id(); }
       virtual Kind kind() const override { return Kind::DECLARATOR_FUNCTION; }
 
@@ -191,10 +242,12 @@ namespace zc {
          return new FunctionDeclarator(args...);
       }
 
+      virtual void get_declarables(Declarations* output) const override;
+      
       virtual void DumpNode(std::ostream& os) const override { os << "FunctionDeclarator"; }
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
 
-      virtual void TypeCheck(SemantEnv& env) override;
+      // virtual void TypeCheck(SemantEnv& env) override;
       
       virtual ASTType *Type(ASTType *init_type) const override;
       
@@ -202,9 +255,9 @@ namespace zc {
       
    protected:
       ASTDeclarator *declarator_;
-      Types *params_;
+      VarDeclarations *params_;
 
-      FunctionDeclarator(ASTDeclarator *declarator, Types *params, const SourceLoc& loc):
+      FunctionDeclarator(ASTDeclarator *declarator, VarDeclarations *params, const SourceLoc& loc):
          ASTDeclarator(loc), declarator_(declarator), params_(params) {}
    };
 
@@ -220,7 +273,7 @@ namespace zc {
 
       virtual void DumpNode(std::ostream& os) const override { os << "ArrayDeclarator"; }
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
-      virtual void TypeCheck(SemantEnv& env) override;
+      // virtual void TypeCheck(SemantEnv& env) override;
       virtual ASTType *Type(ASTType *init_type) const override;
       virtual void JoinPointers() override { declarator()->JoinPointers(); }
 
@@ -246,7 +299,7 @@ namespace zc {
          /* no children */
       }
 
-      void TypeCheck(SemantEnv& env) {}
+      // void TypeCheck(SemantEnv& env) {}
       
    protected:
       Symbol *id_;

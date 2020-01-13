@@ -24,7 +24,7 @@ namespace zc {
       /* TODO: this doesn't work. */
    }
    
-   void CgenExtEnv::Enter(Symbol *sym, const Types *args) {
+   void CgenExtEnv::Enter(Symbol *sym, const VarDeclarations *args) {
       sym_env_.Enter(sym);
       frame_ = StackFrame(args);
    }
@@ -40,24 +40,25 @@ namespace zc {
    }
 
    VarSymInfo::VarSymInfo(const ExternalDecl *ext_decl): SymInfo() {
-      type_ = ext_decl->Type();
+      decl_ = dynamic_cast<const VarDeclaration *>(ext_decl->decl());
+      const ASTType *type = decl()->type();
       Label *label = new Label(std::string("_") + *ext_decl->sym());
       LabelValue *label_val = new LabelValue(label);
 
-      if (type_->kind() == ASTType::Kind::TYPE_FUNCTION) {
+      if (type->kind() == ASTType::Kind::TYPE_FUNCTION) {
          /* Functions _always_ behave as lvalues, i.e. they are always treated as addresses. */
          addr_ = val_ = label_val;
       } else {
          addr_ = label_val;
 
          MemoryLocation *mem_loc = new MemoryLocation(label_val);
-         val_ = new MemoryValue(mem_loc, type()->bytes());
+         val_ = new MemoryValue(mem_loc, type->bytes());
       }
    }
 
-   VarSymInfo::VarSymInfo(const Value *addr, const ASTType *type): SymInfo() {
+   VarSymInfo::VarSymInfo(const Value *addr, const VarDeclaration *decl): SymInfo() {
       auto loc = new MemoryLocation(addr);
-      auto val = new MemoryValue(loc, type->bytes());
+      auto val = new MemoryValue(loc, decl->bytes());
       val_ = val;
    }
    
@@ -101,7 +102,7 @@ namespace zc {
    void FunctionDef::CodeGen(CgenEnv& env) {
       /* enter function into global scope */
       VarSymInfo *info = new VarSymInfo(this);
-      const Types *args = Type()->get_callable()->params();
+      const VarDeclarations *args = Type()->get_callable()->params();
       env.symtab().AddToScope(sym(), info);
       env.ext_env().Enter(sym(), args);
 
@@ -112,9 +113,9 @@ namespace zc {
       FrameGen(env.ext_env().frame());
 
       /* assign argument stack locations */
-      for (const ASTType *type : *Type()->get_callable()->params()) {
-         VarSymInfo *info = env.ext_env().frame().next_arg(type);
-         env.symtab().AddToScope(type->sym(), info);
+      for (const VarDeclaration *arg : *args) {
+         VarSymInfo *info = env.ext_env().frame().next_arg(arg);
+         env.symtab().AddToScope(arg->sym(), info);
       }
       
       Block *start_block = new Block(dynamic_cast<const LabelValue *>(info->addr())->label());
@@ -141,8 +142,8 @@ namespace zc {
          env.EnterScope();
       }
 
-      for (ASTType *decl : *decls()) {
-         decl->CodeGen(env);
+      for (Declaration *decl : *decls()) {
+         decl->Declare(env);
       }
 
       for (ASTStat *stat : stats()->vec()) {
@@ -156,6 +157,7 @@ namespace zc {
       return block;
    }
 
+#if 0
    void ASTType::CodeGen(CgenEnv& env) {
       SymInfo *info = env.ext_env().frame().next_local(this);
 
@@ -164,7 +166,9 @@ namespace zc {
          env.symtab().AddToScope(sym(), info);
       }
    }
+#endif
 
+#if 0
    void EnumType::CodeGen(CgenEnv& env) {
       for (auto memb : *membs()) {
          const auto imm = new ImmediateValue(memb->eval(), bytes());
@@ -174,6 +178,7 @@ namespace zc {
 
       ASTType::CodeGen(env);
    }
+#endif
 
    Block *ReturnStat::CodeGen(CgenEnv& env, Block *block) {
       /* generate returned expression 
@@ -1247,7 +1252,7 @@ namespace zc {
 
    StackFrame::StackFrame(): base_bytes_(long_size * 2), locals_bytes_(0), args_bytes_(0) {}
    
-   StackFrame::StackFrame(const Types *params):
+   StackFrame::StackFrame(const VarDeclarations *params):
       base_bytes_(long_size * 2), locals_bytes_(0), args_bytes_(0), next_local_addr_(nullptr),
       next_arg_addr_(nullptr) /* saved FP, RA */ {
       /* add size for each param */
@@ -1256,34 +1261,34 @@ namespace zc {
 
    int StackFrame::bytes() const { return base_bytes_ + locals_bytes_ + args_bytes_; }
    
-   void StackFrame::add_local(const ASTType *type) { add_local(type->bytes()); }
+   void StackFrame::add_local(const VarDeclaration *local) { add_local(local->bytes()); }
 
-   VarSymInfo *StackFrame::next_arg(const ASTType *type) {
+   VarSymInfo *StackFrame::next_arg(const VarDeclaration *arg) {
       if (next_arg_addr_ == nullptr) {
          next_arg_addr_ = FP_idxval.Add(locals_bytes_ + base_bytes_);
       }
-      VarSymInfo *info = new VarSymInfo(next_arg_addr_, type);
-      next_arg_addr_ = next_arg_addr_->Add(long_size);
-      return info;
-   }
+      VarSymInfo *info = new VarSymInfo(next_arg_addr_, arg);
+       next_arg_addr_ = next_arg_addr_->Add(long_size);
+       return info;
+    }
 
-   VarSymInfo *StackFrame::next_local(const ASTType *type) {
-      if (next_local_addr_ == nullptr) {
-         next_local_addr_ = &FP_idxval;
-      }
-      VarSymInfo *info = new VarSymInfo(next_local_addr_, type);
-      next_local_addr_ = next_local_addr_->Add(type->bytes());
-      return info;
-   }
+    VarSymInfo *StackFrame::next_local(const VarDeclaration *decl) {
+       if (next_local_addr_ == nullptr) {
+          next_local_addr_ = &FP_idxval;
+       }
+       VarSymInfo *info = new VarSymInfo(next_local_addr_, decl);
+       next_local_addr_ = next_local_addr_->Add(decl->bytes());
+       return info;
+    }
    
-   void FunctionDef::FrameGen(StackFrame& frame) const {
-      comp_stat()->FrameGen(frame);
-   }
+    void FunctionDef::FrameGen(StackFrame& frame) const {
+       comp_stat()->FrameGen(frame);
+    }
 
-   void CompoundStat::FrameGen(StackFrame& frame) const {
-      for (const ASTType *decl : *decls()) {
-         decl->FrameGen(frame);
-      }
+    void CompoundStat::FrameGen(StackFrame& frame) const {
+       for (const Declaration *decl : *decls()) {
+          decl->FrameGen(frame);
+       }
       for (const ASTStat *stat : stats()->vec()) {
          stat->FrameGen(frame);
       }
@@ -1298,8 +1303,35 @@ namespace zc {
       body()->FrameGen(frame);
    }
 
-   void ASTType::FrameGen(StackFrame& frame) const {
+   void VarDeclaration::FrameGen(StackFrame& frame) const {
       frame.add_local(this);
+   }
+
+   void VarDeclaration::Declare(CgenEnv& env) {
+      SymInfo *info = env.ext_env().frame().next_local(this);
+      env.symtab().AddToScope(sym(), info);
+   }
+
+   void TypeDeclaration::Declare(CgenEnv& env) {
+      dynamic_cast<DeclarableType *>(type())->Declare(env);
+   }
+
+   void Enumerator::Declare(CgenEnv& env) {
+      const Value *val = new ImmediateValue(eval(), enum_type()->bytes());
+      
+      env.symtab().AddToScope
+         (sym(),
+          new ConstSymInfo(VarDeclaration::Create(sym(), true, enum_type(), loc()),
+                               val));
+          
+   }
+
+   void EnumType::Declare(CgenEnv& env) {
+      if (membs()) {
+         for (auto memb : *membs()) {
+            memb->Declare(env);
+         }
+      }
    }
 
 

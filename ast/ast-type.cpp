@@ -6,6 +6,7 @@
 #include "asm.hpp"
 
 extern const char *g_filename;
+extern zc::SemantError g_semant_error;
 
 namespace zc {
 
@@ -140,5 +141,44 @@ namespace zc {
    void TaggedType::DumpNode(std::ostream& os) const {
       os << tag_kind() << "'" << *tag() << "'";
    }
+
+
+   /*** GET DECLARABLES ***/
+
+   void PointerType::get_declarables(Declarations* output) const {
+      /* declarable type might appear somewhere in pointee */
+      pointee()->get_declarables(output);
+   }
    
+   void FunctionType::get_declarables(Declarations* output) const {
+      /* declarable types might appear in the function parameters or return value */
+      return_type()->get_declarables(output);
+
+#if 0
+      for (auto param : *params()) {
+         param->get_declarables(output);
+      }
+#endif
+   }
+
+   void DeclarableType::get_declarables(Declarations* output) const {
+      output->push_back(TypeDeclaration::Create((DeclarableType *) this));
+   }
+
+   void CompoundType::get_declarables(Declarations* output) const {
+      TaggedType::get_declarables(output);
+      if (membs()) {
+         for (auto memb : *membs()) {
+            auto type_decl = dynamic_cast<TypeDeclaration *>(memb);
+            if (type_decl) {
+               output->push_back(type_decl);
+            }
+         }
+      }
+   }
+
+   void ArrayType::get_declarables(Declarations* output) const {
+      elem()->get_declarables(output);
+   }
+
  }

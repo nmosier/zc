@@ -140,16 +140,20 @@
        }
        return_type()->TypeCheck(env, true);
        for (auto param : *params()) {
-          param->TypeCheck(env);
+          param->type()->TypeCheck(env);
        }
     }
 
     void TaggedType::TypeCheck(SemantEnv& env, bool allow_void) {
+       TypeCheckMembs(env);
+    }
+    
+    void TaggedType::Declare(SemantEnv& env) {
        AssignUniqueID(env);
        
        if (is_complete()) {
           /* this tagged type is a complete definition */
-          TypeCheckMembs(env);
+          DeclareMembs(env);
 
           /* enscope struct if it isn't anonymous */
           if (tag() != nullptr) {
@@ -178,13 +182,75 @@
        }
     }
 
-    void EnumType::TypeCheckMembs(SemantEnv& env) {
+    void CompoundType::DeclareMembs(SemantEnv& env) {
+       if (membs()) {
+          for (auto memb : *membs()) {
+             auto type_memb = dynamic_cast<TypeDeclaration *>(memb);
+             if (type_memb) {
+                type_memb->Declare(env);
+             }
+          }
+       }
+    }
+
+    void VarDeclaration::Declare(SemantEnv& env) {
+       if (sym() == nullptr) {
+          env.error()(g_filename, this) << "expected variable declaration" << std::endl;
+          return;
+       }
+
+       if (env.symtab().Probe(sym()) != nullptr) {
+           /* ERROR: symbol already defined in this scope. */
+           env.error()(g_filename, this) << "redefinition of '" << *sym() << "'" << std::endl;
+           return;          
+       }
+
+       /* type check type */
+       type()->TypeCheck(env, false);
+
+       /* add symbol to scope */
+       env.symtab().AddToScope(sym(), this);
+    }
+
+    void TypeDeclaration::Declare(SemantEnv& env) {
+       dynamic_cast<DeclarableType *>(type())->Declare(env);
+    }
+
+    void EnumType::Declare(SemantEnv& env) {
+       TaggedType::Declare(env);
+
+#if 0
+       if (membs()) {
+          for (auto memb : *membs()) {
+             memb->Declare(env);
+          }
+       }
+#endif
+    }
+
+    void Enumerator::Declare(SemantEnv& env) {
+#if 1
+       TypeCheck(env, enum_type());
+#else
+       if (env.symtab().Probe(sym())) {
+          env.error()(g_filename, this) << "enumeration constant '" << *sym()
+                                        << "' previously defined as different kind of symbol"
+                                        << " in this scope"
+                                        << std::endl;
+       } else {
+          env.symtab().AddToScope(sym(), VarDeclaration::Create(sym(), true, enum_type(), loc()));
+       }
+#endif
+    }
+
+    void EnumType::DeclareMembs(SemantEnv& env) {
        if (membs_ != nullptr) {
           for (auto enumerator : *membs_) {
              enumerator->TypeCheck(env, this);
           }
        }
     }
+
 
     void Enumerator::TypeCheck(SemantEnv& env, EnumType *enum_type) {
        enum_type_ = enum_type;
@@ -210,7 +276,8 @@
           env.error()(g_filename, this) << "redefinition of '" << *sym()
                                         << "' as different kind of symbol" << std::endl;
        } else {
-          env.symtab().AddToScope(sym(), enum_type);
+          env.symtab().AddToScope(sym(),
+                                  VarDeclaration::Create(sym(), true, enum_type, loc()));
        }
 
     }
@@ -242,7 +309,7 @@
           unique_id_ = unique_id_counter_++;
        } else if (kind() != tagged_type->kind()) {
           /* tagged kinds do not match */
-          env.error()(g_filename, this) << "use of '" << *sym()
+          env.error()(g_filename, this) << "use of '" << *tag()
                                         << "' with tag type that does "
                                         << "not match previous declaration" << std::endl;
        } else if (!tagged_type->is_complete()) {
@@ -289,24 +356,26 @@
     }
 
     void ExternalDecl::TypeCheck(SemantEnv& env) {
-       decl()->TypeCheck(env);
-       decl()->Enscope(env);
+       decl()->Declare(env);
     }
 
     void FunctionDef::TypeCheck(SemantEnv& env) {
-       decl()->TypeCheck(env);
+       // decl()->Declare(env);
        Enscope(env);
        comp_stat()->TypeCheck(env, false); /* function body doesn't get new scope */
        Descope(env);
     }
 
+#if 0
     void FunctionDeclarator::TypeCheck(SemantEnv& env) {
        declarator()->TypeCheck(env);
        for (auto param : *params()) {
           param->TypeCheck(env);
        }
     }
+#endif
 
+#if 0
     void ArrayDeclarator::TypeCheck(SemantEnv& env) {
        declarator()->TypeCheck(env);
        count_expr()->TypeCheck(env);
@@ -314,6 +383,7 @@
           env.error()(g_filename, this) << "array size expression is not constant" << std::endl;
        }
     }
+#endif
     
    void CompoundStat::TypeCheck(SemantEnv& env, bool scoped) {
       if (scoped) {
@@ -321,8 +391,7 @@
       }
 
       for (auto decl : *decls()) {
-         decl->TypeCheck(env);
-         decl->Enscope(env);
+         decl->Declare(env);
       }
       
       stats()->TypeCheck(env);
@@ -337,7 +406,9 @@
 
        const ASTType *expr_type = expr()->type();
        Symbol *fn_sym = env.ext_env().sym();
-       const FunctionType *fn_type = dynamic_cast<const FunctionType *>(env.symtab().Lookup(fn_sym));
+       VarDeclaration *var = env.symtab().Lookup(fn_sym);
+       const FunctionType *fn_type = dynamic_cast<const FunctionType *>(var->type());
+       assert(fn_type);
        const ASTType *ret_type = fn_type->return_type();
        if (!ret_type->TypeCoerce(expr_type)) {
           env.error()(g_filename, this) << "value in return statement has incompatible type"
@@ -426,7 +497,7 @@
        auto arg_end = params()->vec().end();
        for (int i = 1; type_it != type_end; ++type_it, ++arg_it, ++i) {
           const ASTType *arg_type = (*arg_it)->type();
-          if (!(*type_it)->TypeCoerce(arg_type)) {
+          if (!(*type_it)->type()->TypeCoerce(arg_type)) {
              env.error()(g_filename, this) << "cannot coerce type of argument " << i << std::endl;
           }
        }
@@ -441,7 +512,7 @@
        if (expr()->type()->kind() != ASTType::Kind::TYPE_TAGGED) {
           env.error()(g_filename, this) << "member access into non-tagged type" << std::endl;
        }
-       const CompoundType *compound_type = dynamic_cast<const CompoundType *>(expr()->type());
+       CompoundType *compound_type = dynamic_cast<CompoundType *>(expr()->type());
        if (compound_type->membs() == nullptr) {
           env.error()(g_filename, this) << "member access into incomplete "
                                         << compound_type->kind() << "'"
@@ -455,7 +526,7 @@
                                            << compound_type->tag() << "'" << std::endl;
              type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());
           } else {
-             type_ = *it;
+             type_ = (*it)->type();
           }
        }
     }
@@ -586,10 +657,13 @@
    }
 
    void IdentifierExpr::TypeCheck(SemantEnv& env) {
-      if ((type_ = env.symtab().Lookup(id()->id())) == nullptr) {
+      const VarDeclaration *var;
+      if ((var = env.symtab().Lookup(id()->id())) == nullptr) {
          env.error()(g_filename, this) << "use of undeclared identifier '" << *id()->id()
                                        << "'" << std::endl;
          type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());         
+      } else {
+         type_ = var->type();
       }
    }
 
@@ -680,8 +754,15 @@
        if (fn_other == nullptr) {
           return false;
        } else {
+          /* get param type lists */
+          Types this_types, other_types;
+          std::transform(params()->begin(), params()->end(), std::back_inserter(this_types),
+                         [](const auto decl) { return decl->type(); });
+          std::transform(fn_other->params()->begin(), fn_other->params()->end(),
+                         std::back_inserter(this_types),
+                         [](const auto decl) { return decl->type(); });
           return return_type()->TypeEq(fn_other->return_type()) &&
-             ::zc::TypeEq(params(), fn_other->params());
+             ::zc::TypeEq(&this_types, &other_types);
        }
     }
 
@@ -693,7 +774,7 @@
           return unique_id() == tagged_other->unique_id();
        }
     }
-    
+
     bool TypeEq(const Types *lhs, const Types *rhs) {
        if (lhs->size() != rhs->size()) {
           return false;
@@ -749,6 +830,19 @@
     bool EnumType::TypeCoerce(const ASTType *from) const {
        return int_type_->TypeCoerce(from);
     }
+
+
+    void EnumType::TypeCheckMembs(SemantEnv& env) {
+       if (membs()) {
+          for (auto memb : *membs()) {
+             memb->TypeCheck(env, this);
+          }
+       }
+    }
+
+    void VarDeclaration::TypeCheck(SemantEnv& env) {
+       type()->TypeCheck(env, false);
+    }
     
    /*** JOIN POINTERS ***/
 
@@ -768,7 +862,7 @@
    }
 
     ASTType *ExternalDecl::Type() const {
-       return decl();
+       return decl()->type();
     }
     
    ASTType *BasicDeclarator::Type(ASTType *type) const {
@@ -780,7 +874,7 @@
       switch (declarator()->kind()) {
       case Kind::DECLARATOR_BASIC:
          /* basic pointer */
-         return PointerType::Create(depth(), declarator()->Type(type), type->sym(), loc());
+         return PointerType::Create(depth(), declarator()->Type(type), loc());
          
       case Kind::DECLARATOR_POINTER:
          /* this shouldn't happen */
@@ -788,31 +882,31 @@
          
       case Kind::DECLARATOR_FUNCTION:
          /* tricky: pointer is actualy part of the return value type */
-         return declarator()->Type(PointerType::Create(depth(), type, type->sym(), loc()));
+         return declarator()->Type(PointerType::Create(depth(), type, loc()));
 
       case Kind::DECLARATOR_ARRAY:
          /* pointer is part of the element type. */
-         return declarator()->Type(PointerType::Create(depth(), type, type->sym(), loc()));
+         return declarator()->Type(PointerType::Create(depth(), type, loc()));
       }
    }
 
    ASTType *FunctionDeclarator::Type(ASTType *type) const {
       /* NOTE: _type_ represents the (possibly partial) return value of this function. */
-      Types *param_types = params();
+      VarDeclarations *param_types = params();
 
       /* WHOA -- if this works, it's beautiful. */
       switch (declarator()->kind()) {
       case Kind::DECLARATOR_BASIC:
-         return FunctionType::Create(type, param_types, type->sym(), loc());
+         return FunctionType::Create(type, param_types, loc());
          
       case Kind::DECLARATOR_POINTER:
          /* Actually a function pointer -- but primarily a pointer. */
-         return declarator()->Type(FunctionType::Create(type, param_types, type->sym(), loc()));
+         return declarator()->Type(FunctionType::Create(type, param_types, loc()));
          
       case Kind::DECLARATOR_FUNCTION:
          /* This function is actually the RETURN TYPE of another function declared
           * _declarator()_. */
-         return declarator()->Type(FunctionType::Create(type, param_types, type->sym(), loc()));
+         return declarator()->Type(FunctionType::Create(type, param_types, loc()));
 
       case Kind::DECLARATOR_ARRAY:
          /* Who in their right mind would try to declare an array of functions?! */
@@ -821,7 +915,7 @@
                                    "please consider, well, uh, NOT declaring an array of " \
                                    "functions?"};
          g_semant_error(g_filename, this) << errmsgs[(intptr_t) this % 7 % 2] << std::endl;
-         return declarator()->Type(PointerType::Create(1, type, type->sym(), loc()));
+         return declarator()->Type(PointerType::Create(1, type, loc()));
       }
    }
 
@@ -829,20 +923,20 @@
        /* NOTE: _type_ represents the (possibly partial) element type of this array. */
        switch (declarator()->kind()) {
        case Kind::DECLARATOR_BASIC:
-          return ArrayType::Create(type, count_expr(), type->sym(), loc());
+          return ArrayType::Create(type, count_expr(), loc());
           
        case Kind::DECLARATOR_POINTER:
           /* Actually a pointer to an array. */
-          return declarator()->Type(ArrayType::Create(type, count_expr(), type->sym(), loc()));
+          return declarator()->Type(ArrayType::Create(type, count_expr(), loc()));
 
        case Kind::DECLARATOR_FUNCTION:
           /* Functions can't return arrays. */
           g_semant_error(g_filename, this) << "functions can't return arrays" << std::endl;
-          return declarator()->Type(PointerType::Create(1, type, type->sym(), loc()));
+          return declarator()->Type(PointerType::Create(1, type, loc()));
 
        case Kind::DECLARATOR_ARRAY:
           /* Swap array order. */
-          return declarator()->Type(ArrayType::Create(type, count_expr(), type->sym(), loc()));
+          return declarator()->Type(ArrayType::Create(type, count_expr(), loc()));
        }
     }
 
@@ -894,6 +988,7 @@
        env.ExitScope();
      }
 
+#if 0
      void ASTType::Enscope(SemantEnv& env) { 
         /* check for previous declarations in scope */
         if (sym() == nullptr) {
@@ -909,10 +1004,15 @@
         /* add symbol to scope */
         env.symtab().AddToScope(sym(), this);
      }
+#endif
 
      void ExternalDecl::Enscope(SemantEnv& env) const {
-        decl()->Enscope(env);
-        env.ext_env().Enter(decl()->sym());
+        decl()->Declare(env);
+
+        auto var_decl = dynamic_cast<VarDeclaration *>(decl());
+        if (var_decl) {
+           env.ext_env().Enter(var_decl->sym());
+        }
      }
 
      void ExternalDecl::Descope(SemantEnv& env) const {
@@ -933,10 +1033,10 @@
           return;
        }
 
-       Types *params = type->params();
+       auto params = type->params();
        std::for_each(params->begin(), params->end(),
-                     [&](ASTType *param) {
-                        param->Enscope(env);
+                     [&](auto param) {
+                        param->Declare(env);
                      });
     }
 
