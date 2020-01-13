@@ -56,7 +56,7 @@ namespace zc {
       }
    }
 
-   VarSymInfo::VarSymInfo(const Value *addr, const VarDeclaration *decl): SymInfo() {
+   VarSymInfo::VarSymInfo(const Value *addr, const VarDeclaration *decl): SymInfo(), addr_(addr) {
       auto loc = new MemoryLocation(addr);
       auto val = new MemoryValue(loc, decl->bytes());
       val_ = val;
