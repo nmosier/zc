@@ -62,6 +62,12 @@ E  [Ee][+-]?{D}+
 "else" { return ELSE; }
 "while" { return WHILE; }
 
+"auto" { return AUTO; }
+"register" { return REGISTER; }
+"static" { return STATIC; }
+"extern" { return EXTERN; }
+"typedef" { return TYPEDEF; }
+
 "++" { return INC; }
 "--" { return DEC; }
 

@@ -56,6 +56,7 @@
     zc::VarDeclaration *var_declaration;
     zc::DeclSpecs *decl_specs;
     zc::TypeSpec *type_spec;
+    zc::StorageClassSpec *storage_class_spec;
 }
 
 %initial-action {
@@ -99,6 +100,10 @@
 %token IF
 %token ELSE
 %token WHILE
+
+                        /* STORAGE CLASS SPECS */
+%token AUTO REGISTER STATIC EXTERN TYPEDEF
+                        
                          /* IDENTIFIERS */
 %type  <translation_unit> translation_unit
 %type  <external_decls> external_decl
@@ -122,6 +127,7 @@
 %type   <type>    struct_or_enum_spec enum_spec
 %type   <decl_specs>    decl_specs
 %type   <type_spec>     type_spec
+%type   <storage_class_spec> storage_class_spec
                         
 %%
 
@@ -188,6 +194,14 @@ decl_specs:     type_spec decl_specs {
                     $$ = zc::DeclSpecs::Create(@1);
                     $1->AddTo($$);
                 }
+        |       storage_class_spec decl_specs {
+                    $$ = $2;
+                    $1->AddTo($$);
+                }
+        |       storage_class_spec {
+                    $$ = zc::DeclSpecs::Create(@1);
+                    $1->AddTo($$);
+                }
         ;
 type_spec:      VOID { $$ = zc::BasicTypeSpec::Create(zc::BasicTypeSpec::Kind::TS_VOID, @1); }
         |       CHAR { $$ = zc::BasicTypeSpec::Create(zc::BasicTypeSpec::Kind::TS_CHAR, @1); }
@@ -196,6 +210,13 @@ type_spec:      VOID { $$ = zc::BasicTypeSpec::Create(zc::BasicTypeSpec::Kind::T
         |       LONG { $$ = zc::BasicTypeSpec::Create(zc::BasicTypeSpec::Kind::TS_LONG, @1); }
         |       struct_or_enum_spec { $$ = zc::ComplexTypeSpec::Create($1, @1); }
         |       enum_spec { $$ = zc::ComplexTypeSpec::Create($1, @1); }
+        ;
+storage_class_spec:
+                AUTO { $$ = zc::StorageClassSpec::Create(zc::StorageClassSpec::Kind::SC_AUTO, @1); }
+        |       REGISTER { $$ = zc::StorageClassSpec::Create(zc::StorageClassSpec::Kind::SC_REGISTER, @1); }
+        |       STATIC { $$ = zc::StorageClassSpec::Create(zc::StorageClassSpec::Kind::SC_STATIC, @1); }
+        |       EXTERN { $$ = zc::StorageClassSpec::Create(zc::StorageClassSpec::Kind::SC_EXTERN, @1); }
+        |       TYPEDEF { $$ = zc::StorageClassSpec::Create(zc::StorageClassSpec::Kind::SC_TYPEDEF, @1); }
         ;
 struct_or_enum_spec:
                 STRUCT ID '{' struct_decl_list '}' {
