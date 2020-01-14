@@ -47,8 +47,7 @@ namespace zc {
 
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
 
-      
-
+      virtual ASTType *TypeResolve(SemantEnv& env) = 0;
       void TypeCheck(SemantEnv& env) { TypeCheck(env, true); }
       virtual void TypeCheck(SemantEnv& env, bool allow_void) = 0;
       virtual bool TypeEq(const ASTType *other) const = 0;
@@ -90,6 +89,10 @@ namespace zc {
 
       virtual void DumpNode(std::ostream& os) const override;
 
+      virtual ASTType *TypeResolve(SemantEnv& env) override {
+         pointee_ = pointee_->TypeResolve(env);
+         return this;
+      }      
       virtual bool TypeEq(const ASTType *other) const override;
       virtual bool TypeCoerce(const ASTType *from) const override;
       virtual void TypeCheck(SemantEnv& env, bool allow_void) override;
@@ -124,6 +127,7 @@ namespace zc {
       
       virtual void DumpNode(std::ostream& os) const override;
 
+      virtual ASTType *TypeResolve(SemantEnv& env) override;
       virtual bool TypeEq(const ASTType *other) const override;
       virtual bool TypeCoerce(const ASTType *from) const override;
       virtual void TypeCheck(SemantEnv& env, bool allow_void) override;
@@ -151,6 +155,7 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override { os << "VoidType VOID"; }
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
 
+      virtual ASTType *TypeResolve(SemantEnv& env) override { return this; }
       virtual void TypeCheck(SemantEnv& env, bool allow_void) override;
       virtual bool TypeEq(const ASTType *other) const override;
       virtual bool TypeCoerce(const ASTType *from) const override { return TypeEq(from); }
@@ -184,6 +189,7 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override;
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
 
+      virtual ASTType *TypeResolve(SemantEnv& env) override { return this; }      
       virtual void TypeCheck(SemantEnv& env, bool allow_void) override {}
       virtual bool TypeEq(const ASTType *other)  const override;
       virtual bool TypeCoerce(const ASTType *from) const override { return true; }
@@ -261,7 +267,8 @@ namespace zc {
       
       virtual ASTType *Address() override;
       virtual ASTType *Dereference(SemantEnv *env) override;
-      virtual void EnscopeTag(SemantEnv& env);      
+      virtual void EnscopeTag(SemantEnv& env);
+
       virtual void TypeCheck(SemantEnv& env, bool allow_void) override;
       virtual void TypeCheckMembs(SemantEnv& env) = 0;
       virtual bool TypeEq(const ASTType *other) const override;      
@@ -358,6 +365,7 @@ namespace zc {
    public:
       virtual void get_declarables(Declarations* output) const override;
       
+      virtual ASTType *TypeResolve(SemantEnv& env) override;
       virtual bool TypeCoerce(const ASTType *from) const override;
 
       virtual int bytes() const override = 0;
@@ -476,6 +484,7 @@ namespace zc {
       virtual TagKind tag_kind() const override {return TagKind::TAG_ENUM; }
       IntegralType *int_type() const { return int_type_; }
       
+      virtual ASTType *TypeResolve(SemantEnv& env) override { return this; } /* TODO */
       virtual void TypeCheckMembs(SemantEnv& env) override;
       virtual bool TypeCoerce(const ASTType *other) const override;
 
@@ -525,6 +534,10 @@ namespace zc {
       
       virtual void DumpNode(std::ostream& os) const override;
 
+      virtual ASTType *TypeResolve(SemantEnv& env) override {
+         elem_ = elem_->TypeResolve(env);
+         return this;
+      }
       virtual bool TypeEq(const ASTType *other) const override;
       virtual bool TypeCoerce(const ASTType *from) const override;
       virtual void TypeCheck(SemantEnv& env, bool allow_void) override;
@@ -555,6 +568,8 @@ namespace zc {
       ASTType *Type(SemantEnv& env) const;
       virtual Kind kind() const override { throw std::logic_error("unresolved named type"); }
       virtual void get_declarables(Declarations *output) const override {}
+
+      virtual ASTType *TypeResolve(SemantEnv& env) override;
       virtual void TypeCheck(SemantEnv& env, bool allow_void) override {
          throw std::logic_error("unresolved named type");
       }

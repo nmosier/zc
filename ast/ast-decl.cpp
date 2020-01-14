@@ -143,4 +143,8 @@ namespace zc {
       decl_specs->typename_specs.push_back(this);
    }
 
+   void Declaration::TypeResolve(SemantEnv& env) {
+      type_ = type_->TypeResolve(env);
+   }
+
 }

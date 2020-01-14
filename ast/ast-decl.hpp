@@ -186,6 +186,8 @@ namespace zc {
 
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
 
+      void TypeResolve(SemantEnv& env);
+
       virtual void FrameGen(StackFrame& frame) const = 0;
 
    protected:

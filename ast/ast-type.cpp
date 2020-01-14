@@ -189,4 +189,39 @@ namespace zc {
       return type_decl->type();
    }
 
+   /*** TYPE RESOLUTION ***/
+
+   ASTType *FunctionType::TypeResolve(SemantEnv& env) {
+      return_type_ = return_type_->TypeResolve(env);
+      for (auto param_decl : *params()) {
+         param_decl->TypeResolve(env);
+      }
+      return this;
+   }
+
+   ASTType *CompoundType::TypeResolve(SemantEnv& env) {
+      for (auto memb : *membs()) {
+         memb->TypeResolve(env);
+      }
+      return this;
+   }
+
+   ASTType *NamedType::TypeResolve(SemantEnv& env) {
+      Declaration *decl = env.symtab().Lookup(sym());
+      if (decl == nullptr) {
+         env.error()(g_filename, this) <<  "undeclared symbol '" << *sym() << "'"
+                                       << std::endl;
+         return IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());
+      }
+      
+      auto typename_decl = dynamic_cast<TypenameDeclaration *>(decl);
+      if (typename_decl == nullptr) {
+         env.error()(g_filename, this) << "symbol '" << *sym() << "' declared with conflicting "
+                                       << "type" << std::endl;
+         return IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());
+      }
+
+      return typename_decl->type();
+   }
+
  }
