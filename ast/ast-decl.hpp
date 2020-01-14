@@ -73,6 +73,7 @@ namespace zc {
    };
 
    class DeclSpecs;
+   
    class TypeSpec: public ASTNode {
    public:
       virtual void AddTo(DeclSpecs *decl_specs) = 0;
@@ -114,15 +115,34 @@ namespace zc {
       template <typename... Args>
       ComplexTypeSpec(ASTType *type, Args... args): TypeSpec(args...), type_(type) {}
    };
+
+   class StorageClassSpec: public ASTNode {
+   public:
+      enum class Kind {SC_TYPEDEF, SC_AUTO, SC_REGISTER, SC_STATIC, SC_EXTERN};
+      Kind kind() const { return kind_; }
+
+      void AddTo(DeclSpecs *decl_specs);
+      
+      template <typename... Args>
+      static StorageClassSpec *Create(Args... args) { return new StorageClassSpec(args...); }
+      
+   private:
+      Kind kind_;
+
+      template <typename... Args>
+      StorageClassSpec(Kind kind, Args... args): ASTNode(args...), kind_(kind) {}
+   };
       
    
    class DeclSpecs: public ASTNode {
    public:
       typedef std::vector<BasicTypeSpec *> BasicTypeSpecs;
       typedef std::vector<ComplexTypeSpec *> ComplexTypeSpecs;
+      typedef std::vector<StorageClassSpec *> StorageClassSpecs;
 
       BasicTypeSpecs basic_type_specs;
       ComplexTypeSpecs complex_type_specs;
+      StorageClassSpecs storage_class_specs;
 
       ASTType *Type(SemantError& err);
 

@@ -121,4 +121,8 @@ namespace zc {
       }
    }
 
+   void StorageClassSpec::AddTo(DeclSpecs *decl_specs) {
+      decl_specs->storage_class_specs.push_back(this);
+   }
+
 }
