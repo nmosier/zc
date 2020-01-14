@@ -22,6 +22,8 @@
 
   int omerrs = 0; /* Number of lexing/parsing errors */
 
+extern std::unordered_set<Symbol *> type_names;
+
 #include "util.hpp"
 
 %}
@@ -103,6 +105,7 @@
 
                         /* STORAGE CLASS SPECS */
 %token AUTO REGISTER STATIC EXTERN TYPEDEF
+%token  <identifier> TYPE_NAME
                         
                          /* IDENTIFIERS */
 %type  <translation_unit> translation_unit
@@ -210,6 +213,7 @@ type_spec:      VOID { $$ = zc::BasicTypeSpec::Create(zc::BasicTypeSpec::Kind::T
         |       LONG { $$ = zc::BasicTypeSpec::Create(zc::BasicTypeSpec::Kind::TS_LONG, @1); }
         |       struct_or_enum_spec { $$ = zc::ComplexTypeSpec::Create($1, @1); }
         |       enum_spec { $$ = zc::ComplexTypeSpec::Create($1, @1); }
+        |       TYPE_NAME { $$ = zc::TypenameSpec::Create($1, @1); }
         ;
 storage_class_spec:
                 AUTO { $$ = zc::StorageClassSpec::Create(zc::StorageClassSpec::Kind::SC_AUTO, @1); }

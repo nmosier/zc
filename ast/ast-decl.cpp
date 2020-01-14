@@ -87,6 +87,18 @@ namespace zc {
    }
 
    ASTType *DeclSpecs::Type(SemantError& err) {
+      /* check if any typenames are present */
+      if (typename_specs.size() > 0) {
+         if (typename_specs.size() > 1 || !complex_type_specs.empty() ||
+             !basic_type_specs.empty()) {
+            err(g_filename, this) << "invalid combination of type specifiers" << std::endl;
+         }
+         
+         /* lookup typename */
+         /* TODO */
+      }
+      
+      /* check if any complex types are present */
       if (complex_type_specs.size() > 0) {
          if (complex_type_specs.size() > 1 || basic_type_specs.size() > 0) {
             err(g_filename, this) << "incompatible type specifiers" << std::endl;
@@ -123,6 +135,12 @@ namespace zc {
 
    void StorageClassSpec::AddTo(DeclSpecs *decl_specs) {
       decl_specs->storage_class_specs.push_back(this);
+   }
+
+   Symbol *TypenameSpec::sym() const { return id()->id(); }
+
+   void TypenameSpec::AddTo(DeclSpecs *decl_specs) {
+      decl_specs->typename_specs.push_back(this);
    }
 
 }

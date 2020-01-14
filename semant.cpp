@@ -216,6 +216,20 @@
        dynamic_cast<DeclarableType *>(type())->Declare(env);
     }
 
+    void TypenameDeclaration::Declare(SemantEnv& env) {
+       if (env.symtab().Probe(sym())) {
+          env.error()(g_filename, this) << "redefinition of '" << *sym() << "' as different kind of "
+                                        << "symbol" << std::endl;
+          return;
+       }
+
+       /* type check type */
+       type()->TypeCheck(env, false);
+
+       /* add to scope */
+       env.symtab().AddToScope(sym(), this);
+    }
+
     void EnumType::Declare(SemantEnv& env) {
        TaggedType::Declare(env);
 
@@ -406,7 +420,8 @@
 
        const ASTType *expr_type = expr()->type();
        Symbol *fn_sym = env.ext_env().sym();
-       VarDeclaration *var = env.symtab().Lookup(fn_sym);
+       VarDeclaration *var = dynamic_cast<VarDeclaration *>(env.symtab().Lookup(fn_sym));
+       assert(var);
        const FunctionType *fn_type = dynamic_cast<const FunctionType *>(var->type());
        assert(fn_type);
        const ASTType *ret_type = fn_type->return_type();
@@ -692,14 +707,22 @@
    }
 
    void IdentifierExpr::TypeCheck(SemantEnv& env) {
-      const VarDeclaration *var;
-      if ((var = env.symtab().Lookup(id()->id())) == nullptr) {
+      const Declaration *decl;
+      if ((decl = env.symtab().Lookup(id()->id())) == nullptr) {
          env.error()(g_filename, this) << "use of undeclared identifier '" << *id()->id()
                                        << "'" << std::endl;
          type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());         
       } else {
-         type_ = var->type();
-         is_const_ = var->is_const();
+         auto var = dynamic_cast<const VarDeclaration *>(decl);
+         if (var) {
+            type_ = var->type();
+            is_const_ = var->is_const();
+         } else {
+            env.error()(g_filename, this) << "identifier '" << *id()->id()
+                                          << "'is incorrect kind of symbol"
+                                          << std::endl;
+            type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());
+         }
       }
    }
 

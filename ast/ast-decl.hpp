@@ -116,6 +116,23 @@ namespace zc {
       ComplexTypeSpec(ASTType *type, Args... args): TypeSpec(args...), type_(type) {}
    };
 
+   class TypenameSpec: public TypeSpec {
+   public:
+      Symbol *sym() const;
+      Identifier *id() const { return id_; }
+
+      virtual void AddTo(DeclSpecs *decl_specs) override;
+
+      template <typename... Args>
+      static TypenameSpec *Create(Args... args) { return new TypenameSpec(args...); }
+
+   private:
+      Identifier *id_;
+
+      template <typename... Args>
+      TypenameSpec(Identifier *id, Args... args): TypeSpec(args...), id_(id) {}
+   };
+
    class StorageClassSpec: public ASTNode {
    public:
       enum class Kind {SC_TYPEDEF, SC_AUTO, SC_REGISTER, SC_STATIC, SC_EXTERN};
@@ -139,9 +156,11 @@ namespace zc {
       typedef std::vector<BasicTypeSpec *> BasicTypeSpecs;
       typedef std::vector<ComplexTypeSpec *> ComplexTypeSpecs;
       typedef std::vector<StorageClassSpec *> StorageClassSpecs;
+      typedef std::vector<TypenameSpec *> TypenameSpecs;
 
       BasicTypeSpecs basic_type_specs;
       ComplexTypeSpecs complex_type_specs;
+      TypenameSpecs typename_specs;
       StorageClassSpecs storage_class_specs;
 
       ASTType *Type(SemantError& err);
@@ -190,7 +209,7 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override;
 
       
-      virtual void FrameGen(StackFrame& frame) const override; /* TODO */
+      virtual void FrameGen(StackFrame& frame) const override;
 
       int bytes() const;
 
@@ -222,6 +241,25 @@ namespace zc {
       template <typename... Args>
       TypeDeclaration(Args... args): Declaration(args...) {}
       TypeDeclaration(DeclarableType *type);
+   };
+
+   class TypenameDeclaration: public Declaration {
+   public:
+      Symbol *sym() const { return sym_; }
+      
+      virtual void Declare(SemantEnv& env) override;
+      virtual void Declare(CgenEnv& env) override {} /* substitution should have already happened */
+      
+      virtual void FrameGen(StackFrame& frame) const override {}
+
+      template <typename... Args>
+      static TypenameDeclaration *Create(Args... args) { return new TypenameDeclaration(args...); }
+      
+   private:
+      Symbol *sym_;
+
+      template <typename... Args>
+      TypenameDeclaration(Symbol *sym, Args... args): Declaration(args...), sym_(sym) {}
    };
    
    class ASTDeclarator: public ASTNode {
