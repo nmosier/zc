@@ -99,6 +99,40 @@ namespace zc {
       ReturnStat(ASTExpr *expr, Args... args): JumpStat(args...), expr_(expr) {}
    };
 
+   class BreakStat: public JumpStat {
+   public:
+      virtual void DumpNode(std::ostream& os) const override { os << "BreakStat"; }
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
+
+      virtual void TypeCheck(SemantEnv& env) override;
+      virtual Block *CodeGen(CgenEnv& env, Block *) override;
+      virtual void FrameGen(StackFrame& frame) const override {}
+
+      template <typename... Args>
+      static BreakStat *Create(Args... args) { return new BreakStat(args...); }
+      
+   private:
+      template <typename... Args>
+      BreakStat(Args... args): JumpStat(args...) {}
+   };
+
+   class ContinueStat: public JumpStat {
+   public:
+      virtual void DumpNode(std::ostream& os) const override { os << "BreakStat"; }
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
+
+      virtual void TypeCheck(SemantEnv& env) override;
+      virtual Block *CodeGen(CgenEnv& env, Block *) override;
+      virtual void FrameGen(StackFrame& frame) const override {}
+      
+      template <typename... Args>
+      static ContinueStat *Create(Args... args) { return new ContinueStat(args...); }
+      
+   private:
+      template <typename... Args>
+      ContinueStat(Args... args): JumpStat(args...) {}
+   };
+
    /* NOTE: Abstract */
    class SelectionStat: public ASTStat {
    public:
@@ -142,11 +176,24 @@ namespace zc {
          SelectionStat(args...), cond_(cond), if_body_(if_body), else_body_(else_body) {}
    };
 
+#if 0
+   class SwitchStat: public SelectionStat {
+   public:
+      
+   private:
+      ASTExpr *control_;
+      
+   };
+#endif
+
    /* NOTE: Abstract */
    class IterationStat: public ASTStat {
    public:
       ASTExpr *pred() const { return pred_; }
       ASTStat *body() const { return body_; }
+
+      virtual bool can_break() const override { return true; }
+      virtual bool can_continue() const override { return true; }
       
    protected:
       ASTExpr *pred_;
@@ -239,6 +286,8 @@ namespace zc {
       template <typename... Args>
       LabelDefStat(Identifier *label_id, Args... args): LabeledStat(args...), label_id_(label_id) {}
    };
+
+   
 
 
 }

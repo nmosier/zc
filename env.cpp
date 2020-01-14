@@ -9,19 +9,19 @@
 namespace zc {
 
 
-   template <typename A, typename B, class C>
-   void Env<A,B,C>::EnterScope() {
+   template <typename A, typename B, typename D, class C>
+   void Env<A,B,D,C>::EnterScope() {
       symtab_.EnterScope();
       tagtab_.EnterScope();
    }
 
-   template <typename A, typename B, class C>   
-   void Env<A,B,C>::ExitScope() {
+   template <typename A, typename B, typename D, class C>   
+   void Env<A,B,D,C>::ExitScope() {
       symtab_.EnterScope();
       tagtab_.EnterScope();
    }   
 
-   template class Env<VarDeclaration, TaggedType, SemantExtEnv>;
-   template class Env<SymInfo, TaggedType, CgenExtEnv>;
+   template class Env<VarDeclaration, TaggedType, ASTStat, SemantExtEnv>;
+   template class Env<SymInfo, TaggedType, StatInfo, CgenExtEnv>;
    
 }

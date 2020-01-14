@@ -30,6 +30,9 @@ namespace zc {
 
    class ASTStat: public ASTNode {
    public:
+      virtual bool can_break() const { return false; }
+      virtual bool can_continue() const { return false; }
+      
       virtual void TypeCheck(SemantEnv& env) = 0;
       virtual Block *CodeGen(CgenEnv& env, Block *block) = 0;
       virtual void FrameGen(StackFrame& frame) const = 0;

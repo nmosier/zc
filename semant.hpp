@@ -96,9 +96,11 @@ namespace zc {
    };
 
    class TaggedType;
-   class SemantEnv: public Env<VarDeclaration, TaggedType, SemantExtEnv> {
+   class ASTStat;
+   class SemantEnv: public Env<VarDeclaration, TaggedType, ASTStat, SemantExtEnv> {
    public:
-      SemantEnv(SemantError& error): Env<VarDeclaration, TaggedType, SemantExtEnv>(), error_(error) {}
+      SemantEnv(SemantError& error): Env<VarDeclaration, TaggedType, ASTStat, SemantExtEnv>(),
+                                     error_(error) {}
       SemantError& error() { return error_; }
 
    private:

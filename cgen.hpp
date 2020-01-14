@@ -19,6 +19,19 @@ namespace zc {
     */
    void Cgen(TranslationUnit *root, std::ostream& os, const char *filename);
 
+   class StatInfo {
+   public:
+      ASTStat *stat() const { return stat_; }
+      Block *enter() const { return enter_; }
+      Block *exit() const { return exit_; }
+
+      StatInfo(ASTStat *stat, Block *enter, Block *exit): stat_(stat), enter_(enter), exit_(exit) {}
+      
+   private:
+      ASTStat *stat_;
+      Block *enter_;
+      Block *exit_;
+   };
    
    class SymInfo {
    public:
@@ -59,20 +72,6 @@ namespace zc {
       const Value *addr_;
    };
 
-
-
-   
-#if 0
-   class TagInfo {
-   public:
-      const TaggedType *type() const { return type_; }
-
-      TagInfo(const TaggedType *type): type_(type) {}
-      
-   private:
-      const TaggedType *type_;
-   };
-   #endif
 
    class StackFrame {
    public:
@@ -163,6 +162,8 @@ namespace zc {
 
       template <typename... Args>
       Block(const Label *label, Args... args): label_(label), transitions_(args...) {}
+
+      Block() {}
       
    protected:
       const Label *label_;
@@ -260,14 +261,14 @@ namespace zc {
    };
 
    
-   class CgenEnv: public Env<SymInfo, TaggedType, CgenExtEnv> {
+   class CgenEnv: public Env<SymInfo, TaggedType, StatInfo, CgenExtEnv> {
    public:
       const StringConstants& strconsts() const { return strconsts_; }
       StringConstants& strconsts() { return strconsts_; }
       const FunctionImpls& impls() const { return impls_; }
       FunctionImpls& impls() { return impls_; }
 
-      CgenEnv(): Env<SymInfo, TaggedType, CgenExtEnv>(), strconsts_(), impls_() {}
+      CgenEnv(): Env<SymInfo, TaggedType, StatInfo, CgenExtEnv>(), strconsts_(), impls_() {}
 
       void DumpAsm(std::ostream& os) const;
       

@@ -88,6 +88,8 @@
 %token UNION
 %token GOTO
 %token ENUM
+%token BREAK
+%token CONTINUE
 
  /* CONTROL */
 %token RETURN
@@ -330,6 +332,8 @@ labeled_stat:   ID ':' stat { $$ = zc::LabelDefStat::Create($1, $3, @1); }
         ;
 jump_stat:      RETURN optional_exp ';' { $$ = zc::ReturnStat::Create($2, @1); }
         |       GOTO ID ';' { $$ = zc::GotoStat::Create($2, @1); }
+        |       CONTINUE ';' { $$ = zc::ContinueStat::Create(@1); }
+        |       BREAK ';' { $$ = zc::BreakStat::Create(@1); }
         ;
 selection_stat: IF '(' exp ')' stat { $$ = zc::IfStat::Create($3, $5, nullptr, @1); }
         |       IF '(' exp ')' stat ELSE stat { $$ = zc::IfStat::Create($3, $5, $7, @1); }

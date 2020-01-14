@@ -425,12 +425,28 @@
     }
 
     void WhileStat::TypeCheck(SemantEnv& env) {
+       env.stat_stack().Push(this);
        pred()->TypeCheck(env);
        body()->TypeCheck(env);
+       env.stat_stack().Pop();
     }
 
     void GotoStat::TypeCheck(SemantEnv& env) {
        env.ext_env().LabelRef(label_id());
+    }
+
+    void BreakStat::TypeCheck(SemantEnv& env) {
+       if (env.stat_stack().Find([](auto stat){ return stat->can_break(); }) == nullptr) {
+          env.error()(g_filename, this) << "'break' statement not in loop or switch statement"
+                                        << std::endl;
+       }
+    }
+
+    void ContinueStat::TypeCheck(SemantEnv& env) {
+       if (env.stat_stack().Find([](auto stat){ return stat->can_continue(); }) == nullptr) {
+          env.error()(g_filename, this) << "'continue' statement not in loop statement"
+                                        << std::endl;
+       }
     }
 
     void LabeledStat::TypeCheck(SemantEnv& env) {
@@ -664,6 +680,7 @@
          type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());         
       } else {
          type_ = var->type();
+         is_const_ = var->is_const();
       }
    }
 

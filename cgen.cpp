@@ -8,6 +8,8 @@
 #include "cgen.hpp"
 
 namespace zc {
+
+   static Block dead_block;
    
    void Cgen(TranslationUnit *root, std::ostream& os, const char *filename) {
       CgenEnv env;
@@ -226,7 +228,12 @@ namespace zc {
       
       /* Code generate if, else blocks */
       Block *if_end = if_body()->CodeGen(env, if_block);
-      Block *else_end = else_body()->CodeGen(env, else_block);
+      Block *else_end;
+      if (else_body()) {
+         else_end = else_body()->CodeGen(env, else_block);
+      } else {
+         else_end = else_block;
+      }
 
       /* Transition if, else end blocks to join block */
       BlockTransition *join_transition = new JumpTransition(join_block, Cond::ANY);
@@ -243,24 +250,40 @@ namespace zc {
       Label *pred_label = new_label("while_pred");
       Block *pred_block = new Block(pred_label);
 
-      BlockTransition *pred_trans = new JumpTransition(pred_block, Cond::ANY);
-      block->transitions().vec().push_back(pred_trans);
-
-      pred_block = pred()->CodeGen(env, pred_block, ASTExpr::ExprKind::EXPR_RVALUE);
-      emit_nonzero_test(env, block, pred()->type()->bytes());
-
-      pred_block->transitions().vec().push_back(new JumpTransition(body_block, Cond::NZ));
-
-      body_block = body()->CodeGen(env, body_block);
-      body_block->transitions().vec().push_back(pred_trans);
-
       Label *join_label = new_label("while_end");
       Block *join_block = new Block(join_label);
+
+      /* push stat info onto statement stack */
+      StatInfo *stat_info = new StatInfo(this, body_block, join_block);
+      env.stat_stack().Push(stat_info);
+      
+      pred_block = pred()->CodeGen(env, pred_block, ASTExpr::ExprKind::EXPR_RVALUE);
+      emit_nonzero_test(env, block, pred()->type()->bytes());
+      pred_block->transitions().vec().push_back(new JumpTransition(body_block, Cond::NZ));
       pred_block->transitions().vec().push_back(new JumpTransition(join_block, Cond::ANY));
+
+      body_block = body()->CodeGen(env, body_block);
+      body_block->transitions().vec().push_back(new JumpTransition(pred_block, Cond::ANY));
+
+      block->transitions().vec().push_back(new JumpTransition(pred_block, Cond::ANY));
+
+      env.stat_stack().Pop();
 
       return join_block;
    }
 
+   Block *BreakStat::CodeGen(CgenEnv& env, Block *block) {
+      StatInfo *stat_info = env.stat_stack().Find([](auto info){return info->stat()->can_break(); });
+      block->transitions().vec().push_back(new JumpTransition(stat_info->exit(), Cond::ANY));
+      return &dead_block;
+   }
+
+   Block *ContinueStat::CodeGen(CgenEnv& env, Block *block) {
+      StatInfo *stat_info = env.stat_stack().Find([](auto info){return info->stat()->can_break(); });
+      block->transitions().vec().push_back(new JumpTransition(stat_info->enter(), Cond::ANY));
+      return &dead_block;
+   }
+   
    Block *GotoStat::CodeGen(CgenEnv& env, Block *block) {
       /* obtain label */
       const LabelValue *lv = env.ext_env().LabelGen(label_id()->id());
@@ -1296,7 +1319,9 @@ namespace zc {
 
    void IfStat::FrameGen(StackFrame& frame) const {
       if_body()->FrameGen(frame);
-      else_body()->FrameGen(frame);
+      if (else_body()) {
+         else_body()->FrameGen(frame);
+      }
    }
 
    void WhileStat::FrameGen(StackFrame& frame) const {

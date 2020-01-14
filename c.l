@@ -53,6 +53,8 @@ E  [Ee][+-]?{D}+
 "enum" { return ENUM; }
 "sizeof" { return SIZEOF; }
 "goto" { return GOTO; }
+"continue" { return CONTINUE; }
+"break" { return BREAK; }
 
 "return" { return RETURN; }
 
