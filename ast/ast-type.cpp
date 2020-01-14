@@ -181,4 +181,12 @@ namespace zc {
       elem()->get_declarables(output);
    }
 
+   ASTType *NamedType::Type(SemantEnv& env) const {
+      Declaration *decl = env.symtab().Lookup(sym());
+      assert(decl);
+      auto type_decl = dynamic_cast<TypenameDeclaration *>(decl);
+      assert(type_decl);
+      return type_decl->type();
+   }
+
  }

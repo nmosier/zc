@@ -47,6 +47,8 @@ namespace zc {
 
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
 
+      
+
       void TypeCheck(SemantEnv& env) { TypeCheck(env, true); }
       virtual void TypeCheck(SemantEnv& env, bool allow_void) = 0;
       virtual bool TypeEq(const ASTType *other) const = 0;
@@ -56,7 +58,6 @@ namespace zc {
       virtual ASTType *Address() = 0;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) = 0;
 
-      // virtual void CodeGen(CgenEnv& env);
       virtual int bytes() const = 0;
       void FrameGen(StackFrame& frame) const;
 
@@ -494,7 +495,6 @@ namespace zc {
 
       virtual void DeclareMembs(SemantEnv& env) override;
 
-#if 1
       template <typename InputIt>
       EnumType(SemantError& err, InputIt begin, InputIt end, Symbol *tag, const SourceLoc& loc):
          TaggedType_aux<Enumerator>(err, begin, end, tag, loc) {
@@ -510,12 +510,6 @@ namespace zc {
          TaggedType_aux<Enumerator>(tag, loc) {
          int_type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, 0);
       }
-
-#else
-      template <typename... Args> EnumType(Args... args): TaggedType_aux<Enumerator>(args...) {
-         int_type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, 0);
-      }
-#endif
    };
 
 
@@ -552,6 +546,38 @@ namespace zc {
       template <typename... Args>
       ArrayType(ASTType *elem, ASTExpr *count, Args... args):
          ASTType(args...), elem_(elem), count_(count) {}
+   };
+
+   class NamedType: public ASTType {
+   public:
+      Symbol *sym() const { return sym_; }
+
+      ASTType *Type(SemantEnv& env) const;
+      virtual Kind kind() const override { throw std::logic_error("unresolved named type"); }
+      virtual void get_declarables(Declarations *output) const override {}
+      virtual void TypeCheck(SemantEnv& env, bool allow_void) override {
+         throw std::logic_error("unresolved named type");
+      }
+      virtual bool TypeEq(const ASTType *other) const override {
+         throw std::logic_error("unresolved named type");
+      }
+      virtual bool TypeCoerce(const ASTType *from) const override {
+         throw std::logic_error("unresolved named type");
+      }
+      virtual ASTType *Address() override { throw std::logic_error("unresolved named type"); }
+      virtual ASTType *Dereference(SemantEnv *env) override {
+         throw std::logic_error("unresolved named type");
+      }
+      virtual int bytes() const override { throw std::logic_error("unresolved named type"); }
+      
+      template <typename... Args>
+      static NamedType *Create(Args... args) { return new NamedType(args...); }
+      
+   private:
+      Symbol *sym_;
+
+      template <typename... Args>
+      NamedType(Symbol *sym, Args... args): ASTType(args...), sym_(sym) {}
    };
 
    std::ostream& operator<<(std::ostream& os, IntegralType::IntKind kind);
