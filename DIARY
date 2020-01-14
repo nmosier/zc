@@ -115,9 +115,13 @@ structs on [1], [2], [3] share the same unique ID, while [4] has a different uni
 [6 hrs] ASTType -> {Var,Type}Decl
 
 01/14/2020
+[1 hr] I added pre/post inc/dec expressions. Instead of creating a new expression class, I added four new 'kinds' to the UnaryExpr class, UOP_{INC,DEC}_{PRE,POST}. I wrote some tests to confirm
+       that these operators are working. Interestingly, there is no penalty for pre- vs. post-increment/decrement on chars (single-byte values); however, there _is_ a penalty for post-inc'ing/dec'ing
+       ints.
+
 
 TODO
 [ ] typedef
-[ ] ++, --
+[X] ++, --
 [ ] +=, *=, etc.
 [ ] for

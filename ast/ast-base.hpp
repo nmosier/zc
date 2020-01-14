@@ -19,8 +19,8 @@ namespace zc {
    public:
       const SourceLoc& loc() const { return loc_; }
       virtual void Dump(std::ostream& os, int level, bool with_types) const;
-      virtual void DumpNode(std::ostream& os) const = 0;
-      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const = 0;
+      virtual void DumpNode(std::ostream& os) const {}
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const {}
       virtual void DumpType(std::ostream& os) const {}
 
    protected:

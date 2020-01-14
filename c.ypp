@@ -35,7 +35,6 @@
     zc::TranslationUnit *translation_unit;
     zc::ExternalDecls *external_decls;
     zc::FunctionDef *function_def;
-    zc::DeclSpecs *decl_specs;
     zc::ASTDeclarators *declarators;
     zc::ASTDeclarator *declarator;
     zc::Decls *param_types;
@@ -55,6 +54,8 @@
     zc::Declarations *declarations;
     zc::VarDeclarations *var_declarations;
     zc::VarDeclaration *var_declaration;
+    zc::DeclSpecs *decl_specs;
+    zc::TypeSpec *type_spec;
 }
 
 %initial-action {
@@ -118,10 +119,9 @@
 %type  <unary_operator> unary_operator
 %type  <exprs>         optional_argument_exp_list argument_exp_list
 %type  <type>           type_name
-%type   <token>         integral_spec
-%type   <token_multiset>        integral_spec_list
-%type   <token>          void_spec
-%type   <type>    type_specs struct_spec enum_spec
+%type   <type>    struct_or_enum_spec enum_spec
+%type   <decl_specs>    decl_specs
+%type   <type_spec>     type_spec
                         
 %%
 
@@ -150,11 +150,12 @@ external_decl:  function_definition {
                         }, @1); }
         ;
 function_definition:
-                type_specs declarator compound_stat {
+                decl_specs declarator compound_stat {
+                    zc::ASTType *type = $1->Type(zc::g_semant_error);
                     $$ = zc::FunctionDef::Create
                         ($3,
                          zc::VarDeclaration::Create($2->sym(), false,
-                                                    zc::ASTType::Create($1, $2), @1), @1);
+                                                    zc::ASTType::Create(type, $2), @1), @1);
                 }
         ; /* incomplete */
 optional_decl_list:
@@ -167,36 +168,36 @@ decl_list:      decl
                     $$ = $1; $$->insert($1->end(), $2->begin(), $2->end());
                 }
         ;
-decl:           type_specs optional_init_declarator_list ';' {
+decl:           decl_specs optional_init_declarator_list ';' {
                     $$ = new zc::Declarations();
-                    $1->get_declarables($$);
+                    zc::ASTType *specs_type = $1->Type(zc::g_semant_error);
+                    specs_type->get_declarables($$);
                     for (auto declarator : $2->vec()) {
                         declarator->get_declarables($$);
-                        auto type = zc::ASTType::Create($1, declarator);
+                        auto type = zc::ASTType::Create(specs_type, declarator);
                         $$->push_back(zc::VarDeclaration::Create(declarator->sym(), false,
                                                                  type, @1));
                     }
                 }
         ;
-type_specs:     void_spec { $$ = zc::VoidType::Create(@1); }
-        |       integral_spec_list {
-                    $$ = zc::combine_integral_type_specs(*$1, zc::g_semant_error, @1);
+decl_specs:     type_spec decl_specs {
+                    $$ = $2;
+                    $1->AddTo($$);
                 }
-        |       struct_spec
-        |       enum_spec
+        |       type_spec {
+                    $$ = zc::DeclSpecs::Create(@1);
+                    $1->AddTo($$);
+                }
         ;
-void_spec:      VOID { $$ = VOID; }
+type_spec:      VOID { $$ = zc::BasicTypeSpec::Create(zc::BasicTypeSpec::Kind::TS_VOID, @1); }
+        |       CHAR { $$ = zc::BasicTypeSpec::Create(zc::BasicTypeSpec::Kind::TS_CHAR, @1); }
+        |       SHORT { $$ = zc::BasicTypeSpec::Create(zc::BasicTypeSpec::Kind::TS_SHORT, @1); }
+        |       INT { $$ = zc::BasicTypeSpec::Create(zc::BasicTypeSpec::Kind::TS_INT, @1); }
+        |       LONG { $$ = zc::BasicTypeSpec::Create(zc::BasicTypeSpec::Kind::TS_LONG, @1); }
+        |       struct_or_enum_spec { $$ = zc::ComplexTypeSpec::Create($1, @1); }
+        |       enum_spec { $$ = zc::ComplexTypeSpec::Create($1, @1); }
         ;
-integral_spec_list:
-                integral_spec { $$ = new std::unordered_multiset<int> {$1}; }
-        |       integral_spec_list integral_spec { $$ = $1; $$->insert($2); }
-        ;
-integral_spec:  CHAR { $$ = CHAR; }
-        |       SHORT { $$ = SHORT; }
-        |       INT { $$ = INT; } 
-        |       LONG { $$ = LONG; }
-        ;
-struct_spec:
+struct_or_enum_spec:
                 STRUCT ID '{' struct_decl_list '}' {
                     $$ = zc::StructType::Create(zc::g_semant_error, $4->begin(), $4->end(),
                                                 $2->id(), @1);
@@ -220,14 +221,15 @@ struct_decl_list:
                      $$->insert($$->end(), $2->begin(), $2->end());
                 }
         ;
-struct_decl:    type_specs struct_declarator_list ';' {
+struct_decl:    decl_specs struct_declarator_list ';' {
                     $$ = new zc::Declarations();
-                    $1->get_declarables($$);
+                    zc::ASTType *type = $1->Type(zc::g_semant_error);
+                    type->get_declarables($$);
                     for (auto declarator : $2->vec()) {
                         declarator->get_declarables($$);
                         $$->push_back
                             (zc::VarDeclaration::Create(declarator->sym(), false,
-                                                        zc::ASTType::Create($1, declarator), @1));
+                                                        zc::ASTType::Create(type, declarator), @1));
                     }
                 }           
         ;
@@ -307,8 +309,9 @@ param_type_list:
 param_list:     param_decl { $$ = new zc::VarDeclarations(); $$->push_back($1); }
         |       param_list ',' param_decl { $$ = $1; $$->push_back($3); }
         ;
-param_decl:     type_specs declarator {
-                    auto type = zc::ASTType::Create($1, $2);
+param_decl:     decl_specs declarator {
+                    auto type_specs_type = $1->Type(zc::g_semant_error);
+                    auto type = zc::ASTType::Create(type_specs_type, $2);
                     $$ = zc::VarDeclaration::Create($2->sym(), false, type, @1);
                 }
         ; /* incomplete */
@@ -427,8 +430,9 @@ cast_exp:       unary_exp { $$ = $1; }
                     $$ = zc::CastExpr::Create($2, $4, @1);
                 }   
         ;
-type_name:      type_specs optional_abstract_declarator {
-                    $$ = zc::ASTType::Create($1, $2);
+type_name:      decl_specs optional_abstract_declarator {
+                    zc::ASTType *type = $1->Type(zc::g_semant_error);
+                    $$ = zc::ASTType::Create(type, $2);
                 }
         ;
 optional_abstract_declarator:

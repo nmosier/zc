@@ -72,6 +72,69 @@ namespace zc {
       
    };
 
+   class DeclSpecs;
+   class TypeSpec: public ASTNode {
+   public:
+      virtual void AddTo(DeclSpecs *decl_specs) = 0;
+      
+   protected:
+      template <typename... Args>
+      TypeSpec(Args... args): ASTNode(args...) {}
+   };
+
+   class BasicTypeSpec: public TypeSpec {
+   public:
+      enum class Kind {TS_VOID, TS_CHAR, TS_SHORT, TS_INT, TS_LONG};
+      Kind kind() const { return kind_; }
+
+      virtual void AddTo(DeclSpecs *decl_specs) override;
+
+      template <typename... Args>
+      static BasicTypeSpec *Create(Args... args) { return new BasicTypeSpec(args...); }
+      
+   private:
+      Kind kind_;
+
+      template <typename... Args>
+      BasicTypeSpec(Kind kind, Args... args): TypeSpec(args...), kind_(kind) {}
+   };
+
+   class ComplexTypeSpec: public TypeSpec {
+   public:
+      ASTType *type() const { return type_; }
+
+      virtual void AddTo(DeclSpecs *decl_specs) override;
+
+      template <typename... Args>
+      static ComplexTypeSpec *Create(Args... args) { return new ComplexTypeSpec(args...); }
+      
+   private:
+      ASTType *type_;
+
+      template <typename... Args>
+      ComplexTypeSpec(ASTType *type, Args... args): TypeSpec(args...), type_(type) {}
+   };
+      
+   
+   class DeclSpecs: public ASTNode {
+   public:
+      typedef std::vector<BasicTypeSpec *> BasicTypeSpecs;
+      typedef std::vector<ComplexTypeSpec *> ComplexTypeSpecs;
+
+      BasicTypeSpecs basic_type_specs;
+      ComplexTypeSpecs complex_type_specs;
+
+      ASTType *Type(SemantError& err);
+
+      template <typename... Args>
+      static DeclSpecs *Create(Args... args) { return new DeclSpecs(args...); }
+      
+   protected:
+
+      template <typename... Args>
+      DeclSpecs(Args... args): ASTNode(args...) {}
+   };
+
    /**
     * NOTE: Abstract.
     */
