@@ -597,14 +597,33 @@
       case Kind::UOP_NEGATIVE:
       case Kind::UOP_BITWISE_NOT:
       case Kind::UOP_LOGICAL_NOT:
-         /* requires integral type */
-         
+         /* requires integral type */         
          if (!(expr_->type()->kind() == ASTType::Kind::TYPE_INTEGRAL)) {
             env.error()(g_filename, this) << "positive/negative sign verboten for non-integral type"
                                           << std::endl;
          }
          type_ = expr_->type();
          break;
+
+      case Kind::UOP_INC_PRE:
+      case Kind::UOP_INC_POST:
+      case Kind::UOP_DEC_PRE:
+      case Kind::UOP_DEC_POST:
+         /* require integral or pointer type */
+         if (!IntegralType::Create(IntegralType::IntKind::SPEC_INT, 0)->TypeCoerce(expr_->type()) &&
+             expr_->type()->kind() != ASTType::Kind::TYPE_POINTER) {
+            env.error()(g_filename, this) << "operand to increment/decrement must be "
+                                          << "of integral or pointer type"
+                                          << std::endl;
+         }
+         if (expr_->expr_kind() != ExprKind::EXPR_LVALUE) {
+            env.error()(g_filename, this) << "operand to increment/decrement is not "
+                                          << "assignable"
+                                          << std::endl;
+         }
+         type_ = expr_->type();
+         break;
+
       }
    }
 
@@ -709,6 +728,12 @@
        case Kind::UOP_BITWISE_NOT:
        case Kind::UOP_LOGICAL_NOT:
           return ExprKind::EXPR_RVALUE;
+
+       case Kind::UOP_INC_PRE:
+       case Kind::UOP_DEC_PRE:
+       case Kind::UOP_INC_POST:
+       case Kind::UOP_DEC_POST:
+          return ExprKind::EXPR_RVALUE;
        }
     }
 
@@ -743,7 +768,7 @@
     }
 
     ASTExpr::ExprKind IdentifierExpr::expr_kind() const {
-       return ExprKind::EXPR_LVALUE;
+       return is_const() ? ExprKind::EXPR_RVALUE : ExprKind::EXPR_LVALUE;
     }
 
     intmax_t IdentifierExpr::int_const() const {

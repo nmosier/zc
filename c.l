@@ -62,6 +62,9 @@ E  [Ee][+-]?{D}+
 "else" { return ELSE; }
 "while" { return WHILE; }
 
+"++" { return INC; }
+"--" { return DEC; }
+
 {L}({L}|{D})* {
     /* convert yytext to AST identifier */
     yylval.identifier = zc::Identifier::Create(std::string(yytext), g_lineno);

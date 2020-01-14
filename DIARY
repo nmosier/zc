@@ -111,4 +111,13 @@ The enum type EnumType inherits from TaggedType_aux<Enumerator>, where 'Enumerat
        }
 structs on [1], [2], [3] share the same unique ID, while [4] has a different unique ID. This resolved the bug, and I confirmed it with tests.
 
-[1 hr]
+01/13/2020
+[6 hrs] ASTType -> {Var,Type}Decl
+
+01/14/2020
+
+TODO
+[ ] typedef
+[ ] ++, --
+[ ] +=, *=, etc.
+[ ] for

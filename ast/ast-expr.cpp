@@ -13,6 +13,10 @@ namespace zc {
       case Kind::UOP_NEGATIVE:   return "UOP_NEGATIVE";
       case Kind::UOP_BITWISE_NOT:          return "UOP_BITWISE_NOT";
       case Kind::UOP_LOGICAL_NOT: return "UOP_LOGICAL_NOT";
+      case Kind::UOP_INC_PRE: return "UOP_INC_PRE";
+      case Kind::UOP_INC_POST: return "UOP_INC_POST";
+      case Kind::UOP_DEC_PRE: return "UOP_DEC_PRE";
+      case Kind::UOP_DEC_POST: return "UOP_DEC_POST";
       }
    }
    
@@ -104,13 +108,21 @@ namespace zc {
    }
 
    bool UnaryExpr::is_const() const {
-      std::unordered_set<Kind> set
-         {Kind::UOP_POSITIVE,
-          Kind::UOP_NEGATIVE,
-          Kind::UOP_BITWISE_NOT,
-          Kind::UOP_LOGICAL_NOT
-         };
-      return set.find(kind()) != set.end() ? expr()->is_const() : false;
+      switch (kind()) {
+      case Kind::UOP_POSITIVE:
+      case Kind::UOP_NEGATIVE:
+      case Kind::UOP_BITWISE_NOT:
+      case Kind::UOP_LOGICAL_NOT:
+         return true;
+
+      case Kind::UOP_ADDR:
+      case Kind::UOP_DEREFERENCE:
+      case Kind::UOP_INC_PRE:
+      case Kind::UOP_DEC_PRE:
+      case Kind::UOP_INC_POST:
+      case Kind::UOP_DEC_POST:
+         return false;
+      }
    }
 
    bool BinaryExpr::is_const() const {
@@ -124,8 +136,13 @@ namespace zc {
       case Kind::UOP_NEGATIVE: return -i;
       case Kind::UOP_BITWISE_NOT: return ~i;
       case Kind::UOP_LOGICAL_NOT: return !i;
+         
       case Kind::UOP_ADDR:
       case Kind::UOP_DEREFERENCE:
+      case Kind::UOP_INC_PRE:
+      case Kind::UOP_DEC_PRE:
+      case Kind::UOP_INC_POST:
+      case Kind::UOP_DEC_POST:
          abort();
       }
    }

@@ -30,10 +30,6 @@ namespace zc {
                        TYPE_TAGGED,
                        TYPE_ARRAY};
       virtual Kind kind() const = 0;
-#if TYPE_SYM
-      Symbol *sym() const { return sym_; }
-      void set_sym(Symbol *sym) { sym_ = sym; }
-#endif
 
       bool is_callable() const { return get_callable() != nullptr; }
       virtual const FunctionType *get_callable() const { return nullptr; }
@@ -65,26 +61,12 @@ namespace zc {
       void FrameGen(StackFrame& frame) const;
 
       static ASTType *Create(ASTType *specs, ASTDeclarator *declarator) {
-#if TYPE_SYM         
-         specs->set_sym(declarator->sym());
-#endif
          return declarator->Type(specs);         
       }
       
    protected:
-#if TYPE_SYM
-      Symbol *sym_;
-#endif
-
-#if TYPE_SYM
-      template <typename... Args>
-      ASTType(Args... args): ASTNode(args...), sym_(nullptr) {}
-      template <typename... Args>
-      ASTType(Symbol *sym, Args... args): ASTNode(args...), sym_(sym) {}
-#else
       template <typename... Args>
       ASTType(Args... args): ASTNode(args...) {}
-#endif
    };
 
    std::ostream& operator<<(std::ostream& os, ASTType::Kind kind);
@@ -574,9 +556,6 @@ namespace zc {
 
    std::ostream& operator<<(std::ostream& os, IntegralType::IntKind kind);
    std::ostream& operator<<(std::ostream& os, CompoundType::TagKind kind);
-
-   
-   
 
 }
    

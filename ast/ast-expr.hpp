@@ -41,6 +41,10 @@ namespace zc {
                        UOP_NEGATIVE,
                        UOP_BITWISE_NOT,
                        UOP_LOGICAL_NOT,
+                       UOP_INC_PRE,
+                       UOP_INC_POST,
+                       UOP_DEC_PRE,
+                       UOP_DEC_POST
       };
       Kind kind() const { return kind_; }
       const char *kindstr() const;
@@ -344,7 +348,6 @@ namespace zc {
       IndexExpr(ASTExpr *base, ASTExpr *index, Args... args):
          ASTExpr(args...), base_(base), index_(index) {}
    };
-
    
 }
 

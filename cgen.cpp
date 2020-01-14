@@ -416,10 +416,12 @@ namespace zc {
          break;
          
       case Kind::UOP_POSITIVE:
+         block = expr()->CodeGen(env, block, ExprKind::EXPR_RVALUE);         
          /* nop */
          break;
          
       case Kind::UOP_NEGATIVE:
+         block = expr()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
          switch (bytes) {
          case byte_size:
             block->instrs().push_back(new NegInstruction());
@@ -435,6 +437,7 @@ namespace zc {
          break;
          
       case Kind::UOP_BITWISE_NOT:
+         block = expr()->CodeGen(env, block, ExprKind::EXPR_RVALUE);         
          switch (bytes) {
          case byte_size:
             block->instrs().push_back(new CplInstruction());
@@ -451,7 +454,83 @@ namespace zc {
          break;
          
       case Kind::UOP_LOGICAL_NOT:
+         block = expr()->CodeGen(env, block, ExprKind::EXPR_RVALUE);         
          emit_logical_not(env, block, bytes);
+         break;
+
+      case Kind::UOP_INC_PRE:
+      case Kind::UOP_DEC_PRE:
+         {
+            block = expr()->CodeGen(env, block, ExprKind::EXPR_LVALUE);
+            MemoryValue *memval = new MemoryValue(new MemoryLocation(&rv_hl), bytes);
+            bool inc = kind() == Kind::UOP_INC_PRE;
+            
+            switch (bytes) {
+            case byte_size:
+               /* inc/dec (hl)
+                * ld a,(hl)
+                */
+               block->instrs().push_back(inc ?
+                                         (Instruction *) new IncInstruction(memval) :
+                                         (Instruction *) new DecInstruction(memval));
+               block->instrs().push_back(new LoadInstruction(&rv_a, memval));
+               break;
+               
+            case word_size: abort();
+            case long_size:
+               /* ld de,(hl)
+                * inc/dec de
+                * ld (hl),de
+                * ex de,hl
+                */
+               block->instrs().push_back(new LoadInstruction(&rv_de, memval));
+               block->instrs().push_back(inc ?
+                                         (Instruction *) new IncInstruction(&rv_de) :
+                                         (Instruction *) new DecInstruction(&rv_de));
+               block->instrs().push_back(new LoadInstruction(memval, &rv_de));
+               block->instrs().push_back(new ExInstruction(&rv_de, &rv_hl));
+               break;
+            }
+         }
+         break;
+
+      case Kind::UOP_INC_POST:
+      case Kind::UOP_DEC_POST:
+         {
+            bool inc = kind() == Kind::UOP_INC_POST;            
+            block = expr()->CodeGen(env, block, ExprKind::EXPR_LVALUE);
+            MemoryValue *memval = new MemoryValue(new MemoryLocation(&rv_hl), bytes);
+
+            switch (bytes) {
+            case byte_size:
+               /* ld a,(hl)
+                * inc (hl)
+                */
+               block->instrs().push_back(new LoadInstruction(&rv_a, memval));
+               block->instrs().push_back(inc ?
+                                         (Instruction *) new IncInstruction(memval) :
+                                         (Instruction *) new DecInstruction(memval));
+               break;
+            case word_size: abort();
+            case long_size:
+               /* ld de,(hl)
+                * inc/dec de
+                * ld (hl),de
+                * dec/inc de
+                * ex de,hl
+                */
+               block->instrs().push_back(new LoadInstruction(&rv_de, memval));
+               block->instrs().push_back(inc ?
+                                         (Instruction *) new IncInstruction(&rv_de) :
+                                         (Instruction *) new DecInstruction(&rv_de));
+               block->instrs().push_back(new LoadInstruction(memval, &rv_de));
+               block->instrs().push_back(inc ?
+                                         (Instruction *) new DecInstruction(&rv_de) :
+                                         (Instruction *) new IncInstruction(&rv_de));
+               block->instrs().push_back(new ExInstruction(&rv_de, &rv_hl));
+               break;
+            }
+         }
          break;
       }
 
