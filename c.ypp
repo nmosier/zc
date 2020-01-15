@@ -20,9 +20,11 @@
   extern const char *g_filename;
   extern zc::TranslationUnit *g_translation_unit;
 
+  extern zc::ScopedTable<Symbol *,char> typenames;
+  void enscope_typedef(zc::Declaration *decl);
+
   int omerrs = 0; /* Number of lexing/parsing errors */
 
-extern std::unordered_set<Symbol *> type_names;
 
 #include "util.hpp"
 
@@ -183,10 +185,14 @@ decl:           decl_specs optional_init_declarator_list ';' {
                     specs_type->get_declarables($$);
                     for (auto declarator : $2->vec()) {
                         declarator->get_declarables($$);
-                        auto type = zc::ASTType::Create(specs_type, declarator);
-                        $$->push_back(zc::VarDeclaration::Create(declarator->sym(), false,
-                                                                 type, @1));
+                        zc::Declaration *decl = $1->GetDecl(zc::g_semant_error, declarator);
+                        enscope_typedef(decl);
+                        // auto type = zc::ASTType::Create(specs_type, declarator);
+                        // $$->push_back(zc::VarDeclaration::Create(declarator->sym(), false,
+                        //                                      type, @1));
+                        $$->push_back(decl);
                     }
+                
                 }
         ;
 decl_specs:     type_spec decl_specs {
@@ -564,3 +570,13 @@ void yyerror(const char *s) {
         exit(1);
     }
 }
+
+ void enscope_typedef(zc::Declaration *decl) {
+     zc::TypenameDeclaration *tn = dynamic_cast<zc::TypenameDeclaration *>(decl);
+
+     if (tn) {
+         if (typenames.Probe(tn->sym()) == nullptr) {
+             typenames.AddToScope(tn->sym(), (char *) 1);
+         }
+     }
+ }

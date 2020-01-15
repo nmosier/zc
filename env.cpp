@@ -17,8 +17,8 @@ namespace zc {
 
    template <typename A, typename B, typename D, class C>   
    void Env<A,B,D,C>::ExitScope() {
-      symtab_.EnterScope();
-      tagtab_.EnterScope();
+      symtab_.ExitScope();
+      tagtab_.ExitScope();
    }   
 
    template class Env<Declaration, TaggedType, ASTStat, SemantExtEnv>;

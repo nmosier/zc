@@ -205,6 +205,9 @@
            return;          
        }
 
+       /* resolve type */
+       type_ = type()->TypeResolve(env);
+
        /* type check type */
        type()->TypeCheck(env, false);
 
@@ -213,6 +216,7 @@
     }
 
     void TypeDeclaration::Declare(SemantEnv& env) {
+        type_ = type()->TypeResolve(env);
        dynamic_cast<DeclarableType *>(type())->Declare(env);
     }
 
@@ -223,6 +227,8 @@
           return;
        }
 
+       type_ = type()->TypeResolve(env);
+       
        /* type check type */
        type()->TypeCheck(env, false);
 
@@ -719,7 +725,7 @@
             is_const_ = var->is_const();
          } else {
             env.error()(g_filename, this) << "identifier '" << *id()->id()
-                                          << "'is incorrect kind of symbol"
+                                          << "' is incorrect kind of symbol"
                                           << std::endl;
             type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());
          }
@@ -824,7 +830,7 @@
           std::transform(params()->begin(), params()->end(), std::back_inserter(this_types),
                          [](const auto decl) { return decl->type(); });
           std::transform(fn_other->params()->begin(), fn_other->params()->end(),
-                         std::back_inserter(this_types),
+                         std::back_inserter(other_types),
                          [](const auto decl) { return decl->type(); });
           return return_type()->TypeEq(fn_other->return_type()) &&
              ::zc::TypeEq(&this_types, &other_types);
@@ -868,6 +874,12 @@
       if (from_arr != nullptr) {
          /* ensure base elements are of same type */
          return from_arr->TypeEq(pointee());
+      }
+
+      /* check if this is a function pointer and `from' is a function */
+      if (pointee()->kind() == Kind::TYPE_FUNCTION && depth() == 1 &&
+          from->kind() == Kind::TYPE_FUNCTION) {
+          return pointee()->TypeCoerce(from);
       }
       
       /* 0. Verify `from' is a pointer. */

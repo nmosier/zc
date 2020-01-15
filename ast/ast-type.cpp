@@ -200,9 +200,11 @@ namespace zc {
    }
 
    ASTType *CompoundType::TypeResolve(SemantEnv& env) {
-      for (auto memb : *membs()) {
-         memb->TypeResolve(env);
-      }
+       if (membs()) {
+           for (auto memb : *membs()) {
+               memb->TypeResolve(env);
+           }
+       }
       return this;
    }
 

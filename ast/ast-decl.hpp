@@ -163,12 +163,15 @@ namespace zc {
       TypenameSpecs typename_specs;
       StorageClassSpecs storage_class_specs;
 
-      ASTType *Type(SemantError& err);
+       ASTType *Type(SemantError& err);
+
+       Declaration *GetDecl(SemantError& err, ASTDeclarator *declarator);
 
       template <typename... Args>
       static DeclSpecs *Create(Args... args) { return new DeclSpecs(args...); }
       
    protected:
+
 
       template <typename... Args>
       DeclSpecs(Args... args): ASTNode(args...) {}

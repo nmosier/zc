@@ -93,9 +93,7 @@ namespace zc {
              !basic_type_specs.empty()) {
             err(g_filename, this) << "invalid combination of type specifiers" << std::endl;
          }
-         
-         /* lookup typename */
-         /* TODO */
+         return NamedType::Create(typename_specs.front()->sym(), loc());
       }
       
       /* check if any complex types are present */
@@ -146,5 +144,24 @@ namespace zc {
    void Declaration::TypeResolve(SemantEnv& env) {
       type_ = type_->TypeResolve(env);
    }
+
+    Declaration *DeclSpecs::GetDecl(SemantError& err, ASTDeclarator *declarator) {
+        ASTType *type = zc::ASTType::Create(Type(err), declarator);
+        auto sc_size = storage_class_specs.size();
+
+        if (sc_size == 0) {
+            return VarDeclaration::Create(declarator->sym(), false, type, loc());
+        } else if (sc_size == 1) {
+            StorageClassSpec *sc = storage_class_specs.front();
+            if (sc->kind() == StorageClassSpec::Kind::SC_TYPEDEF) {
+                return TypenameDeclaration::Create(declarator->sym(), type, loc());
+            } else {
+                throw std::logic_error("unimplemented storage class spec");
+            }
+        } else {
+            err(g_filename, this) << "too many storage class specifiers" << std::endl;
+            return VarDeclaration::Create(declarator->sym(), false, type, loc());
+        }
+    }
 
 }

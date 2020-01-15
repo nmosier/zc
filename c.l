@@ -24,7 +24,7 @@
 extern zc::SourceLoc g_lineno;
 extern YYSTYPE yylval;
 
-std::unordered_set<Symbol *> type_names;
+zc::ScopedTable<Symbol *,char> typenames;
 
 bool comment(void);
 char extract_char(const char *);
@@ -76,7 +76,7 @@ E  [Ee][+-]?{D}+
 {L}({L}|{D})* {
     /* convert yytext to AST identifier */
     yylval.identifier = zc::Identifier::Create(std::string(yytext), g_lineno);
-    if (type_names.find(yylval.identifier->id()) != type_names.end()) {
+    if (typenames.Lookup(yylval.identifier->id())) {
         return TYPE_NAME;
     } else {
         return ID;
@@ -107,8 +107,12 @@ E  [Ee][+-]?{D}+
 "!=" { return NEQ; }
 "->" { return ARROW; }
 
+    /* special scope tokens */
+"{" { typenames.EnterScope(); return '{'; }
+"}" { typenames.ExitScope(); return '}'; }
+
     /* single character tokens */
-[;{},:=()[\].&!~\-+*/%<>^|?] { return yytext[0]; }
+[;,:=()[\].&!~\-+*/%<>^|?] { return yytext[0]; }
 
 \n { ++g_lineno; }
 [ \t\v\f]  { /* ignore */ }
