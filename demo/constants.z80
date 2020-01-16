@@ -1,0 +1,59 @@
+#include "ti84pce.inc"
+
+_indcall .equ __indcall
+
+.org userMem - 2
+.db tExtTok, tAsm84CeCmp
+
+_start:
+   ld hl, 25
+   push hl
+   call _main
+   pop de
+   ld iy,flags
+   ret
+
+#include "crt.z80"
+
+_main:
+	push	ix
+	ld	ix,0
+	add	ix,sp
+	ld	sp,ix
+	ld	hl,8
+	push	hl
+	ld	hl,6
+	push	hl
+	ld	hl,1
+	pop	bc
+	call	__idivu
+	push	bc
+	pop	hl
+	push	hl
+	ld	hl,4
+	push	hl
+	ld	hl,3
+	pop	bc
+	call	__idivu
+	push	hl
+	ld	hl,2
+	push	hl
+	ld	hl,1
+	pop	de
+	call	__imulu
+	pop	de
+	add	hl,de
+	pop	de
+	or	a,a
+	sbc	hl,de
+	pop	bc
+	call	__iand
+	jp	__frameunset_main
+	jp	__LABEL__0
+__LABEL__0:
+	jp	__frameunset_main
+__frameunset_main:
+	lea	ix,ix+0
+	ld	sp,ix
+	pop	ix
+	ret	

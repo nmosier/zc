@@ -16,3 +16,4 @@ cgen-main*
 *.z80
 *.s
 *.8xp
+!demo/*

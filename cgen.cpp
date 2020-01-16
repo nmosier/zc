@@ -795,9 +795,10 @@ namespace zc {
             block->instrs().push_back(new MultInstruction(&rv_bc));
             block->instrs().push_back(new LoadInstruction(&rv_a, &rv_c));
             break;
-         case word_size:
+         case word_size: abort();
          case long_size:
-            abort();
+            emit_crt("__imulu", block);
+            break;
          }
          break;
 
