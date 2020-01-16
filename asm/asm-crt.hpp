@@ -28,7 +28,7 @@ namespace zc::z80 {
       const Pair& add(const std::string& name);
    };
 
-   extern CRT crt;
+   extern CRT g_crt;
 }
 
 #endif

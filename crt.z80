@@ -1,0 +1,27 @@
+; divide unsigned chars
+; ARGS:
+;  - a: numerator
+;  - b: denominator
+; RETV:
+;  - a: quotient
+;  - b: remainder
+__cdivu:
+   push de
+   ld e,c
+   ld c,a
+   ld d,b
+   ld b,8
+   xor a,a
+__cdivu.loop:
+   sla c
+   adc a,a
+   cp a,d
+   jr c,_
+   sub a,d
+   inc c
+_: djnz __cdivu.loop
+   ld b,a
+   ld a,c
+   ld c,e
+   pop de
+   ret

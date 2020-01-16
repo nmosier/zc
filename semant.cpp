@@ -617,8 +617,7 @@
          break;
          
       case Kind::UOP_DEREFERENCE:
-         if ((type_ = type->Dereference()) == nullptr) {
-            env.error()(g_filename, this) << "attempt to dereference non-pointer type" << std::endl;
+         if ((type_ = type->Dereference(&env)) == nullptr) {
             type_ = type;
          }
          break;
@@ -735,7 +734,7 @@
       } else {
          auto var = dynamic_cast<const VarDeclaration *>(decl);
          if (var) {
-            type_ = var->type();
+            type_ = var->type();//->Decay();
             is_const_ = var->is_const();
          } else {
             env.error()(g_filename, this) << "identifier '" << *id()->id()
@@ -814,7 +813,13 @@
     }
 
     ASTExpr::ExprKind IdentifierExpr::expr_kind() const {
-       return is_const() ? ExprKind::EXPR_RVALUE : ExprKind::EXPR_LVALUE;
+       if (is_const()) {
+          return ExprKind::EXPR_RVALUE;
+       } else if (type()->kind() == ASTType::Kind::TYPE_ARRAY) {
+          return ExprKind::EXPR_RVALUE;
+       } else {
+          return ExprKind::EXPR_LVALUE;
+       }
     }
 
     intmax_t IdentifierExpr::int_const() const {
@@ -886,11 +891,13 @@
          return true;
       }
 
+      bool isvoid = pointee()->kind() == ASTType::Kind::TYPE_VOID;
+
       /* check if `from' is an array. */
       const ArrayType *from_arr = dynamic_cast<const ArrayType *>(from);
       if (from_arr != nullptr) {
          /* ensure base elements are of same type */
-         return from_arr->TypeEq(pointee());
+         return from_arr->TypeEq(pointee()) || is_void();
       }
 
       /* check if this is a function pointer and `from' is a function */
@@ -904,13 +911,8 @@
       if (from_ptr == nullptr) {
          return false; /* can never implicitly cast from non-pointer type to pointer type */
       }
-      
-      /* 1. Check if coercing to 'void *'. */
-      if (pointee()->kind() == ASTType::Kind::TYPE_VOID) {
-         return true;
-      }
 
-      return false; /* cannot coerce since pointers are non-identical and `to' is not void ptr */
+      return from_ptr->is_void() || is_void();
    }
    
    bool FunctionType::TypeCoerce(const ASTType *from) const {
@@ -1050,10 +1052,33 @@
     ASTType *ArrayType::Address() {
        return PointerType::Create(1, this, loc());
     }
-          
+
+    /*** DECAY TYPE ***/
+    ASTType *ArrayType::Decay() {
+       return PointerType::Create(1, get_containee(), loc());
+    }
     
     /*** DEREFERENCE TYPE ***/
+    ASTType *ASTType::Dereference(SemantEnv *env) {
+       if (env) {
+          env->error()(g_filename, this) << "attempt to dereference non-pointer type" << std::endl;
+       } else {
+          abort();
+       }
+
+       return nullptr;
+    }
+
+    
     ASTType *PointerType::Dereference(SemantEnv *env) {
+       if (is_void()) {
+          if (env) {
+             env->error()(g_filename, this) << "cannot dereference void pointer" << std::endl;
+          } else {
+             abort();
+          }
+       }
+       
        if (depth() == 1) {
           return pointee();
        } else {

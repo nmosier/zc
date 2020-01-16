@@ -1,0 +1,175 @@
+#include "ti84pce.inc"
+
+_indcall .equ __indcall
+
+.org userMem - 2
+.db tExtTok, tAsm84CeCmp
+
+_start:
+   ld hl, 25
+   push hl
+   call _main
+   pop de
+   ld iy,flags
+   ret
+
+#include "crt.z80"
+
+_mymemset:
+	push	ix
+	ld	ix,-3
+	add	ix,sp
+	ld	sp,ix
+	ld	hl,(ix+9)
+	push	hl
+	lea	hl,ix+0
+	pop	de
+	ld	(hl),de
+	jp	__LABEL_for_cond_0
+__LABEL_for_cond_0:
+	ld	hl,0
+	push	hl
+	ld	hl,(ix+15)
+	pop	de
+	scf	
+	sbc	hl,de
+	sbc	a,a
+	inc	a
+	or	a,a
+	jp	nz,__LABEL_for_body_2
+	jp	__LABEL_for_join_3
+__LABEL_for_join_3:
+	ld	hl,(ix+9)
+	jp	__frameunset_mymemset
+	jp	__LABEL__4
+__LABEL__4:
+	jp	__frameunset_mymemset
+__LABEL_for_body_2:
+	ld	a,(ix+12)
+	push	af
+	lea	hl,ix+0
+	ld	de,(hl)
+	inc	de
+	ld	(hl),de
+	dec	de
+	ex	de,hl
+	pop	af
+	ld	(hl),a
+	jp	__LABEL_for_after_1
+__LABEL_for_after_1:
+	lea	hl,ix+15
+	ld	de,(hl)
+	dec	de
+	ld	(hl),de
+	ex	de,hl
+	jp	__LABEL_for_cond_0
+__frameunset_mymemset:
+	lea	ix,ix+3
+	ld	sp,ix
+	pop	ix
+	ret	
+_mymemcpy:
+	push	ix
+	ld	ix,-6
+	add	ix,sp
+	ld	sp,ix
+	ld	hl,(ix+12)
+	push	hl
+	lea	hl,ix+0
+	pop	de
+	ld	(hl),de
+	ld	hl,(ix+15)
+	push	hl
+	lea	hl,ix+3
+	pop	de
+	ld	(hl),de
+	jp	__LABEL_for_cond_5
+__LABEL_for_cond_5:
+	ld	hl,0
+	push	hl
+	ld	hl,(ix+18)
+	pop	de
+	scf	
+	sbc	hl,de
+	sbc	a,a
+	inc	a
+	or	a,a
+	jp	nz,__LABEL_for_body_7
+	jp	__LABEL_for_join_8
+__LABEL_for_join_8:
+	ld	hl,(ix+12)
+	jp	__frameunset_mymemcpy
+	jp	__LABEL__9
+__LABEL__9:
+	jp	__frameunset_mymemcpy
+__LABEL_for_body_7:
+	lea	hl,ix+3
+	ld	de,(hl)
+	inc	de
+	ld	(hl),de
+	dec	de
+	ex	de,hl
+	ld	a,(hl)
+	push	af
+	lea	hl,ix+0
+	ld	de,(hl)
+	inc	de
+	ld	(hl),de
+	dec	de
+	ex	de,hl
+	pop	af
+	ld	(hl),a
+	jp	__LABEL_for_after_6
+__LABEL_for_after_6:
+	lea	hl,ix+18
+	ld	de,(hl)
+	dec	de
+	ld	(hl),de
+	ex	de,hl
+	jp	__LABEL_for_cond_5
+__frameunset_mymemcpy:
+	lea	ix,ix+6
+	ld	sp,ix
+	pop	ix
+	ret	
+_main:
+	push	ix
+	ld	ix,-20
+	add	ix,sp
+	ld	sp,ix
+	ld	hl,10
+	push	hl
+	ld	hl,42
+	push	hl
+	lea	hl,ix+10
+	push	hl
+	ld	hl,_mymemset
+	push	hl
+	pop	iy
+	call	__indcall
+	pop	de
+	pop	de
+	pop	de
+	ld	hl,10
+	push	hl
+	lea	hl,ix+10
+	push	hl
+	lea	hl,ix+0
+	push	hl
+	ld	hl,_mymemcpy
+	push	hl
+	pop	iy
+	call	__indcall
+	pop	de
+	pop	de
+	pop	de
+	ld	hl,0
+	jp	__frameunset_main
+	jp	__LABEL__10
+__LABEL__10:
+	jp	__frameunset_main
+__frameunset_main:
+	lea	ix,ix+20
+	ld	sp,ix
+	pop	ix
+	ret	

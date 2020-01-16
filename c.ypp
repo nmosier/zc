@@ -188,9 +188,6 @@ decl:           decl_specs optional_init_declarator_list ';' {
                         declarator->get_declarables($$);
                         zc::Declaration *decl = $1->GetDecl(zc::g_semant_error, declarator);
                         enscope_typedef(decl);
-                        // auto type = zc::ASTType::Create(specs_type, declarator);
-                        // $$->push_back(zc::VarDeclaration::Create(declarator->sym(), false,
-                        //                                      type, @1));
                         $$->push_back(decl);
                     }
                 

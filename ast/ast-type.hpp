@@ -55,7 +55,9 @@ namespace zc {
       void Enscope(SemantEnv& env);
 
       virtual ASTType *Address() = 0;
-      virtual ASTType *Dereference(SemantEnv *env = nullptr) = 0;
+      virtual ASTType *Dereference(SemantEnv *env);
+      virtual bool decays() const { return false; }
+      virtual ASTType *Decay() { return this; }
 
       virtual int bytes() const = 0;
       void FrameGen(StackFrame& frame) const;
@@ -79,6 +81,7 @@ namespace zc {
       virtual ASTType *get_containee() const override { return pointee(); }
       int depth() const { return depth_; }
       ASTType *pointee() const { return pointee_; }
+      bool is_void() const { return pointee()->kind() == Kind::TYPE_VOID; }
       
       template <typename... Args>
       static PointerType *Create(Args... args) {
@@ -544,6 +547,8 @@ namespace zc {
 
       virtual ASTType *Address() override;
       virtual ASTType *Dereference(SemantEnv *env) override { return elem(); }
+      virtual bool decays() const override { return true; }
+      virtual ASTType *Decay() override;
 
       virtual int bytes() const override;
 

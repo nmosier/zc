@@ -46,7 +46,7 @@ namespace zc {
       const Value *val_;      
 
       SymInfo(): decl_(nullptr), val_(nullptr) {}
-      SymInfo(const VarDeclaration *decl, const Value *val): decl_(decl), val_(val) {}
+      SymInfo(const Value *val, const VarDeclaration *decl): decl_(decl), val_(val) {}
    };
 
    class ConstSymInfo: public SymInfo {
@@ -66,6 +66,8 @@ namespace zc {
       const Value *addr() const { return addr_; }
 
       VarSymInfo(const Value *addr, const VarDeclaration *decl);
+      template <typename... Args>
+      VarSymInfo(const Value *addr, Args... args): SymInfo(args...), addr_(addr) {}
       VarSymInfo(const ExternalDecl *ext_decl);
 
    private:
@@ -309,6 +311,8 @@ namespace zc {
     * Post condition: lhs in %a or %hl; hs in %b or %de, depending on size.
     */
    Block *emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr);
+   Block *emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr,
+                     const RegisterValue *long_rhs_reg);
    
    /**
     * Emit instructions that move the contents of the zero flag (ZF) into register %a.

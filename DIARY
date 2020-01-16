@@ -127,9 +127,26 @@ structs on [1], [2], [3] share the same unique ID, while [4] has a different uni
 [1 hr] Wrote tests for loop; fixed binary operation bug (invalid 'case' fallthrough in switch statement, leading to incorrect type being assigned). Added comma operator (the one that separates
        expressions).
 
+01/16/2020
+[1 hr] Wrote script that searches through the TI 84+ CE C runtime (CRT) for given symbols (e.g. sprintf, imulu, etc.) and then prints out the disassembled contents. This script was tricky because the CRT functions use a trampoline (for stability across releases) -- that is, the static address `__sprintf' points to a single jump instruction that jumps to the real implemenation of _sprintf.
+
+[1 hr] I wrote a new C runtime function 'cdivu' that divides two unsigned chars. (The CRT already on the calculator did not have this, and fast division is non-trivial). I unit-tested this, and it works.
+
+[2 hr] Wrote program 'memcpy.c' to demonstrate current state of compiler. It contains three functions:
+   ```
+   int main(int argc, char **argv); /* main */
+   void *mymemset(void *dst, char c, size_t bytes); /* re-implementation of C memset function */
+   void *mymemcpy(void *dst, void *src, size_t bytes); /* re-implementation of C memcpy function */
+   ```
+   At first, the program wouldn't compile; later, it wouldn't produce correct output and/or crash. I went back and fixed those bugs. This program behave correctly now.
+   memcpy.c compiles to approximately 170 lines of code (!!!). This should be a very easy to target for optimization.
+
 TODO
 [ ] typedef
 [X] ++, --
 [ ] +=, *=, etc.
 [ ] for
 
+
+need bdivs, bdivu
+add signed/unsigned

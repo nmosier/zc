@@ -47,9 +47,11 @@ namespace zc {
       Label *label = new Label(std::string("_") + *ext_decl->sym());
       LabelValue *label_val = new LabelValue(label);
 
-      if (type->kind() == ASTType::Kind::TYPE_FUNCTION) {
-         /* Functions _always_ behave as lvalues, i.e. they are always treated as addresses. */
-         addr_ = val_ = label_val;
+      if (type->kind() == ASTType::Kind::TYPE_FUNCTION ||
+          type->kind() == ASTType::Kind::TYPE_ARRAY)
+         {
+         /* Functions and arrays _always_ behave as addresses */
+            addr_ = val_ = label_val;
       } else {
          addr_ = label_val;
 
@@ -59,9 +61,14 @@ namespace zc {
    }
 
    VarSymInfo::VarSymInfo(const Value *addr, const VarDeclaration *decl): SymInfo(), addr_(addr) {
-      auto loc = new MemoryLocation(addr);
-      auto val = new MemoryValue(loc, decl->bytes());
-      val_ = val;
+      if (decl->type()->kind() == ASTType::Kind::TYPE_FUNCTION ||
+          decl->type()->kind() == ASTType::Kind::TYPE_ARRAY) {
+         val_ = addr;
+      } else {
+         auto loc = new MemoryLocation(addr);
+         auto val = new MemoryValue(loc, decl->bytes());
+         val_ = val;
+      }
    }
    
    /*** STRING CONSTANTS ***/
@@ -138,7 +145,7 @@ namespace zc {
       env.ext_env().Exit();
       env.ExitScope();
    }
-
+   
    Block *CompoundStat::CodeGen(CgenEnv& env, Block *block, bool new_scope) {
       if (new_scope) {
          env.EnterScope();
@@ -702,14 +709,12 @@ namespace zc {
 
          case word_size: abort();
          case long_size:
-            /* dec hl
-             * xor a,a
+            /* scf
              * sbc hl,de
              * sbc a,a
              * inc a
              */
-            block->instrs().push_back(new DecInstruction(&rv_hl));
-            block->instrs().push_back(new XorInstruction(&rv_a, &rv_a));
+            block->instrs().push_back(new ScfInstruction());
             block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_de));
             block->instrs().push_back(new SbcInstruction(&rv_a, &rv_a));
             block->instrs().push_back(new IncInstruction(&rv_a));
@@ -798,11 +803,63 @@ namespace zc {
 
       case Kind::BOP_DIVIDE:
       case Kind::BOP_MOD:
+         block = emit_binop(env, block, this, &rv_bc);
+         switch (type()->bytes()) {
+         case byte_size:
+            emit_crt("__cdivu", block);
+            if (kind() == Kind::BOP_MOD) {
+               block->instrs().push_back(new LoadInstruction(&rv_a, &rv_b));
+            }
+            break;
+         case word_size: abort();
+         case long_size:
+            emit_crt("__idivu", block);
+            if (kind() == Kind::BOP_MOD) {
+               block->instrs().push_back(new PushInstruction(&rv_bc));
+               block->instrs().push_back(new PopInstruction(&rv_hl));
+            }
+            break;
+         }
+         break;
+         
       case Kind::BOP_BITWISE_AND:
+         block = emit_binop(env, block, this, &rv_bc);
+         switch (type()->bytes()) {
+         case byte_size:
+            block->instrs().push_back(new AndInstruction(&rv_a, &rv_b));
+            break;
+         case word_size: abort();
+         case long_size:
+            emit_crt("__iand", block);
+            break;
+         }
+         break;
+         
       case Kind::BOP_BITWISE_OR:
+         block = emit_binop(env, block, this, &rv_bc);
+         switch (type()->bytes()) {
+         case byte_size:
+            block->instrs().push_back(new OrInstruction(&rv_a, &rv_b));
+            break;
+         case word_size: abort();
+         case long_size:
+            emit_crt("__ior", block);
+            break;
+         }
+         break;
+         
       case Kind::BOP_BITWISE_XOR:
-         /* TODO */
-         abort();
+         block = emit_binop(env, block, this, &rv_bc);
+         switch (type()->bytes()) {
+         case byte_size:
+            block->instrs().push_back(new OrInstruction(&rv_a, &rv_b));
+            break;
+         case word_size: abort();
+         case long_size:
+            emit_crt("__ixor", block);
+            break;
+         }
+         break;
 
       case Kind::BOP_COMMA:
          lhs()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
@@ -841,33 +898,26 @@ namespace zc {
    Block *IdentifierExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
       const SymInfo *id_info = env.symtab().Lookup(id()->id());
 
-      switch (mode) {
-      case ExprKind::EXPR_NONE: abort();
-      case ExprKind::EXPR_LVALUE:
-         {
-            /* obtain address of identifier */
-            const Value *id_addr = dynamic_cast<const VarSymInfo *>(id_info)->addr();
-            block->instrs().push_back(new LeaInstruction(&rv_hl, id_addr));
-         }
-         break;
+
+      if (mode == ExprKind::EXPR_LVALUE || type()->kind() == ASTType::Kind::TYPE_ARRAY) {
+         /* obtain address of identifier */
+         const Value *id_addr = dynamic_cast<const VarSymInfo *>(id_info)->addr();
+         block->instrs().push_back(new LeaInstruction(&rv_hl, id_addr));
+      } else {
+         const Value *id_rval = id_info->val();
+         const RegisterValue *rv;
          
-      case ExprKind::EXPR_RVALUE:
-         {
-            const Value *id_rval = id_info->val();
-            const RegisterValue *rv;
-            switch (type()->bytes()) {
-            case byte_size:
-               rv = &rv_a;
-               break;
-            case word_size: abort();
-            case long_size:
-               rv = &rv_hl;
-               break;
-            default: abort();
-            }
-            block->instrs().push_back(new LoadInstruction(rv, id_rval));
+         switch (type()->bytes()) {
+         case byte_size:
+            rv = &rv_a;
+            break;
+         case word_size: abort();
+         case long_size:
+            rv = &rv_hl;
+            break;
+         default: abort();
          }
-         break;
+         block->instrs().push_back(new LoadInstruction(rv, id_rval));
       }
 
       return block;
@@ -877,10 +927,11 @@ namespace zc {
       /* push arguments onto stack (1st arg is highest on stack) */
 
       /* codegen params */
-      for (ASTExpr *param : params()->vec()) {
+      for (auto it = params()->vec().rbegin(), end = params()->vec().rend(); it != end; ++it) {
+         auto param = *it;
          block = param->CodeGen(env, block, ExprKind::EXPR_RVALUE);
          const RegisterValue *rv;
-         switch (param->type()->bytes()) {
+         switch (param->type()->Decay()->bytes()) {
          case byte_size:
             rv = &rv_af;
             break;
@@ -1119,6 +1170,11 @@ namespace zc {
    }
 
    Block *emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr) {
+      return emit_binop(env, block, expr, &rv_de);
+   }
+   
+   Block *emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr,
+                     const RegisterValue *long_rhs_reg) {
       Block::InstrVec& instrs = block->instrs();
       int bytes = expr->type()->bytes();
       int lhs_bytes = expr->lhs()->type()->bytes();
@@ -1150,7 +1206,7 @@ namespace zc {
          break;
       case word_size: abort();
       case long_size:
-         block->instrs().push_back(new PopInstruction(&rv_de));
+         block->instrs().push_back(new PopInstruction(long_rhs_reg));
          break;
       default: abort();
       }
@@ -1159,7 +1215,7 @@ namespace zc {
    }
 
    void emit_crt(const std::string& name, Block *block) {
-      const LabelValue *lv = crt.val(name);
+      const LabelValue *lv = g_crt.val(name);
       block->instrs().push_back(new CallInstruction(lv));
    }
 
@@ -1397,21 +1453,23 @@ namespace zc {
        if (next_local_addr_ == nullptr) {
           next_local_addr_ = &FP_idxval;
        }
+
        VarSymInfo *info = new VarSymInfo(next_local_addr_, decl);
-       next_local_addr_ = next_local_addr_->Add(decl->bytes());
+       next_local_addr_ = next_local_addr_->Add(decl->type()->bytes());
        return info;
-    }
-   
+   }
+
+
     void FunctionDef::FrameGen(StackFrame& frame) const {
        comp_stat()->FrameGen(frame);
     }
-
-    void CompoundStat::FrameGen(StackFrame& frame) const {
-       for (const Declaration *decl : *decls()) {
-          decl->FrameGen(frame);
-       }
-      for (const ASTStat *stat : stats()->vec()) {
-         stat->FrameGen(frame);
+ 
+   void CompoundStat::FrameGen(StackFrame& frame) const {
+      for (const Declaration *decl : *decls()) {
+         decl->FrameGen(frame);
+         for (const ASTStat *stat : stats()->vec()) {
+            stat->FrameGen(frame);
+         }
       }
    }
 
@@ -1448,10 +1506,11 @@ namespace zc {
       
       env.symtab().AddToScope
          (sym(),
-          new ConstSymInfo(VarDeclaration::Create(sym(), true, enum_type(), loc()),
-                               val));
+          new ConstSymInfo(val, VarDeclaration::Create(sym(), true, enum_type(), loc())));
           
    }
+   
+   
 
    void EnumType::Declare(CgenEnv& env) {
       if (membs()) {
