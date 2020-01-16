@@ -167,6 +167,7 @@ namespace zc {
       case Kind::BOP_TIMES:       return l *  r;
       case Kind::BOP_DIVIDE:      return l /  r;
       case Kind::BOP_MOD:         return l %  r;
+      case Kind::BOP_COMMA:       return r;
       }
    }
 

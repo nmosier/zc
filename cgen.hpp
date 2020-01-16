@@ -308,7 +308,7 @@ namespace zc {
     * Generic emission routine for performing binary operation on two integers.
     * Post condition: lhs in %a or %hl; hs in %b or %de, depending on size.
     */
-   void emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr);
+   Block *emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr);
    
    /**
     * Emit instructions that move the contents of the zero flag (ZF) into register %a.

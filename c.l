@@ -63,6 +63,7 @@ E  [Ee][+-]?{D}+
 "if" { return IF; }
 "else" { return ELSE; }
 "while" { return WHILE; }
+"for" { return FOR; }
 
 "auto" { return AUTO; }
 "register" { return REGISTER; }

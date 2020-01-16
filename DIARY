@@ -119,9 +119,17 @@ structs on [1], [2], [3] share the same unique ID, while [4] has a different uni
        that these operators are working. Interestingly, there is no penalty for pre- vs. post-increment/decrement on chars (single-byte values); however, there _is_ a penalty for post-inc'ing/dec'ing
        ints.
 
+[6 hrs] Added typedefs. TODO
+
+[1 hr] Added for loop.
+
+01/15/2020
+[1 hr] Wrote tests for loop; fixed binary operation bug (invalid 'case' fallthrough in switch statement, leading to incorrect type being assigned). Added comma operator (the one that separates
+       expressions).
 
 TODO
 [ ] typedef
 [X] ++, --
 [ ] +=, *=, etc.
 [ ] for
+

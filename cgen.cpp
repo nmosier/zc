@@ -158,30 +158,6 @@ namespace zc {
 
       return block;
    }
-
-#if 0
-   void ASTType::CodeGen(CgenEnv& env) {
-      SymInfo *info = env.ext_env().frame().next_local(this);
-
-      if (sym() != nullptr) {
-         /* if this type is bounded to a symbol, declare that symbol */
-         env.symtab().AddToScope(sym(), info);
-      }
-   }
-#endif
-
-#if 0
-   void EnumType::CodeGen(CgenEnv& env) {
-      for (auto memb : *membs()) {
-         const auto imm = new ImmediateValue(memb->eval(), bytes());
-         auto info = new ConstSymInfo(this, imm);
-         env.symtab().AddToScope(memb->sym(), info);
-      }
-
-      ASTType::CodeGen(env);
-   }
-#endif
-
    Block *ReturnStat::CodeGen(CgenEnv& env, Block *block) {
       /* generate returned expression 
        * For now, assume result will be in %a or %hl. */
@@ -258,7 +234,7 @@ namespace zc {
       env.stat_stack().Push(stat_info);
       
       pred_block = pred()->CodeGen(env, pred_block, ASTExpr::ExprKind::EXPR_RVALUE);
-      emit_nonzero_test(env, block, pred()->type()->bytes());
+      emit_nonzero_test(env, pred_block, pred()->type()->bytes()); /* CHANGED */
       pred_block->transitions().vec().push_back(new JumpTransition(body_block, Cond::NZ));
       pred_block->transitions().vec().push_back(new JumpTransition(join_block, Cond::ANY));
 
@@ -269,6 +245,42 @@ namespace zc {
 
       env.stat_stack().Pop();
 
+      return join_block;
+   }
+
+   Block *ForStat::CodeGen(CgenEnv& env, Block *block) {
+      Label *cond_label = new_label("for_cond");
+      Block *cond_block = new Block(cond_label);
+      BlockTransition *cond_trans = new JumpTransition(cond_block, Cond::ANY);
+
+      Label *after_label = new_label("for_after");
+      Block *after_block = new Block(after_label);
+      BlockTransition *after_trans = new JumpTransition(after_block, Cond::ANY);
+      
+      Label *body_label = new_label("for_body");
+      Block *body_block = new Block(body_label);
+      BlockTransition *body_trans = new JumpTransition(body_block, Cond::NZ);
+
+      Label *join_label = new_label("for_join");
+      Block *join_block = new Block(join_label);
+      BlockTransition *join_trans = new JumpTransition(join_block, Cond::ANY);
+
+      StatInfo *stat_info = new StatInfo(this, after_block, join_block);
+      env.stat_stack().Push(stat_info);
+      
+      block = init()->CodeGen(env, block, ASTExpr::ExprKind::EXPR_RVALUE);
+      block->transitions().vec().push_back(cond_trans);
+      block = pred()->CodeGen(env, cond_block, ASTExpr::ExprKind::EXPR_RVALUE);
+      emit_nonzero_test(env, block, pred()->type()->bytes());
+      block->transitions().vec().push_back(body_trans);
+      block->transitions().vec().push_back(join_trans);
+      block = body()->CodeGen(env, body_block);
+      block->transitions().vec().push_back(after_trans);
+      block = after()->CodeGen(env, after_block, ASTExpr::ExprKind::EXPR_RVALUE);
+      block->transitions().vec().push_back(cond_trans);
+      
+      env.stat_stack().Pop();
+      
       return join_block;
    }
 
@@ -600,7 +612,7 @@ namespace zc {
 
       case Kind::BOP_EQ:
       case Kind::BOP_NEQ:
-         emit_binop(env, block, this);
+         block = emit_binop(env, block, this);
          switch (lhs()->type()->bytes()) {
          case byte_size:
             block->instrs().push_back(new CompInstruction(&rv_a, &rv_b));
@@ -617,7 +629,7 @@ namespace zc {
          break;
 
       case Kind::BOP_LT:
-         emit_binop(env, block, this);
+         block = emit_binop(env, block, this);
          switch (lhs()->type()->bytes()) {
          case byte_size:
             /* cp a,b
@@ -644,7 +656,7 @@ namespace zc {
          break;
 
       case Kind::BOP_LEQ:
-         emit_binop(env, block, this);
+         block = emit_binop(env, block, this);
          switch (lhs()->type()->bytes()) {
          case byte_size:
             /* scf
@@ -674,7 +686,7 @@ namespace zc {
          break;
 
       case Kind::BOP_GT:
-         emit_binop(env, block, this);
+         block = emit_binop(env, block, this);
          switch (lhs()->type()->bytes()) {
          case byte_size:
             /* dec a
@@ -706,7 +718,7 @@ namespace zc {
          break;
 
       case Kind::BOP_GEQ:
-         emit_binop(env, block, this);
+         block = emit_binop(env, block, this);
          switch (lhs()->type()->bytes()) {
          case byte_size:
             /* cp a,b
@@ -734,7 +746,7 @@ namespace zc {
          break;
 
       case Kind::BOP_PLUS:
-         emit_binop(env, block, this);
+         block = emit_binop(env, block, this);
          switch (type()->bytes()) {
          case byte_size:
             /* add a,b */
@@ -749,7 +761,7 @@ namespace zc {
          break;
 
       case Kind::BOP_MINUS:
-         emit_binop(env, block, this);
+         block = emit_binop(env, block, this);
          switch (type()->bytes()) {
          case byte_size:
             /* sub a,b */
@@ -767,7 +779,7 @@ namespace zc {
          break;
 
       case Kind::BOP_TIMES:
-         emit_binop(env, block, this);
+         block = emit_binop(env, block, this);
          switch (type()->bytes()) {
          case byte_size:
             /* ld c,a
@@ -791,6 +803,11 @@ namespace zc {
       case Kind::BOP_BITWISE_XOR:
          /* TODO */
          abort();
+
+      case Kind::BOP_COMMA:
+         lhs()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
+         rhs()->CodeGen(env, block, mode);
+         break;
       }
 
       return block;
@@ -1101,7 +1118,7 @@ namespace zc {
       }
    }
 
-   void emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr) {
+   Block *emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr) {
       Block::InstrVec& instrs = block->instrs();
       int bytes = expr->type()->bytes();
       int lhs_bytes = expr->lhs()->type()->bytes();
@@ -1137,6 +1154,8 @@ namespace zc {
          break;
       default: abort();
       }
+
+      return block;
    }
 
    void emit_crt(const std::string& name, Block *block) {
@@ -1404,6 +1423,10 @@ namespace zc {
    }
 
    void WhileStat::FrameGen(StackFrame& frame) const {
+      body()->FrameGen(frame);
+   }
+
+   void ForStat::FrameGen(StackFrame& frame) const {
       body()->FrameGen(frame);
    }
 

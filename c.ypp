@@ -104,6 +104,7 @@
 %token IF
 %token ELSE
 %token WHILE
+%token FOR
 
                         /* STORAGE CLASS SPECS */
 %token AUTO REGISTER STATIC EXTERN TYPEDEF
@@ -378,6 +379,9 @@ iteration_stat:
                 WHILE '(' exp ')' stat {
                     $$ = zc::WhileStat::Create($3, $5, @3);
                 }
+        |       FOR '(' optional_exp ';' optional_exp ';' optional_exp ')' stat {
+                    $$ = zc::ForStat::Create($3, $5, $7, $9, @1);
+                }
         ;
 exp_stat:       optional_exp ';' { $$ = zc::ExprStat::Create($1, @1); }
         ;
@@ -385,7 +389,8 @@ optional_exp:   /* empty */ { $$ = zc::NoExpr::Create(@$); @$ = 0; }
         |       exp         { $$ = $1; }
         ;
 exp:            assignment_exp { $$ = $1; }
-        ; /* incomplete */
+        |       exp ',' assignment_exp { $$ = zc::BinaryExpr::Create(zc::BinaryExpr::Kind::BOP_COMMA, $1, $3, @1); }
+        ;
 assignment_exp: conditional_exp { $$ = $1; }
         |       unary_exp '=' conditional_exp { $$ = zc::AssignmentExpr::Create($1, $3, @1); }
         ; /* incomplete */
@@ -537,6 +542,8 @@ equality_operator:
 relational_operator:
                 '<' { $$ = zc::BinaryExpr::Kind::BOP_LT; }
         |       LEQ { $$ = zc::BinaryExpr::Kind::BOP_LEQ; }
+        |       '>' { $$ = zc::BinaryExpr::Kind::BOP_GT; }
+        |       GEQ { $$ = zc::BinaryExpr::Kind::BOP_GEQ; }
         ; /* incomplete */
 additive_operator:
                 '+' { $$ = zc::BinaryExpr::Kind::BOP_PLUS; }

@@ -84,7 +84,8 @@ namespace zc {
                        BOP_MINUS,
                        BOP_TIMES,
                        BOP_DIVIDE,
-                       BOP_MOD
+                       BOP_MOD,
+                       BOP_COMMA
       };
       Kind kind() const { return kind_; }
       bool is_logical() const;
@@ -206,9 +207,7 @@ namespace zc {
 
       virtual void TypeCheck(SemantEnv& env) override;
 
-      virtual Block *CodeGen(CgenEnv& env, Block *block, ExprKind mode) override {
-         abort();
-      }
+      virtual Block *CodeGen(CgenEnv& env, Block *block, ExprKind mode) override { return block; }
 
    protected:
       NoExpr(const SourceLoc& loc): ASTExpr(loc) {}

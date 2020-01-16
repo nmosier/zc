@@ -452,6 +452,15 @@
        env.stat_stack().Pop();
     }
 
+    void ForStat::TypeCheck(SemantEnv& env) {
+       env.stat_stack().Push(this);
+       init()->TypeCheck(env);
+       pred()->TypeCheck(env);
+       after()->TypeCheck(env);
+       body()->TypeCheck(env);
+       env.stat_stack().Pop();
+    }
+
     void GotoStat::TypeCheck(SemantEnv& env) {
        env.ext_env().LabelRef(label_id());
     }
@@ -700,6 +709,11 @@
                type_ = IntegralType::Create(IntegralType::IntKind::SPEC_CHAR, loc());
             }
          }
+         break;
+         
+      case Kind::BOP_COMMA:
+         type_ = rhs()->type();
+         break;
       }
    }
 
@@ -785,6 +799,9 @@
        case Kind::BOP_DIVIDE:
        case Kind::BOP_MOD:
           return ExprKind::EXPR_RVALUE;
+
+       case Kind::BOP_COMMA:
+          return ExprKind::EXPR_LVALUE;
        }
     }
 

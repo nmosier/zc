@@ -176,16 +176,6 @@ namespace zc {
          SelectionStat(args...), cond_(cond), if_body_(if_body), else_body_(else_body) {}
    };
 
-#if 0
-   class SwitchStat: public SelectionStat {
-   public:
-      
-   private:
-      ASTExpr *control_;
-      
-   };
-#endif
-
    /* NOTE: Abstract */
    class IterationStat: public ASTStat {
    public:
@@ -224,6 +214,30 @@ namespace zc {
    protected:
       template <typename... Args>
       WhileStat(Args... args): IterationStat(args...) {}
+   };
+
+   class ForStat: public IterationStat {
+   public:
+      ASTExpr *init() const { return init_; }
+      ASTExpr *after() const { return after_; }
+
+      /* Semantic Analysis */
+      virtual void TypeCheck(SemantEnv& env) override;
+
+      /* Code Generation */
+      virtual Block *CodeGen(CgenEnv& env, Block *block) override;
+      virtual void FrameGen(StackFrame& env) const override;
+      
+      template <typename... Args>
+      static ForStat *Create(Args... args) { return new ForStat(args...); }
+      
+   private:
+      ASTExpr *init_;
+      ASTExpr *after_;
+      
+      template <typename...  Args>
+      ForStat(ASTExpr *init, ASTExpr *cond, ASTExpr *after, Args... args):
+         IterationStat(cond, args...), init_(init), after_(after) {}
    };
 
    class GotoStat: public ASTStat {
