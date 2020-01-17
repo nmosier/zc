@@ -19,7 +19,7 @@ FLEX_SRC = lex.yy.c
 FLEX_OBJ = $(FLEX_SRC:.c=.o)
 
 HDRS = $(AST_HDRS) $(BISON_HDR) cgen.hpp semant.hpp env.hpp
-OBJS = $(AST_OBJS) $(ASM_OBJS) util.o symtab.o semant.o env.o cgen.o
+OBJS = $(AST_OBJS) $(ASM_OBJS) util.o symtab.o semant.o env.o cgen.o optim.o
 
 CLEAN_OBJS = $(shell find . -name "*.o")
 CLEAN_SRCS = $(BISON_SRC) $(FLEX_SRC)

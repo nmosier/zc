@@ -9,6 +9,25 @@ namespace zc {
 
    class Block;
 
+   class ASTStat: public ASTNode {
+   public:
+      virtual bool can_break() const { return false; }
+      virtual bool can_continue() const { return false; }
+
+      /* Semantic Analysis */
+      virtual void TypeCheck(SemantEnv& env) = 0;
+
+      /* Code Generation */
+      virtual Block *CodeGen(CgenEnv& env, Block *block) = 0;
+      virtual void FrameGen(StackFrame& frame) const = 0;
+
+      /* Optimization */
+      virtual ASTStat *ReduceConst() = 0;
+      
+   protected:
+      ASTStat(const SourceLoc& loc): ASTNode(loc) {}
+   };   
+
    class CompoundStat: public ASTStat {
    public:
       Declarations *decls() const { return decls_; }
@@ -32,6 +51,9 @@ namespace zc {
       }
       Block *CodeGen(CgenEnv& env, Block *block, bool new_scope);
       virtual void FrameGen(StackFrame& env) const override;
+
+      /* Optimization */
+      virtual ASTStat *ReduceConst() override;
       
    protected:
       Declarations *decls_;
@@ -44,8 +66,11 @@ namespace zc {
    class ExprStat: public ASTStat {
    public:
       ASTExpr *expr() const { return expr_; }
-      
-      static ExprStat *Create(ASTExpr *expr, SourceLoc& loc) { return new ExprStat(expr, loc); }
+
+      template <typename... Args>
+      static ExprStat *Create(Args... args) {
+         return new ExprStat(args...);
+      }
 
       virtual void DumpNode(std::ostream& os) const override { os << "ExprStat"; }
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {
@@ -58,11 +83,15 @@ namespace zc {
       /* Code Generation */
       virtual Block *CodeGen(CgenEnv& env, Block *block) override;
       virtual void FrameGen(StackFrame& env) const override {}
+
+      /* Optimization */
+      virtual ASTStat *ReduceConst() override;
       
    protected:
       ASTExpr *expr_;
-      
-   ExprStat(ASTExpr *expr, SourceLoc& loc): ASTStat(loc), expr_(expr) {}
+
+      template <typename... Args>
+      ExprStat(ASTExpr *expr, Args... args): ASTStat(args...), expr_(expr) {}
    };
 
    /* NOTE: abstract */
@@ -91,6 +120,9 @@ namespace zc {
       /* Code Generation */
       virtual Block *CodeGen(CgenEnv& env, Block *block) override;
       virtual void FrameGen(StackFrame& env) const override {}    
+
+      /* Optimization */
+      virtual ASTStat *ReduceConst() override;
       
    protected:
       ASTExpr *expr_;
@@ -104,10 +136,16 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override { os << "BreakStat"; }
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
 
+      /* Semantic Analysis */
       virtual void TypeCheck(SemantEnv& env) override;
+
+      /* Code Generation */
       virtual Block *CodeGen(CgenEnv& env, Block *) override;
       virtual void FrameGen(StackFrame& frame) const override {}
 
+      /* Optimization */
+      virtual ASTStat *ReduceConst() override { return this; }
+      
       template <typename... Args>
       static BreakStat *Create(Args... args) { return new BreakStat(args...); }
       
@@ -121,9 +159,15 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override { os << "BreakStat"; }
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
 
+      /* Semantic Analysis */
       virtual void TypeCheck(SemantEnv& env) override;
+
+      /* Code Generation */
       virtual Block *CodeGen(CgenEnv& env, Block *) override;
       virtual void FrameGen(StackFrame& frame) const override {}
+
+      /* Optimization */
+      virtual ASTStat *ReduceConst() override { return this; }      
       
       template <typename... Args>
       static ContinueStat *Create(Args... args) { return new ContinueStat(args...); }
@@ -166,6 +210,9 @@ namespace zc {
       virtual Block *CodeGen(CgenEnv& env, Block *block) override;
       virtual void FrameGen(StackFrame& env) const override;          
       
+      /* Optimization */
+      virtual ASTStat *ReduceConst() override;
+
    protected:
       ASTExpr *cond_;
       ASTStat *if_body_;
@@ -185,6 +232,10 @@ namespace zc {
       virtual bool can_break() const override { return true; }
       virtual bool can_continue() const override { return true; }
       
+      /* Optimization */
+      virtual ASTStat *ReduceConst() override;
+      virtual ASTStat *ReduceConst_aux() = 0;
+
    protected:
       ASTExpr *pred_;
       ASTStat *body_;
@@ -192,6 +243,36 @@ namespace zc {
       template <typename... Args>
       IterationStat(ASTExpr *pred, ASTStat *body, Args... args):
          ASTStat(args...), pred_(pred), body_(body) {}
+   };
+
+   /**
+    * Infinite loop. NOTE: No corresponding construct in C; used for optimizations.
+    */
+   class LoopStat: public ASTStat {
+   public:
+      ASTStat *body() const { return body_; }
+
+      virtual bool can_break() const override { return true; }
+      virtual bool can_continue() const override { return true; }
+
+      /* Semantic Analysis */
+      virtual void TypeCheck(SemantEnv& env) override {}
+      
+      /* Code Generation */
+      virtual Block *CodeGen(CgenEnv& env, Block *block) override;
+      virtual void FrameGen(StackFrame& frame) const override;
+
+      /* Optimization */
+      virtual ASTStat *ReduceConst() override { return this; }
+
+      template <typename... Args>
+      static LoopStat *Create(Args... args) { return new LoopStat(args...); }
+      
+   private:
+      ASTStat *body_;
+
+      template <typename... Args>
+      LoopStat(ASTStat *body, Args... args): ASTStat(args...), body_(body) {}
    };
 
    class WhileStat: public IterationStat {
@@ -209,7 +290,10 @@ namespace zc {
 
       /* Code Generation */
       virtual Block *CodeGen(CgenEnv& env, Block *block) override;
-      virtual void FrameGen(StackFrame& env) const override;          
+      virtual void FrameGen(StackFrame& env) const override;
+
+      /* Optimization */
+      virtual ASTStat *ReduceConst_aux() override;
       
    protected:
       template <typename... Args>
@@ -228,6 +312,9 @@ namespace zc {
       virtual Block *CodeGen(CgenEnv& env, Block *block) override;
       virtual void FrameGen(StackFrame& env) const override;
       
+      /* Optimization */
+      virtual ASTStat *ReduceConst_aux() override;
+
       template <typename... Args>
       static ForStat *Create(Args... args) { return new ForStat(args...); }
       
@@ -251,9 +338,16 @@ namespace zc {
 
       virtual void DumpNode(std::ostream& os) const override;
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
+
+      /* Semantic Analysis */
       virtual void TypeCheck(SemantEnv& env) override;
+
+      /* Code Generation */
       virtual Block *CodeGen(CgenEnv& env, Block *block) override;
       virtual void FrameGen(StackFrame& env) const override {}
+
+      /* Optimization */
+      virtual ASTStat *ReduceConst() override { return this; }
       
    private:
       Identifier *label_id_;
@@ -270,9 +364,16 @@ namespace zc {
       ASTStat *stat() const { return stat_; }
 
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
+
+      /* Semantic Analysis */
       virtual void TypeCheck(SemantEnv& env) override;
+
+      /* Code Generation */
       virtual Block *CodeGen(CgenEnv& env, Block *block) override;
       
+      /* Optimization */
+      virtual ASTStat *ReduceConst() override;
+
    protected:
       ASTStat *stat_;
 
@@ -290,7 +391,11 @@ namespace zc {
       }
 
       virtual void DumpNode(std::ostream& os) const override;
+
+      /* Semantic Analysis */
       virtual void TypeCheck(SemantEnv& env) override;
+
+      /* Code Generation */
       virtual Block *CodeGen(CgenEnv& env, Block *block) override;
       virtual void FrameGen(StackFrame& env) const override {}
       
@@ -301,6 +406,27 @@ namespace zc {
       LabelDefStat(Identifier *label_id, Args... args): LabeledStat(args...), label_id_(label_id) {}
    };
 
+   class NoStat: public ASTStat {
+   public:
+      template <typename... Args>
+      static NoStat *Create(Args... args) {
+         return new NoStat(args...);
+      }
+
+      /* Semantic Analysis */
+      virtual void TypeCheck(SemantEnv& env) override {}
+
+      /* Code Generation */
+      virtual Block *CodeGen(CgenEnv& env, Block *block) override { return block; }
+      virtual void FrameGen(StackFrame& env) const override {}
+
+      /* Optimization */
+      virtual ASTStat *ReduceConst() override { return this; }
+
+   private:
+      template <typename... Args>
+      NoStat(Args... args): ASTStat(args...) {}
+   };
    
 
 

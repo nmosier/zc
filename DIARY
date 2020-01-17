@@ -141,12 +141,17 @@ structs on [1], [2], [3] share the same unique ID, while [4] has a different uni
    At first, the program wouldn't compile; later, it wouldn't produce correct output and/or crash. I went back and fixed those bugs. This program behave correctly now.
    memcpy.c compiles to approximately 170 lines of code (!!!). This should be a very easy to target for optimization.
 
-TODO
-[ ] typedef
-[X] ++, --
-[ ] +=, *=, etc.
-[ ] for
+[2 hr] Added new pass to compiler: AST optimization. This pass currently looks for constant expressions/statements and replaces them with literals or simplifies statements. For example, consider the
+       following for loop:
+       for (i = 0; 1; ++i)
+           if (i % 7 == 1 && i % 13 == 2)
+              break;
 
+       The loop condition `1` (i.e. true) is constant, so this for loop is transformed into a basic loop like so:
+       i = 0;
+       loop:
+         if (i % 7 == 1 && i % 13 == 2)
+            break;
+         ++i;
+         goto loop;
 
-need bdivs, bdivu
-add signed/unsigned

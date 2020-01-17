@@ -12,7 +12,91 @@
 
 namespace zc {
 
+   class ASTExpr;
    typedef ASTNodeVec<ASTExpr> ASTExprs;
+   
+   class ASTExpr: public ASTNode {
+   public:
+      ASTType *type() const { return type_; }
+
+      /*! Enumeration of value kind. */
+      enum class ExprKind
+         {EXPR_NONE,   /*!< indeterminate; this is the default upon construction */
+          EXPR_LVALUE, /*!< expression is an `lvalue'; it can appear on the left-hand side 
+                        *   of an assignment */
+          EXPR_RVALUE  /*!< expression is an `rvalue'; it can appear on the right-hand side
+                        *   of an assignment */
+         };
+      virtual ExprKind expr_kind() const = 0;
+      virtual bool is_const() const = 0;
+      virtual intmax_t int_const() const {
+         throw std::logic_error("attempt to evaluate expression that is not constant");
+      }
+      
+      virtual void TypeCheck(SemantEnv& env) = 0;
+
+      /**
+       * Collapse constant subexpressions to constants.
+       */
+      ASTExpr *ReduceConst();
+
+      void DumpType(std::ostream& os) const;
+
+      /**
+       * Abstract code generation function.
+       * @param env code generation environment
+       * @param block current block
+       * @param mode how to evaluate expression (as lvalue or rvalue)
+       */
+      virtual Block *CodeGen(CgenEnv& env, Block *block, ExprKind mode) = 0;
+
+   protected:
+      /**
+       * Type of expression; populated by @see TypeCheck()
+       */
+      ASTType *type_;
+
+      virtual void ReduceConst_rec() {} /*!< aux. function that reduces subexpressions */
+
+      template <typename... Args>
+      ASTExpr(Args... args): ASTNode(args...), type_(nullptr) {}
+
+      template <typename... Args>
+      ASTExpr(ASTType *type, Args... args): ASTNode(args...), type_(type) {}
+   };
+
+   class ASTUnaryExpr: public ASTExpr {
+   public:
+      ASTExpr *expr() const { return expr_; }
+
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
+      
+   protected:
+      ASTExpr *expr_;
+
+      virtual void ReduceConst_rec() override;
+
+      template <typename... Args>
+      ASTUnaryExpr(ASTExpr *expr, Args... args): ASTExpr(args...), expr_(expr) {}
+   };
+
+   class ASTBinaryExpr: public ASTExpr {
+   public:
+      ASTExpr *lhs() const { return lhs_; }
+      ASTExpr *rhs() const { return rhs_; }
+      
+      virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
+      
+   protected:
+      ASTExpr *lhs_;
+      ASTExpr *rhs_;
+
+      virtual void ReduceConst_rec() override;
+      
+      ASTBinaryExpr(ASTExpr *lhs, ASTExpr *rhs, const SourceLoc& loc):
+         ASTExpr(loc), lhs_(lhs), rhs_(rhs) {}
+   };
+
 
    class AssignmentExpr: public ASTBinaryExpr {
    public:
@@ -119,9 +203,10 @@ namespace zc {
       virtual ExprKind expr_kind() const override;
       virtual bool is_const() const override { return true; }
       virtual intmax_t int_const() const override { return val_; }
-      
-      static LiteralExpr *Create(const intmax_t& val, const SourceLoc& loc) {
-         return new LiteralExpr(val, loc);
+
+      template <typename... Args>
+      static LiteralExpr *Create(Args... args) {
+         return new LiteralExpr(args...);
       }
 
       virtual void DumpNode(std::ostream& os) const override;
@@ -135,7 +220,8 @@ namespace zc {
       
    protected:
       intmax_t val_;
-      LiteralExpr(const intmax_t& val, const SourceLoc& loc): ASTExpr(loc), val_(val) {}
+
+      LiteralExpr(const intmax_t& val, const SourceLoc& loc);
    };
 
    class StringExpr: public ASTExpr {
@@ -242,10 +328,9 @@ namespace zc {
       
    };
 
-   class CastExpr: public ASTExpr {
+   class CastExpr: public ASTUnaryExpr {
    public:
       virtual ExprKind expr_kind() const override { return ExprKind::EXPR_RVALUE; }
-      ASTExpr *expr() const { return expr_; }
       virtual bool is_const() const override { return expr()->is_const(); }
       virtual intmax_t int_const() const override;
 
@@ -260,11 +345,9 @@ namespace zc {
       virtual Block *CodeGen(CgenEnv& env, Block *block, ExprKind mode) override;
       
    protected:
-      ASTExpr *expr_;
-
       template <typename... Args>
       CastExpr(ASTType *type, ASTExpr *expr, Args... args):
-         ASTExpr(type, args...), expr_(expr) {}
+         ASTUnaryExpr(expr, type, args...) {}
    };
 
    /**

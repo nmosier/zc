@@ -12,6 +12,7 @@ namespace zc {
    static Block dead_block;
    
    void Cgen(TranslationUnit *root, std::ostream& os, const char *filename) {
+      
       CgenEnv env;
       root->CodeGen(env);
       
@@ -223,6 +224,26 @@ namespace zc {
       if_end->transitions().vec().push_back(join_transition);
       else_end->transitions().vec().push_back(join_transition);
 
+      return join_block;
+   }
+
+   Block *LoopStat::CodeGen(CgenEnv& env, Block *block) {
+      Label *body_label = new_label("loop_body");
+      Block *body_block = new Block(body_label);
+      BlockTransition *body_trans = new JumpTransition(body_block, Cond::ANY);
+
+      Label *join_label = new_label("loop_join");
+      Block *join_block = new Block(join_label);
+
+      StatInfo *stat_info = new StatInfo(this, body_block, join_block);
+      env.stat_stack().Push(stat_info);
+      
+      block->transitions().vec().push_back(body_trans);
+      auto end_block = body()->CodeGen(env, body_block);
+      end_block->transitions().vec().push_back(body_trans);
+      
+      env.stat_stack().Pop();
+      
       return join_block;
    }
 
@@ -1486,6 +1507,10 @@ namespace zc {
    }
 
    void ForStat::FrameGen(StackFrame& frame) const {
+      body()->FrameGen(frame);
+   }
+
+   void LoopStat::FrameGen(StackFrame& frame) const {
       body()->FrameGen(frame);
    }
 

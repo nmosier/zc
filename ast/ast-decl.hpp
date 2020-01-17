@@ -34,6 +34,9 @@ namespace zc {
 
      /* Code Generation */
       virtual void CodeGen(CgenEnv& env);
+
+      /* Optimization */
+      virtual void ReduceConst() {}
       
    protected:
       Declaration *decl_;
@@ -56,12 +59,17 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override;
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
 
+      /* Semantic Analysis */
       virtual void TypeCheck(SemantEnv& env) override;
       virtual void Enscope(SemantEnv& env) const override;
       virtual void Descope(SemantEnv& env) const override;
 
+      /* Code Generation */
       virtual void CodeGen(CgenEnv& env) override;
       void FrameGen(StackFrame& frame) const;
+
+      /* Optimization */
+      virtual void ReduceConst() override;
       
    protected:
       CompoundStat *comp_stat_;

@@ -23,12 +23,17 @@ namespace zc {
          decls()->Dump(os, level, with_types);
       }
 
+      /* Semantic Analysis */
       void TypeCheck(SemantEnv& env);
       void Enscope(SemantEnv& env) const; void Enscope(CgenEnv& env) const;
       void Descope(SemantEnv& env) const; void Descope(CgenEnv& env) const;
 
+      /* Code Generation */
       void CodeGen(CgenEnv& env);
-      
+
+      /* Optimization */
+      void ReduceConst();
+
    protected:
       ExternalDecls *decls_;
       

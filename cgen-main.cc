@@ -41,6 +41,7 @@ limitations under the License.
 
 #include "ast.hpp"
 #include "cgen.hpp"
+#include "optim.hpp"
 
 // Lexer and parser associated variables
 extern int yy_flex_debug;                // Control Flex debugging (set to 1 to turn on)
@@ -126,6 +127,9 @@ int main(int argc, char *argv[]) {
 
   Semant(g_AST_root);
 
+  /* first optimization pass */
+  OptimizeAST(g_AST_root);
+
   if (zc::g_semant_error.errors() > 0) {
      std::cerr << "Encountered semantic errors, exiting..." << std::endl;
      exit(0);
@@ -148,7 +152,6 @@ int main(int argc, char *argv[]) {
 
   if (out_filename.empty()) {
      g_outpath = std::string("<stdout>");
-     // Semant(g_AST_root);
      Cgen(g_AST_root, std::cout, g_outpath.c_str());
      exit(0);
   } 
