@@ -5,35 +5,42 @@
 namespace zc::z80 {
 
    void Instruction::Emit(std::ostream& os) const {
-      os << "\t" << name() << "\t" << std::endl;
-   }
-
-   void BinaryInstruction::Emit(std::ostream& os) const {
-      os << "\t" << name() << "\t";
-      dst()->Emit(os);
-      os << ",";
-      src()->Emit(os);
+      os << "\t" << name();
+      if (cond_ || !operands_.empty()) {
+         os << "\t";
+      }
+      if (cond_) {
+         cond_->Emit(os);
+      }
+      for (auto it = operands_.begin(), end = operands_.end(); it != end; ++it) {
+         if (it != operands_.begin() || cond_) {
+            os << ",";
+         }
+         (*it)->Emit(os);         
+      }
       os << std::endl;
    }
 
-   void UnaryInstruction::Emit(std::ostream& os) const {
-      os << "\t" << name() << "\t";
-      dst()->Emit(os);
-      os << std::endl;
+   const Value *BinaryInstruction::dst() const { return operands_.front(); }
+   const Value *BinaryInstruction::src() const { return *++operands_.begin(); }
+   const Value *UnaryInstruction::dst() const { return operands_.front(); }
+
+   bool Instruction::Eq(const Instruction *other) const {
+      if (name() != other->name()) {
+         return false;
+      }
+
+      for (auto it = operands_.begin(), other_it = other->operands_.begin(),
+              end = operands_.end(), other_end = other->operands_.end();
+           it != end && other_it != other_end; ++it, ++other_it) {
+         if (!(*it)->Eq(*other_it)) {
+            return false;
+         }
+      }
+
+      return true;
    }
 
-   void JumpCondInstruction::Emit(std::ostream& os) const {
-      os << "\t" << name() << "\t";
-      cond()->Emit(os);
-      os << ",";
-      dst()->Emit(os);
-      os << std::endl;
-   }
-
-   void RetCondInstruction::Emit(std::ostream& os) const {
-      os << "\t" << name() << "\t";
-      cond()->Emit(os);
-      os << std::endl;
-   }
    
+
 }
