@@ -31,7 +31,39 @@ namespace zc {
    template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 
+   /*** VEC TO TUPLE ***/
+   template <class InputIt, typename... Ts>
+   struct vec_to_tupler {
+      template <int I>
+      static void do_it(std::optional<std::tuple<Ts...>>& t, InputIt begin, InputIt end) {
+         if (begin == end) {
+            t = std::nullopt;
+         } else {
+            auto *ptr = dynamic_cast
+               <typename std::remove_reference<decltype(std::get<I-1>(*t))>::type>(*begin);
+            if (ptr) {
+               std::get<I-1>(*t) = ptr;
+               do_it<I-1>(t, ++begin, end);
+            } else {
+               t = std::nullopt;
+            }
+         }
+      }
 
+      template <>
+      static void do_it<0>(std::optional<std::tuple<Ts...>>& t, InputIt begin, InputIt end) {
+         if (begin != end) {
+            t = std::nullopt;
+         }
+      }
+   };
+
+   template <class InputIt, typename... Ts>
+   std::optional<std::tuple<Ts...>> vec_to_tuple(InputIt begin, InputIt end) {
+      std::optional<std::tuple<Ts...>> t;
+      vec_to_tupler<InputIt, Ts...>::template do_it<std::tuple_size<std::tuple<Ts...>>::value>(t, begin, end);
+      return t;
+   }
 }
 
 
