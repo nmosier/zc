@@ -73,16 +73,24 @@ _mymemcpy:
 	ld	ix,-6
 	add	ix,sp
 	ld	sp,ix
+   ;;;;
+   ;; ld hl,(ix+12)
+   ;; ld (ix+0),hl
 	ld	hl,(ix+12)
 	push	hl
 	lea	hl,ix+0
 	pop	de
 	ld	(hl),de
-	ld	hl,(ix+15)
+   ;;;;
+   ;;;;
+   ;; ld hl,(ix+12)
+   ;; ld (ix+3),hl
+ 	ld	hl,(ix+15)
 	push	hl
 	lea	hl,ix+3
 	pop	de
 	ld	(hl),de
+   ;;;;
 	jp	__LABEL_for_cond_5
 __LABEL_for_cond_5:
 	ld	hl,0
