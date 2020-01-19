@@ -6,61 +6,65 @@
 #ifndef __ASM_BASE_HPP
 #define __ASM_BASE_HPP
 
+#include <forward_list>
+
 #include "asm/asm-mem.hpp"
 #include "asm/asm-reg.hpp"
 #include "asm/asm-cond.hpp"
 
 namespace zc::z80 {
 
+   class Value;
+   typedef std::forward_list<const Value *> Values;
+   
    class Instruction {
    public:
-
+      const Values& operands() const { return operands_; }
+      Values& operands() { return operands_; }
+      virtual bool free() const { return false; }
+      
       /**
        * Name of opcode
        */
       const char *name() const { return name_; }
 
-      
-      /** 
-       * Number of cycles required to execute the instruction.
-       */
-      // virtual int cycles() const = 0;
+      void Emit(std::ostream& os) const;
 
-      virtual void Emit(std::ostream& os) const;
-      
-      Instruction(const char *name): name_(name) {}
+      bool Eq(const Instruction *other) const;
 
+      
    protected:
       const char *name_;
-      
+      Values operands_;
+      std::optional<FlagState> cond_;
+
+      Instruction(const char *name): name_(name), operands_(), cond_(std::nullopt) {}
+      Instruction(FlagState cond, const char *name): name_(name), operands_(), cond_(cond) {}
+      Instruction(const Values& operands, const char *name):
+         name_(name), operands_(operands), cond_(std::nullopt) {}
+      Instruction(const Values& operands, FlagState cond, const char *name):
+         name_(name), operands_(operands), cond_(cond) {}
    };
 
    class BinaryInstruction: public Instruction {
    public:
-      const Value *dst() const { return dst_; }
-      const Value *src() const { return src_; }
+      const Value *dst() const;
+      const Value *src() const;
 
-      virtual void Emit(std::ostream& os) const override;
-
+   protected:
       template <typename... Args>
       BinaryInstruction(const Value *dst, const Value *src, Args... args):
-         Instruction(args...), dst_(dst), src_(src) {}
-      
-   protected:
-      const Value *dst_, *src_; 
+         Instruction(Values {dst, src}, args...) {}
    };
 
    class UnaryInstruction: public Instruction {
    public:
-      const Value *dst() const { return dst_; }
+      const Value *dst() const;
 
-      virtual void Emit(std::ostream& os) const override;
-
-      template <typename... Args>
-      UnaryInstruction(const Value *dst, Args... args): Instruction(args...), dst_(dst) {}
-      
    protected:
-      const Value *dst_;
+      template <typename... Args>
+      UnaryInstruction(const Value *dst, Args... args):
+         Instruction(Values {dst}, args...) {}
    };
 
    /***********************
@@ -184,7 +188,7 @@ namespace zc::z80 {
    public:
       const FlagState *cond() const { return cond_; }
       
-      virtual void Emit(std::ostream& os) const override;
+      // virtual void Emit(std::ostream& os) const override;
 
       template <typename... Args>
       JumpCondInstruction(const FlagState *cond, bool state, Args... args):
@@ -282,7 +286,7 @@ namespace zc::z80 {
    public:
       const FlagState *cond() const { return cond_; }
 
-      virtual void Emit(std::ostream& os) const override;
+      // virtual void Emit(std::ostream& os) const override;
       
       template <typename... Args>
       RetCondInstruction(const FlagState *cond, Args... args):
