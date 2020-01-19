@@ -11,8 +11,6 @@
 
 namespace zc::z80 {
 
-
-
    /**********
     * LABELS *
     **********/
@@ -26,6 +24,8 @@ namespace zc::z80 {
 
       void EmitRef(std::ostream& os) const;
       void EmitDef(std::ostream& os) const;
+
+      bool Eq(const Label *other) const { return name() == other->name(); }
 
       Label(const std::string& name): name_(name) {}
 
@@ -47,6 +47,8 @@ namespace zc::z80 {
 
       MemoryLocation *Advance(const intmax_t& offset) const;
       void Emit(std::ostream& os) const;
+
+      bool Eq(const MemoryLocation *other) const;
 
       MemoryLocation(const Value *addr): addr_(addr) {}
       

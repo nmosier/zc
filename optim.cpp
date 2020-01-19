@@ -6,6 +6,10 @@ namespace zc {
    void OptimizeAST(TranslationUnit *root) {
       root->ReduceConst();
    }
+
+   void OptimizeIR(CgenEnv& env) {
+      // TODO
+   }
    
 
    /*** CONSTANTS ***/

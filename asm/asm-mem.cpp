@@ -24,6 +24,10 @@ namespace zc::z80 {
    Label *Label::Prepend(const std::string& prefix) const {
       return new Label(prefix + name());
    }
+
+   bool MemoryLocation::Eq(const MemoryLocation *other) const {
+      return addr()->Eq(other->addr());
+   }
                          
 
 }

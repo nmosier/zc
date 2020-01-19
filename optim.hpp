@@ -6,7 +6,7 @@
 namespace zc {
 
    void OptimizeAST(TranslationUnit *root);
-   
+   void OptimizeIR(CgenEnv& env);
 }
 
 #endif

@@ -26,21 +26,23 @@ namespace zc::z80 {
       typedef const_iterator (*replace_t)
       (const_iterator in_begin, const_iterator in_end, Instructions& out);
       
-      void ReplaceAll() const;
-      const_iterator ReplaceAt(const_iterator begin) const;
+      void ReplaceAll(Instructions& input) const;
+      const_iterator ReplaceAt(Instructions& input, const_iterator begin) const;
 
-      PeepholeOptimization(Instructions& input_instrs, replace_t replace):
-         input_instrs_(input_instrs), replace_(replace) {}
+      PeepholeOptimization(replace_t replace): replace_(replace) {}
       
    protected:
       replace_t replace_;
-      Instructions& input_instrs_;
 
+   public:
       template <class InputIt, class... Ts>
       static std::optional<std::tuple<Ts...>> Cast(InputIt begin, InputIt end) {
          return vec_to_tuple<InputIt, Ts...>(begin, end);
       }
    };
+
+   extern const PeepholeOptimization PH_IndexedLoadStore;
+   
 }
 
 #endif

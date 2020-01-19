@@ -30,17 +30,31 @@ namespace zc::z80 {
          return false;
       }
 
-      for (auto it = operands_.begin(), other_it = other->operands_.begin(),
-              end = operands_.end(), other_end = other->operands_.end();
-           it != end && other_it != other_end; ++it, ++other_it) {
+      auto it = operands_.begin(), other_it = other->operands_.begin(),
+         end = operands_.end(), other_end = other->operands_.end();      
+      for (; it != end && other_it != other_end; ++it, ++other_it) {
          if (!(*it)->Eq(*other_it)) {
             return false;
          }
       }
 
-      return true;
+      return it == end && other_it == other_end;
    }
 
-   
+   bool Instruction::Match(const Instruction *other) const {
+      if (name() != other->name()) {
+         return false;
+      }
+
+      auto it = operands_.begin(), other_it = other->operands_.begin(),
+         end = operands_.end(), other_end = other->operands_.end();      
+      for (; it != end && other_it != other_end; ++it, ++other_it) {
+         if (!(*it)->Match(*other_it)) {
+            return false;
+         }
+      }
+
+      return it == end && other_it == other_end;
+   }
 
 }

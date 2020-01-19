@@ -7,7 +7,7 @@ namespace zc::z80 {
    /*** EMIT ***/
    
    void ImmediateValue::Emit(std::ostream& os) const {
-      os << imm_;
+      os << *imm_;
    }
 
    void LabelValue::Emit(std::ostream& os) const {
@@ -75,7 +75,7 @@ namespace zc::z80 {
    }
 
 
-   ImmediateValue::ImmediateValue(const intmax_t& imm): Value(long_size), imm_(imm) {
+   ImmediateValue::ImmediateValue(const intmax_t& imm): Value_(long_size), imm_(imm) {
       if (imm <= byte_max) {
          size_ = byte_size;
       } else if (imm <= word_max) {
@@ -85,4 +85,53 @@ namespace zc::z80 {
       }
    }
 
+   /*** MATCHING ***/
+   bool Value::Match(const Value *to) const {
+      if (size_ && size() != to->size()) {
+         return false;
+      } else {
+         return Match_(to);
+      }
+   }
+
+   bool ImmediateValue::Match_aux(const ImmediateValue *to) const {
+      if (imm_) {
+         return imm() == to->imm();
+      } else {
+         return true;
+      }
+   }
+
+   bool RegisterValue::Match_aux(const RegisterValue *to) const {
+      if (reg_) {
+         return reg()->Eq(to->reg());
+      } else {
+         return true;
+      }
+   }
+
+   bool IndexedRegisterValue::Match_aux(const IndexedRegisterValue *to) const {
+      if (val_) {
+         if (!val()->Match(to->val())) {
+            return false;
+         }
+      }
+
+      if (index_) {
+         if (index() != to->index()) {
+            return false;
+         }
+      }
+
+      return true;
+   }
+
+   bool MemoryValue::Match_aux(const MemoryValue *to) const {
+      if (loc_) {
+         return loc()->addr()->Match(to->loc()->addr());
+      } else {
+         return true;
+      }
+   }
+   
 }

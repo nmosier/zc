@@ -15,34 +15,29 @@
 namespace zc::z80 {
 
    class Value;
-   typedef std::forward_list<const Value *> Values;
+   typedef std::vector<const Value *> Values;
    
    class Instruction {
    public:
       const Values& operands() const { return operands_; }
       Values& operands() { return operands_; }
-      virtual bool free() const { return false; }
-      
-      /**
-       * Name of opcode
-       */
-      const char *name() const { return name_; }
+      const std::string& name() const { return name_; }
 
       void Emit(std::ostream& os) const;
 
       bool Eq(const Instruction *other) const;
-
+      bool Match(const Instruction *to) const;
       
    protected:
-      const char *name_;
+      std::string name_;
       Values operands_;
       std::optional<FlagState> cond_;
 
-      Instruction(const char *name): name_(name), operands_(), cond_(std::nullopt) {}
-      Instruction(FlagState cond, const char *name): name_(name), operands_(), cond_(cond) {}
-      Instruction(const Values& operands, const char *name):
+      Instruction(const std::string& name): name_(name), operands_(), cond_(std::nullopt) {}
+      Instruction(FlagState cond, const std::string& name): name_(name), operands_(), cond_(cond) {}
+      Instruction(const Values& operands, const std::string& name):
          name_(name), operands_(operands), cond_(std::nullopt) {}
-      Instruction(const Values& operands, FlagState cond, const char *name):
+      Instruction(const Values& operands, FlagState cond, const std::string& name):
          name_(name), operands_(operands), cond_(cond) {}
    };
 
