@@ -1375,7 +1375,7 @@ namespace zc {
       }
 
       /* emit transitions */
-      std::unordered_set<const Block *> dsts;
+      Blocks dsts;
       transitions().DumpAsm(os, dsts, impl);
 
       /* emit destination blocks */
@@ -1384,17 +1384,14 @@ namespace zc {
       }
    }
 
-   void BlockTransitions::DumpAsm(std::ostream& os,
-                                  std::unordered_set<const Block *>& to_emit,
-                                  const FunctionImpl *impl) const {
+   void BlockTransitions::DumpAsm(std::ostream& os, Blocks& to_emit, const FunctionImpl *impl) const
+   {
       for (const BlockTransition *trans : vec()) {
          trans->DumpAsm(os, to_emit, impl);
       }
    }
 
-   void JumpTransition::DumpAsm(std::ostream& os,
-                                std::unordered_set<const Block *>& to_emit,
-                                const FunctionImpl *impl) const {
+   void JumpTransition::DumpAsm(std::ostream& os, Blocks& to_emit, const FunctionImpl *impl) const {
       os << "\tjp\t";
       switch (cond()) {
       case Cond::Z:
@@ -1420,9 +1417,8 @@ namespace zc {
       to_emit.insert(dst());
    }
 
-   void ReturnTransition::DumpAsm(std::ostream& os,
-                                  std::unordered_set<const Block *>& to_emit,
-                                  const FunctionImpl *impl) const {
+   void ReturnTransition::DumpAsm(std::ostream& os, Blocks& to_emit, const FunctionImpl *impl) const
+   {
       os << "\tjp\t";
       switch (cond()) {
       case Cond::Z:

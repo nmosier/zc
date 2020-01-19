@@ -14,6 +14,9 @@ namespace zc {
 
    using namespace zc::z80;
 
+   class Block;
+   typedef std::unordered_set<Block *> Blocks;
+   
    /**
     * Entry point to code generator.
     */
@@ -124,9 +127,7 @@ namespace zc {
       Transitions& vec() { return vec_; }
 
       bool live() const;
-      void DumpAsm(std::ostream& os,
-                   std::unordered_set<const Block *>& emitted_blocks,
-                   const FunctionImpl *impl) const;
+      void DumpAsm(std::ostream& os, Blocks& emitted_blocks, const FunctionImpl *impl) const;
       
       BlockTransitions(const Transitions& vec);
       BlockTransitions(): vec_() {}
@@ -134,6 +135,7 @@ namespace zc {
    protected:
       Transitions vec_;
    };
+
 
    class Block {
    public:
@@ -155,6 +157,8 @@ namespace zc {
                    std::unordered_set<const Block *>& emitted_blocks,
                    const FunctionImpl *impl) const;
       
+
+
       /**
        * Constructor allows direct initialization of instructions vector.
        */
@@ -178,9 +182,7 @@ namespace zc {
    public:
       Cond cond() const { return cond_; }
 
-      virtual void DumpAsm(std::ostream& os,
-                           std::unordered_set<const Block *>& to_emit,
-                           const FunctionImpl *impl) const = 0;
+      virtual void DumpAsm(std::ostream& os, Blocks& to_emit, const FunctionImpl *impl) const = 0;
       
    protected:
       const Cond cond_;
@@ -190,23 +192,21 @@ namespace zc {
 
    class JumpTransition: public BlockTransition {
    public:
-      const Block *dst() const { return dst_; }
+      Block *dst() const { return dst_; }
 
-      virtual void DumpAsm(std::ostream& os,
-                           std::unordered_set<const Block *>& to_emit,
-                           const FunctionImpl *impl) const override;
+      virtual void DumpAsm(std::ostream& os, Blocks& to_emit, const FunctionImpl *impl)
+         const override;
 
       template <typename... Args>
-      JumpTransition(const Block *dst, Args... args): BlockTransition(args...), dst_(dst) {}
+      JumpTransition(Block *dst, Args... args): BlockTransition(args...), dst_(dst) {}
       
    protected:
-      const Block *dst_;
+      Block *dst_;
    };
 
    class ReturnTransition: public BlockTransition {
    public:
-      virtual void DumpAsm(std::ostream& os,
-                           std::unordered_set<const Block *>& to_emit,
+      virtual void DumpAsm(std::ostream& os, Blocks& to_emit,
                            const FunctionImpl *impl) const override;
       
       template <typename... Args>
