@@ -18,8 +18,12 @@ BISON_HDR = $(BISON_SRC:.cpp=.hpp)
 FLEX_SRC = lex.yy.c
 FLEX_OBJ = $(FLEX_SRC:.c=.o)
 
-HDRS = $(AST_HDRS) $(BISON_HDR) cgen.hpp semant.hpp env.hpp
-OBJS = $(AST_OBJS) $(ASM_OBJS) util.o symtab.o semant.o env.o cgen.o optim.o
+TOP_SRCS = cgen.cpp semant.cpp env.cpp symtab.cpp util.cpp optim.cpp peephole.cpp
+TOP_HDRS = $(wildcard *.hpp)
+TOP_OBJS = $(TOP_SRCS:.cpp=.o)
+
+HDRS = $(AST_HDRS) $(BISON_HDR) $(TOP_HDRS)
+OBJS = $(AST_OBJS) $(ASM_OBJS) $(TOP_OBJS)
 
 CLEAN_OBJS = $(shell find . -name "*.o")
 CLEAN_SRCS = $(BISON_SRC) $(FLEX_SRC)
