@@ -1,6 +1,7 @@
 #include <numeric>
 #include <string>
 #include <unordered_set>
+#include <ostream>
 
 #include "ast.hpp"
 #include "asm.hpp"
@@ -19,7 +20,7 @@ namespace zc {
       env.DumpAsm(os);
    }
 
-   FunctionImpl::FunctionImpl(const CgenEnv& env, const Block *entry, const Block *fin):
+   FunctionImpl::FunctionImpl(const CgenEnv& env, Block *entry, Block *fin):
       entry_(entry), fin_(fin), frame_bytes_(env.ext_env().frame().bytes()) {}
       
    BlockTransitions::BlockTransitions(const Transitions& vec): vec_(vec) {
@@ -1101,7 +1102,7 @@ namespace zc {
    }
 
    void emit_nonzero_test(CgenEnv& env, Block *block, int bytes) {
-      Block::InstrVec& instrs = block->instrs();
+      Instructions& instrs = block->instrs();
       
       switch (bytes) {
       case byte_size:
@@ -1117,7 +1118,7 @@ namespace zc {
           * sbc hl,de
           */
          instrs.push_back(new LoadInstruction(new RegisterValue(&r_de),
-                                              new ImmediateValue(0, long_size)));
+                                              new ImmediateValue((intmax_t) 0, long_size)));
          instrs.push_back(new XorInstruction(new RegisterValue(&r_a), new RegisterValue(&r_a)));
          instrs.push_back(new SbcInstruction(new RegisterValue(&r_hl), new RegisterValue(&r_de)));
          break;
@@ -1125,7 +1126,7 @@ namespace zc {
    }
 
    void emit_logical_not(CgenEnv& env, Block *block, int bytes) {
-      Block::InstrVec& instrs = block->instrs();
+      Instructions& instrs = block->instrs();
       
       switch (bytes) {
       case byte_size:
@@ -1157,7 +1158,7 @@ namespace zc {
    }
 
    void emit_booleanize(CgenEnv& env, Block *block, int bytes) {
-      Block::InstrVec& instrs = block->instrs();
+      Instructions& instrs = block->instrs();
 
       switch (bytes) {
       case byte_size:
@@ -1197,7 +1198,7 @@ namespace zc {
    
    Block *emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr,
                      const RegisterValue *long_rhs_reg) {
-      Block::InstrVec& instrs = block->instrs();
+      Instructions& instrs = block->instrs();
       int bytes = expr->type()->bytes();
       int lhs_bytes = expr->lhs()->type()->bytes();
       int rhs_bytes = expr->rhs()->type()->bytes();
@@ -1352,12 +1353,40 @@ namespace zc {
       }
    }
 
+#if 0
    void FunctionImpl::DumpAsm(std::ostream& os) const {
       std::unordered_set<const Block *> emitted_blocks;
       entry()->DumpAsm(os, emitted_blocks, this);
       fin()->DumpAsm(os, emitted_blocks, this);
    }
+#else
+
+   void Block::DumpAsm(const Block *block, std::ostream& os, const FunctionImpl *impl) {
+      /* emit label */
+      block->label()->EmitDef(os);
+      
+      /* emit instructions */
+      for (const Instruction *instr : block->instrs()) {
+         instr->Emit(os);
+      }
+
+      /* emit transitions */
+      for (const BlockTransition *trans : block->transitions().vec()) {
+         trans->DumpAsm(os, impl);
+      }
+   }
    
+   void FunctionImpl::DumpAsm(std::ostream& os) const {
+      Blocks visited;
+
+      void (*fn)(const Block *, std::ostream& os, const FunctionImpl *) = Block::DumpAsm;
+      
+      entry()->for_each_block(visited, fn, os, this);
+      fin()->for_each_block(visited, fn, os, this);      
+   }
+   
+#endif
+#if 0
    void Block::DumpAsm(std::ostream& os,
                        std::unordered_set<const Block *>& emitted_blocks,
                        const FunctionImpl *impl) const {
@@ -1383,15 +1412,18 @@ namespace zc {
          block->DumpAsm(os, emitted_blocks, impl);
       }
    }
+#endif
 
+#if 0
    void BlockTransitions::DumpAsm(std::ostream& os, Blocks& to_emit, const FunctionImpl *impl) const
    {
       for (const BlockTransition *trans : vec()) {
          trans->DumpAsm(os, to_emit, impl);
       }
    }
+#endif
 
-   void JumpTransition::DumpAsm(std::ostream& os, Blocks& to_emit, const FunctionImpl *impl) const {
+   void JumpTransition::DumpAsm(std::ostream& os, const FunctionImpl *impl) const {
       os << "\tjp\t";
       switch (cond()) {
       case Cond::Z:
@@ -1413,11 +1445,9 @@ namespace zc {
       dst()->label()->EmitRef(os);
 
       os << std::endl;
-
-      to_emit.insert(dst());
    }
 
-   void ReturnTransition::DumpAsm(std::ostream& os, Blocks& to_emit, const FunctionImpl *impl) const
+   void ReturnTransition::DumpAsm(std::ostream& os, const FunctionImpl *impl) const
    {
       os << "\tjp\t";
       switch (cond()) {

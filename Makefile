@@ -37,11 +37,13 @@ bison: $(BISON_OBJ)
 
 $(BISON_SRC) $(BISON_HDR): c.ypp $(AST_HDRS)
 	bison $(BISON_FLAGS) $<
+$(BISON_OBJ): $(BISON_SRC)
+	c++ -c $(CXXFLAGS) -o $@ $^
 
 .PHONY: flex
 flex: $(FLEX_OBJ)
 
-$(FLEX_SRC): c.l $(HDRS)
+$(FLEX_SRC): c.l $(AST_HDRS)
 	flex $<
 
 $(FLEX_OBJ): $(FLEX_SRC)
@@ -50,13 +52,13 @@ $(FLEX_OBJ): $(FLEX_SRC)
 asm/%.o: asm/%.cpp $(ASM_HDRS)
 	c++ -c $(CXXFLAGS) -o $@ $<
 
-%.o: %.cpp $(AST_HDRS)
+%.o: %.cpp $(HDRS)
 	c++ -c $(CXXFLAGS) -o $@ $<
 
-%.o: %.cc $(AST_HDRS)
+%.o: %.cc $(HDRS)
 	c++ -c $(CXXFLAGS) -o $@ $<
 
-%.o: %.c $(AST_HDRS)
+%.o: %.c $(HDRS)
 	c++ -c $(CXXFLAGS) -o $@ $<
 
 lexer-main: lexer-main.o $(FLEX_OBJ) $(OBJS)

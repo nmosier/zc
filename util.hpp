@@ -64,6 +64,34 @@ namespace zc {
       vec_to_tupler<InputIt, Ts...>::template do_it<std::tuple_size<std::tuple<Ts...>>::value>(t, begin, end);
       return t;
    }
+
+
+   /*** PORTAL ***/
+   template <typename T>
+   struct portal {
+      void send(const T& val) const {
+         *std::get<T*>(v) = val;
+      }
+
+      const T& get() const {
+         return std::get<T>(v);
+      }
+
+      operator bool() const {
+         return std::holds_alternative<T>(v);
+      }
+
+      const T& operator*() const {
+         return std::get<T>(v);
+      }
+
+      portal(const T& val): v(val) {}
+      portal(T *ptr): v(ptr) {}
+      
+   private:
+      std::variant <T, T*> v;
+   };
+   
 }
 
 

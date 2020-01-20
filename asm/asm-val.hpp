@@ -8,6 +8,7 @@
 #include <ostream>
 
 #include "asm-reg.hpp"
+#include "util.hpp"
 
 namespace zc::z80 {
 
@@ -20,7 +21,7 @@ namespace zc::z80 {
     */
    class Value {
    public:
-      int size() const { return *size_; }
+      int size() const { return size_.get(); }
       virtual const Register *reg() const = 0;
       
       virtual void Emit(std::ostream& os) const = 0;
@@ -31,12 +32,12 @@ namespace zc::z80 {
       bool Match(const Value *to) const;
       
    protected:
-      std::optional<int> size_;
+      portal<int> size_;
 
       virtual bool Eq_(const Value *other) const = 0;
       virtual bool Match_(const Value *to) const = 0;
       
-      Value(std::optional<int> size): size_(size) {}
+      Value(portal<int> size): size_(size) {}
    };
 
    template <class Derived>
@@ -70,12 +71,11 @@ namespace zc::z80 {
       virtual void Emit(std::ostream& os) const override;
       virtual Value *Add(const intmax_t& offset) const override;
       
-      template <typename... Args>
-      ImmediateValue(std::optional<intmax_t> imm, Args... args): imm_(imm), Value_(args...) {}
-      ImmediateValue(const intmax_t& imm);
+      ImmediateValue(portal<intmax_t> imm, portal<int> size): Value_(size), imm_(imm) {}
+      ImmediateValue(const intmax_t& imm); /* infers size */
       
    protected:
-      std::optional<intmax_t> imm_;
+      portal<intmax_t> imm_;
       
       virtual bool Eq_aux(const ImmediateValue *other) const override {
          return imm() == other->imm();
@@ -117,14 +117,11 @@ namespace zc::z80 {
       virtual void Emit(std::ostream& os) const override;
       virtual Value *Add(const intmax_t& offset) const override;
 
-      template <typename... Args>
-      RegisterValue(const Register *reg, Args... args):
-         Value_(args..., reg->size()), reg_(reg) {}
-      RegisterValue(std::optional<int> size): Value_(size), reg_(std::nullopt) {}
-      
+      RegisterValue(const Register *reg): Value_(reg->size()), reg_(reg) {}
+      RegisterValue(const Register **reg_ptr, portal<int> size): Value_(size), reg_(reg_ptr) {}
       
    protected:
-      std::optional<const Register *> reg_;
+      portal<const Register *> reg_;
 
       virtual bool Eq_aux(const RegisterValue *other) const override {
          return reg()->Eq(other->reg());
@@ -144,13 +141,16 @@ namespace zc::z80 {
       virtual void Emit(std::ostream& os) const override;
       virtual Value *Add(const intmax_t& offset) const override;
 
-      template <typename... Args>
-      IndexedRegisterValue(const RegisterValue *val, std::optional<int8_t> index, Args... args):
-         Value_(args..., val->size()), val_(val), index_(index) {}
+      IndexedRegisterValue(const RegisterValue *val, const portal<int8_t>& index):
+         Value_(val->size()), val_(val), index_(index) {}
+      IndexedRegisterValue(const RegisterValue **val, const portal<int8_t>& index,
+                           const portal<int>& size):
+         Value_(size), val_(val), index_(index) {}
+
       
    protected:
-      std::optional<const RegisterValue *> val_;
-      std::optional<int8_t> index_;
+      portal<const RegisterValue *> val_;
+      portal<int8_t> index_;
 
       virtual bool Eq_aux(const IndexedRegisterValue *other) const override {
          return val()->Eq(other->val()) && index() == other->index();
@@ -198,12 +198,11 @@ namespace zc::z80 {
       MemoryValue *Next(int size) const;
       MemoryValue *Prev(int size) const;
       
-      template <typename... Args>
-      MemoryValue(std::optional<const MemoryLocation *> loc, Args... args):
-         Value_(args...), loc_(loc) {}
+      MemoryValue(portal<const MemoryLocation *> loc, portal<int> size):
+         Value_(size), loc_(loc) {}
       
    protected:
-      std::optional<const MemoryLocation *> loc_;
+      portal<const MemoryLocation *> loc_;
 
       virtual bool Eq_aux(const MemoryValue *other) const override {
          return loc()->Eq(other->loc());

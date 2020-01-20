@@ -6,7 +6,7 @@
 #ifndef __ASM_BASE_HPP
 #define __ASM_BASE_HPP
 
-#include <forward_list>
+#include <list>
 
 #include "asm/asm-mem.hpp"
 #include "asm/asm-reg.hpp"
@@ -16,6 +16,9 @@ namespace zc::z80 {
 
    class Value;
    typedef std::vector<const Value *> Values;
+
+   class Instruction;
+   typedef std::list<Instruction *> Instructions;
    
    class Instruction {
    public:

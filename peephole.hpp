@@ -9,8 +9,6 @@
 namespace zc::z80 {
 
    class FreeRegister;
-
-   typedef std::list<Instruction *> Instructions;
    
    class PeepholeOptimization {
       using iterator = Instructions::iterator;

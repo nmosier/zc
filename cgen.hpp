@@ -16,7 +16,7 @@ namespace zc {
 
    class Block;
    typedef std::unordered_set<Block *> Blocks;
-   
+
    /**
     * Entry point to code generator.
     */
@@ -137,12 +137,48 @@ namespace zc {
    };
 
 
+   class BlockTransition {
+   public:
+      Cond cond() const { return cond_; }
+      virtual Block *dst() const = 0;
+
+      virtual void DumpAsm(std::ostream& os, const FunctionImpl *impl) const = 0;
+      
+   protected:
+      const Cond cond_;
+
+      BlockTransition(Cond cond): cond_(cond) {}
+   };
+
+   class JumpTransition: public BlockTransition {
+   public:
+      virtual Block *dst() const override { return dst_; }
+
+      virtual void DumpAsm(std::ostream& os, const FunctionImpl *impl) const override;
+
+      template <typename... Args>
+      JumpTransition(Block *dst, Args... args): BlockTransition(args...), dst_(dst) {}
+      
+   protected:
+      Block *dst_;
+   };
+
+   class ReturnTransition: public BlockTransition {
+   public:
+      virtual Block *dst() const override { return nullptr; }
+      virtual void DumpAsm(std::ostream& os, const FunctionImpl *impl) const override;
+      
+      template <typename... Args>
+      ReturnTransition(Args... args): BlockTransition(args...) {}
+   protected:
+   };
+
+   
    class Block {
    public:
-      typedef std::deque<Instruction *> InstrVec;
       const Label *label() const { return label_; }
-      const InstrVec& instrs() const { return instrs_; }
-      InstrVec& instrs() { return instrs_; }
+      const Instructions& instrs() const { return instrs_; }
+      Instructions& instrs() { return instrs_; }
       const BlockTransitions& transitions() const { return transitions_; }
       BlockTransitions& transitions() { return transitions_; }
 
@@ -156,9 +192,31 @@ namespace zc {
       void DumpAsm(std::ostream& os,
                    std::unordered_set<const Block *>& emitted_blocks,
                    const FunctionImpl *impl) const;
+      static void DumpAsm(const Block *block, std::ostream& os, const FunctionImpl *impl);
+
+      /**
+       * Apply function to each block.
+       * @tparam Func type of functor to apply. `this' is always passed as first argument.
+       * @tparam Args arguments to pass to each invokation
+       * @param func functor to apply to each block
+       * @param args arguments to pass to each invokation
+       */
+      template <typename Func, typename... Args>
+      void for_each_block(Blocks& visited, Func func, Args&&... args) {
+         /* check if visited */
+         if (visited.find(this) != visited.end()) { return; }
+         visited.insert(this);
+
+         /* apply function */
+         func(this, args...);
+
+         /* visit transitions */
+         for (const BlockTransition *trans : transitions().vec()) {
+            if (trans->dst() == nullptr) { continue; }
+            trans->dst()->for_each_block(visited, func, args...);
+         }
+      }
       
-
-
       /**
        * Constructor allows direct initialization of instructions vector.
        */
@@ -173,60 +231,24 @@ namespace zc {
       
    protected:
       const Label *label_;
-      InstrVec instrs_;
+      Instructions instrs_;
       BlockTransitions transitions_;
 
    };
 
-   class BlockTransition {
-   public:
-      Cond cond() const { return cond_; }
-
-      virtual void DumpAsm(std::ostream& os, Blocks& to_emit, const FunctionImpl *impl) const = 0;
-      
-   protected:
-      const Cond cond_;
-
-      BlockTransition(Cond cond): cond_(cond) {}
-   };
-
-   class JumpTransition: public BlockTransition {
-   public:
-      Block *dst() const { return dst_; }
-
-      virtual void DumpAsm(std::ostream& os, Blocks& to_emit, const FunctionImpl *impl)
-         const override;
-
-      template <typename... Args>
-      JumpTransition(Block *dst, Args... args): BlockTransition(args...), dst_(dst) {}
-      
-   protected:
-      Block *dst_;
-   };
-
-   class ReturnTransition: public BlockTransition {
-   public:
-      virtual void DumpAsm(std::ostream& os, Blocks& to_emit,
-                           const FunctionImpl *impl) const override;
-      
-      template <typename... Args>
-      ReturnTransition(Args... args): BlockTransition(args...) {}
-   protected:
-   };
-
    class FunctionImpl {
    public:
-      const Block *entry() const { return entry_; }
-      const Block *fin() const { return fin_; }
+      Block *entry() const { return entry_; }
+      Block *fin() const { return fin_; }
       const LabelValue *addr() const { return addr_; }
       
       void DumpAsm(std::ostream& os) const;
       
-      FunctionImpl(const CgenEnv& env, const Block *entry, const Block *fin);
+      FunctionImpl(const CgenEnv& env, Block *entry, Block *fin);
       
    protected:
-      const Block *entry_;
-      const Block *fin_;
+      Block *entry_;
+      Block *fin_;
       const LabelValue *addr_;
       int frame_bytes_;
    };

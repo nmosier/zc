@@ -90,6 +90,7 @@ namespace zc::z80 {
       if (size_ && size() != to->size()) {
          return false;
       } else {
+         size_.send(to->size());
          return Match_(to);
       }
    }
@@ -98,6 +99,7 @@ namespace zc::z80 {
       if (imm_) {
          return imm() == to->imm();
       } else {
+         imm_.send(to->size());
          return true;
       }
    }
@@ -106,6 +108,7 @@ namespace zc::z80 {
       if (reg_) {
          return reg()->Eq(to->reg());
       } else {
+         reg_.send(to->reg());
          return true;
       }
    }
@@ -115,12 +118,16 @@ namespace zc::z80 {
          if (!val()->Match(to->val())) {
             return false;
          }
+      } else {
+         val_.send(to->val());
       }
 
       if (index_) {
          if (index() != to->index()) {
             return false;
          }
+      } else {
+         index_.send(to->index());
       }
 
       return true;
@@ -130,6 +137,7 @@ namespace zc::z80 {
       if (loc_) {
          return loc()->addr()->Match(to->loc()->addr());
       } else {
+         loc_.send(to->loc());
          return true;
       }
    }
