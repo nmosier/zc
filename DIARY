@@ -155,3 +155,15 @@ structs on [1], [2], [3] share the same unique ID, while [4] has a different uni
          ++i;
          goto loop;
 
+
+01/20/2020
+
+PEEPHOLE OPTIMIZATIONS
+Done
+[X] push hl/de \ pop de/hl -> ex de,hl
+[X] push rr \ pop rr -> (delete)
+[X] lea rr1,ix+* \ pop rr2 \ ld (rr1), rr2 | ld rr2,(rr1) -> pop rr2 \ ld (ix+*),rr2 | ld rr2,(ix+*)
+
+Todo
+[ ] lea rr,ix+* \ push rr -> pea ix+*
+[ ] ld rr,LL \ push rr \ pop iy \ call _indcall -> call LL
