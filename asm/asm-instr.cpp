@@ -16,14 +16,14 @@ namespace zc::z80 {
          if (it != operands_.begin() || cond_) {
             os << ",";
          }
-         (*it)->Emit(os);         
+         (**it)->Emit(os);         
       }
       os << std::endl;
    }
 
-   const Value *BinaryInstruction::dst() const { return operands_.front(); }
-   const Value *BinaryInstruction::src() const { return *++operands_.begin(); }
-   const Value *UnaryInstruction::dst() const { return operands_.front(); }
+   const Value *BinaryInstruction::dst() const { return *operands_.front(); }
+   const Value *BinaryInstruction::src() const { return **++operands_.begin(); }
+   const Value *UnaryInstruction::dst() const { return *operands_.front(); }
 
    bool Instruction::Eq(const Instruction *other) const {
       if (name() != other->name()) {
@@ -33,7 +33,7 @@ namespace zc::z80 {
       auto it = operands_.begin(), other_it = other->operands_.begin(),
          end = operands_.end(), other_end = other->operands_.end();      
       for (; it != end && other_it != other_end; ++it, ++other_it) {
-         if (!(*it)->Eq(*other_it)) {
+         if (!(**it)->Eq(**other_it)) {
             return false;
          }
       }
@@ -49,8 +49,12 @@ namespace zc::z80 {
       auto it = operands_.begin(), other_it = other->operands_.begin(),
          end = operands_.end(), other_end = other->operands_.end();      
       for (; it != end && other_it != other_end; ++it, ++other_it) {
-         if (!(*it)->Match(*other_it)) {
-            return false;
+         if (*it) {
+            if (!(**it)->Match(**other_it)) {
+               return false;
+            }
+         } else {
+            it->send(**other_it);
          }
       }
 

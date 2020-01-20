@@ -7,15 +7,17 @@
 #define __ASM_BASE_HPP
 
 #include <list>
+#include <vector>
 
 #include "asm/asm-mem.hpp"
 #include "asm/asm-reg.hpp"
 #include "asm/asm-cond.hpp"
+#include "util.hpp"
 
 namespace zc::z80 {
 
    class Value;
-   typedef std::vector<const Value *> Values;
+   typedef std::vector<portal<const Value *>> Values;
 
    class Instruction;
    typedef std::list<Instruction *> Instructions;
