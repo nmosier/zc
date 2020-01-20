@@ -117,7 +117,10 @@ namespace zc::z80 {
       virtual void Emit(std::ostream& os) const override;
       virtual Value *Add(const intmax_t& offset) const override;
 
-      RegisterValue(const Register *reg): Value_(reg->size()), reg_(reg) {}
+      RegisterValue(const ByteRegister *reg): Value_(byte_size), reg_(reg) {}
+      RegisterValue(const MultibyteRegister *reg): Value_(long_size), reg_(reg) {}
+      RegisterValue(const Register *reg): Value_(reg->size()), reg_(reg) {}            
+      RegisterValue(const Register *reg, int size): Value_(size), reg_(reg) {}
       RegisterValue(const Register **reg_ptr, portal<int> size): Value_(size), reg_(reg_ptr) {}
       
    protected:
@@ -142,7 +145,7 @@ namespace zc::z80 {
       virtual Value *Add(const intmax_t& offset) const override;
 
       IndexedRegisterValue(const RegisterValue *val, const portal<int8_t>& index):
-         Value_(val->size()), val_(val), index_(index) {}
+         Value_(long_size), val_(val), index_(index) {}
       IndexedRegisterValue(const RegisterValue **val, const portal<int8_t>& index,
                            const portal<int>& size):
          Value_(size), val_(val), index_(index) {}

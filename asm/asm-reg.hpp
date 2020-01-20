@@ -15,9 +15,9 @@ namespace zc::z80 {
    class MultibyteRegister;
    class RegisterValue;
 
-   extern ByteRegister r_a, r_b, r_c, r_d, r_e, r_f, r_h, r_l, r_ixh,
+   extern const ByteRegister r_a, r_b, r_c, r_d, r_e, r_f, r_h, r_l, r_ixh,
       r_ixl, r_iyh, r_iyl;
-   extern MultibyteRegister r_af, r_bc, r_de, r_hl, r_ix, r_iy, r_sp;
+   extern const MultibyteRegister r_af, r_bc, r_de, r_hl, r_ix, r_iy, r_sp;
 
    extern RegisterValue rv_a, rv_b, rv_c, rv_d, rv_e, rv_f, rv_h, rv_l, rv_ixh,
       rv_ixl, rv_iyh, rv_iyl;
@@ -34,9 +34,8 @@ namespace zc::z80 {
    public:
       enum Kind {REG_BYTE, REG_MULTIBYTE};
       virtual Kind kind() const = 0;
-      const std::string& name() const { return name_; }
-      const int size() const { return size_; }
-      virtual bool free() const { return false; }
+      const char *name() const { return name_; }
+      virtual int size() const = 0;
 
       void Emit(std::ostream& os) const { os << name(); }
       virtual void Cast(Block *block, const Register *from) const = 0;
@@ -44,12 +43,11 @@ namespace zc::z80 {
       bool Eq(const Register *other) const;
 
    protected:
-      const std::string name_;
-      int size_;
+      const char *name_;
 
       virtual bool Eq_(const Register *other) const = 0;
 
-      Register(const std::string& name, int size): name_(name), size_(size) {}
+      constexpr Register(const char *name): name_(name) {}
    };
 
    template <class Derived>
@@ -70,11 +68,12 @@ namespace zc::z80 {
    class ByteRegister: public Register_<ByteRegister> {
    public:
       virtual Kind kind() const override { return Kind::REG_BYTE; }
+      virtual int size() const override { return byte_size; }
 
       virtual void Cast(Block *block, const Register *from) const override;
       
       template <typename... Args>
-      ByteRegister(Args... args): Register_(args..., byte_size) {}
+      constexpr ByteRegister(Args... args): Register_(args...) {}
       
    protected:
       virtual bool Eq_aux(const ByteRegister *other) const override { return true; }
@@ -82,19 +81,20 @@ namespace zc::z80 {
 
    class MultibyteRegister: public Register_<MultibyteRegister> {
    public:
+      virtual int size() const override { return long_size; }
       typedef std::array<const ByteRegister *, word_size> ByteRegs;
       virtual Kind kind() const override { return Kind::REG_MULTIBYTE; }
       const ByteRegs& regs() const { return regs_; }
       bool contains(const Register *reg) const;
-
+      
       virtual void Cast(Block *block, const Register *from) const override;
 
 
       template <typename... Args>
-      MultibyteRegister(Args... args): Register_(args..., long_size) {}
+      constexpr MultibyteRegister(Args... args): Register_(args...) {}
       template <typename... Args>
-      MultibyteRegister(const ByteRegs& regs, Args... args):
-         Register_(args..., long_size), regs_(regs) {}
+      constexpr MultibyteRegister(const ByteRegs& regs, Args... args):
+         Register_(args...), regs_(regs) {}
       
    protected:
       const ByteRegs regs_;

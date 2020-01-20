@@ -22,6 +22,20 @@ namespace zc::z80 {
       return new_end;
    }
 
+   void PeepholeOptimization::PassBlock(Block *block,
+                                        const PeepholeOptimization *optim) {
+      Instructions& instrs = block->instrs();
+      optim->ReplaceAll(instrs);
+   }
+
+   void PeepholeOptimization::Pass(FunctionImpl *impl) const {
+      Blocks visited;
+      void (*fn)(Block *block, const PeepholeOptimization *optim) =
+         PeepholeOptimization::PassBlock;
+      impl->entry()->for_each_block(visited, fn, this);
+      impl->fin()->for_each_block(visited, fn, this);
+   }
+
    /*** PEEPHOLE OPTIMIZATION FUNCTIONS ***/
 
    /* Indexed Register Load/Store
@@ -34,51 +48,106 @@ namespace zc::z80 {
                                                             Instructions::const_iterator end,
                                                             Instructions& out) {
       Instructions::const_iterator it = begin;
-      const RegisterValue *rr1;
-      const IndexedRegisterValue *idxval;
 
-      /* instruction 1 */
-      if (it == end) { return begin; }
-      if ((*it)->name() != "lea") { return begin; }
-      rr1 = (const RegisterValue *) (*it)->operands()[0];
-      idxval = (const IndexedRegisterValue *) (*it)->operands()[1];
+      const auto no_match = [&](){ out.clear(); return begin; };
+
+      /* unbound values */
+      const Register *rr1;
+      const Register *rr2;
+      int8_t frame_index;
+      
+      /* instruction 1: lea rr1,ix+* */
+      if (it == end) { return no_match(); }
+      const RegisterValue rr1_1(&rr1, long_size);
+      const IndexedRegisterValue idx_(&rv_ix, &frame_index);
+      const LeaInstruction instr1(&rr1_1, &idx_);
+      if (!instr1.Match(*it)) { return no_match(); }
+      ++it;
+
+      /* instruction 2: pop rr2 */
+      if (it == end) { return no_match(); }
+      const RegisterValue rr2_2(&rr2, long_size);
+      const PopInstruction instr2(&rr2_2);
+      if (!instr2.Match(*it)) { return no_match(); }
+      out.push_back(*it); /* preserve pop instruction */
       ++it;
       
-      /* instruction 2 */
-      if (it == end) { return begin; }
-      if ((*it)->name() != "ld") { return begin; }
-      const MemoryValue *mem_dst = dynamic_cast<const MemoryValue *>((*it)->operands()[0]);
-      const MemoryValue *mem_src = dynamic_cast<const MemoryValue *>((*it)->operands()[1]);
-      if (mem_dst == nullptr && mem_src == nullptr) { return begin; }
+      /* instruction 3: ld (rr1),rr2 | ld rr2,(rr1) */
+      if (it == end) { return no_match(); }
+      const RegisterValue rr1_3(rr1);
+      const MemoryLocation rr1_loc_3(&rr1_3);
+      const MemoryValue rr1_v_3(&rr1_loc_3, long_size);
+      const RegisterValue *rr2_3 = new RegisterValue(rr2);
 
-      bool is_store = (mem_dst != nullptr);
+      const LoadInstruction instr3a(&rr1_v_3, rr2_3);
+      const LoadInstruction instr3b(rr2_3, &rr1_v_3);
+      const MemoryValue *memval = new MemoryValue
+         (new MemoryLocation (new IndexedRegisterValue(&rv_ix, frame_index)), long_size);
       const Value *dst, *src;
-      if (is_store) {
-         /* store */
-         const RegisterValue *reg_dst = dynamic_cast<const RegisterValue *>(mem_dst->loc()->addr());
-         if (reg_dst == nullptr || !rr1->Eq(reg_dst)) { return begin; }
-         src = (*it)->operands()[1];
-      } else {
-         /* load */
-         const RegisterValue *reg_src = dynamic_cast<const RegisterValue *>(mem_src->loc()->addr());
-         if (reg_src == nullptr || !rr1->Eq(reg_src)) { return begin; }
-         dst = (*it)->operands()[0];
-      }
-
-      const MemoryValue *memval = new MemoryValue(new MemoryLocation(idxval),
-                                                  is_store ? (*it)->operands()[1]->size() :
-                                                  (*it)->operands()[0]->size());
-      if (is_store) {
+      if (instr3a.Match(*it)) {
+         /* instruction 3a: ld (rr1),rr2 */
          dst = memval;
-      } else {
+         src = rr2_3;
+      } else if (instr3b.Match(*it)) {
+         /* instruction 3b: ld rr2,(rr1) */
+         dst = rr2_3;
          src = memval;
+      } else {
+         return no_match();
       }
-
+      ++it;
+      
+      /* generate replacement */
       out.push_back(new LoadInstruction(dst, src));
-
-      return ++it;
+      
+      return it;
    }
 
-   const PeepholeOptimization PH_indexed_load_store(peephole_indexed_load_store);
+   Instructions::const_iterator peephole_push_pop(Instructions::const_iterator begin,
+                                                  Instructions::const_iterator end,
+                                                  Instructions& out) {
+      /* push rr1
+       * pop rr2
+       */
+      Instructions::const_iterator it = begin;
+      const auto no_match = [&](){ out.clear(); return begin; };
+
+      /* unbound values */
+      const Register *rr1;
+      const Register *rr2;
+
+      /* instruction 1: push rr1 */
+      if (it == end) { return no_match(); }
+      const RegisterValue rr1_1(&rr1, long_size);
+      const PushInstruction instr1(&rr1_1);
+      if (!instr1.Match(*it)) { return no_match(); }
+      ++it;
+
+      /* instruction 2: pop rr2 */
+      if (it == end) { return no_match(); }
+      const RegisterValue rr2_2(&rr2, long_size);
+      const PopInstruction instr2(&rr2_2);
+      if (!instr2.Match(*it)) { return no_match(); }
+      ++it;
+
+      /* if rr1 == rr2, delete matched sequence */
+      if (rr1->Eq(rr2)) { return it; }
+
+      /* if rr1 == de and rr2 == hl or vice versa, replace with `ex de,hl` */
+      if ((rr1->Eq(&r_de) && rr2->Eq(&r_hl)) ||
+          (rr1->Eq(&r_hl) && rr2->Eq(&r_de))) {
+         out.push_back(new ExInstruction(&rv_de, &rv_hl));
+         return it;
+      }
+
+      return no_match();
+   }
+
+   const std::forward_list<PeepholeOptimization> peephole_optims = 
+      {PeepholeOptimization(peephole_indexed_load_store),
+       PeepholeOptimization(peephole_push_pop)
+      };
+
+   
    
 }

@@ -2,7 +2,9 @@
 #define __PEEPHOLE_HPP
 
 #include <list>
+#include <forward_list>
 
+#include "cgen.hpp"
 #include "asm.hpp"
 #include "util.hpp"
 
@@ -23,7 +25,8 @@ namespace zc::z80 {
        */
       typedef const_iterator (*replace_t)
       (const_iterator in_begin, const_iterator in_end, Instructions& out);
-      
+
+      void Pass(FunctionImpl *impl) const;
       void ReplaceAll(Instructions& input) const;
       const_iterator ReplaceAt(Instructions& input, const_iterator begin) const;
 
@@ -32,6 +35,8 @@ namespace zc::z80 {
    protected:
       replace_t replace_;
 
+      static void PassBlock(Block *block, const PeepholeOptimization *optim);      
+
    public:
       template <class InputIt, class... Ts>
       static std::optional<std::tuple<Ts...>> Cast(InputIt begin, InputIt end) {
@@ -39,8 +44,7 @@ namespace zc::z80 {
       }
    };
 
-   extern const PeepholeOptimization PH_IndexedLoadStore;
-   
+   extern const std::forward_list<PeepholeOptimization> peephole_optims;
 }
 
 #endif

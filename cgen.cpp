@@ -5,7 +5,7 @@
 
 #include "ast.hpp"
 #include "asm.hpp"
-
+#include "optim.hpp"
 #include "cgen.hpp"
 
 namespace zc {
@@ -16,7 +16,8 @@ namespace zc {
       
       CgenEnv env;
       root->CodeGen(env);
-      
+
+      OptimizeIR(env);
       env.DumpAsm(os);
    }
 

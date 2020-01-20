@@ -82,5 +82,6 @@ LANGUAGE FEATURES
 [X] add struct access semantics
 [ ] some id's ARE constant expressions, e.g. when they are enums
 
-BUGS
-[ ] distinguishing between tagged types declared at different scopes
+OPTIMIZATION
+[ ] Constant propogation
+[ ] Dead code elimination

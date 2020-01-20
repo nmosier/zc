@@ -87,23 +87,25 @@ namespace zc::z80 {
 
    /*** MATCHING ***/
    bool Value::Match(const Value *to) const {
-      if (size_ && size() != to->size()) {
-         return false;
+      if (size_) {
+         if (size() != to->size()) {
+            return false;
+         }
       } else {
          size_.send(to->size());
-         return Match_(to);
       }
+      return Match_(to);
    }
-
+   
    bool ImmediateValue::Match_aux(const ImmediateValue *to) const {
       if (imm_) {
          return imm() == to->imm();
       } else {
          imm_.send(to->size());
-         return true;
+      return true;
       }
    }
-
+   
    bool RegisterValue::Match_aux(const RegisterValue *to) const {
       if (reg_) {
          return reg()->Eq(to->reg());

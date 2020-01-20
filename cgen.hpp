@@ -189,9 +189,6 @@ namespace zc {
        * @param os output stream
        * @param emitted_blocks set of blocks that have already been emitted (to avoid duplication).
        */
-      void DumpAsm(std::ostream& os,
-                   std::unordered_set<const Block *>& emitted_blocks,
-                   const FunctionImpl *impl) const;
       static void DumpAsm(const Block *block, std::ostream& os, const FunctionImpl *impl);
 
       /**
