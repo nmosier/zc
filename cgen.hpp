@@ -240,7 +240,7 @@ namespace zc {
       const LabelValue *addr() const { return addr_; }
       
       void DumpAsm(std::ostream& os) const;
-      
+
       FunctionImpl(const CgenEnv& env, Block *entry, Block *fin);
       
    protected:

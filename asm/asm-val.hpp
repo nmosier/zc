@@ -40,6 +40,29 @@ namespace zc::z80 {
       Value(portal<int> size): size_(size) {}
    };
 
+   /**
+    * Abstract value that hasn't been assigned a storage class.
+    */
+   class AbstractValue: public Value {
+   public:
+      int id() const { return id_; }
+      virtual const Register *reg() const override { return nullptr; }
+      virtual void Emit(std::ostream& os) const override;
+      virtual Value *Add(const intmax_t& offset) const override
+      { throw std::logic_error("attempted to add to abstract value"); }
+
+      AbstractValue(int size): Value(size), id_(id_counter_++) {}
+      
+   protected:
+      int id_;
+      static int id_counter_;
+
+      virtual bool Eq_(const Value *other) const override
+      { throw std::logic_error("attempted to check equality of abstract value"); }
+      virtual bool Match_(const Value *to) const override
+      { throw std::logic_error("attempted to match abstract value"); }
+   };
+
    template <class Derived>
    class Value_: public Value {
    protected:

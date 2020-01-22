@@ -4,6 +4,8 @@
 
 namespace zc::z80 {
 
+   int AbstractValue::id_counter_ = 0;
+
    /*** EMIT ***/
    
    void ImmediateValue::Emit(std::ostream& os) const {

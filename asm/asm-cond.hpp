@@ -36,6 +36,17 @@ namespace zc::z80 {
       const bool state_;
    };
 
+   /**
+    * Flag modification modes.
+    */
+   enum class FlagMod
+      {NONE,   /*!< flag not modified */
+       DEF,    /*!< flag modified as defined */
+       RES,    /*!< flag reset */
+       SET,    /*!< flag set */
+       EXCEPT, /*!< flag exceptional */
+      };
+
    extern Flag ZF, CF;
 }
 

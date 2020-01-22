@@ -27,6 +27,7 @@ namespace zc::z80 {
       const Values& operands() const { return operands_; }
       Values& operands() { return operands_; }
       const std::string& name() const { return name_; }
+      FlagMod flagmod(const Flag& flag) const;
 
       void Emit(std::ostream& os) const;
 
