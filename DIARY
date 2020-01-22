@@ -155,8 +155,56 @@ structs on [1], [2], [3] share the same unique ID, while [4] has a different uni
          ++i;
          goto loop;
 
+01/17/2020
+Didn't work much on compiler -- was reading papers as a post-interview 'homework assignment' for University of Michigan (had to send a very specific research question after reading 20 or so papers).
+
+01/18/2020
+Read more papers and brainstormed for my research question to send to U Mich professor (Daniel Genkin).
+[2 hr] Tried to write code for peephole optimization; ended up revising it later. It is challenging to find a good way to represent instructions patterns vs. instruction instances. For example,
+       one peephole optimization that I would like to implement is to replace
+       ```
+       lea rr1,ix+*
+       pop rr2
+       ld (rr1),rr2
+       ```
+       with
+       ```
+       pop rr2
+       ld (ix+*),rr2
+       ```
+       (The asterisk '*' represents a particular 8-bit signed integer; 'rr1' and 'rr2' represent two distinct multibyte registers.)
+       Two instances of this instruction pattern might be
+       ```
+       lea hl,ix+3
+       pop de
+       ld (hl),de
+       ```
+       and
+       ```
+       pop de
+       ld (ix+3),de
+       ```
+       To make instruction pattern matching more challenging, instruction operands are not represented as a flat hierarchy; more complex operands contain suboperands.
+       The basic kinds of operands (or `Value`, as the class is named in `asm/asm-val.hpp`) are immediate values (`ImmediateValue`), register values (`RegisterValue`), and label values (`LabelValue`).
+       The complex operands are indexed register values (`IndexedRegisterValue`), which contain a register value and 8-bit index; and memory values (`MemoryValue`), which have an address that is in turn
+       a kind of value. In the above example, `(ix+3)` is a memory value whose address is an indexed register value, whose base value is the register value `ix`.
+
+       Pattern matching complex values becomes non-trivial: the most obvious approach would be to `dynamic_cast` each operand to the derived class that the peephole optimization requires it to be, and if
+       the downcast fails, move on to the next window. Otherwise, downcast any children contained within the operand (if it is a complex operand), until all required operands are verified.
+       Any free registers (e.g. the first occurrence of `rr1` in the above example) are bound to whatever register is found in the instruction instance, and further references to `rr1` must be replaced
+       with the matched register.
+       The logic for this approach becomes exceedingly complex, however: my original implementation for the aforementioned peephole optimization took at least 100 lines (but it worked).
+
+01/19/2020
+[2 hrs] More work on peephole optimization. Made a couple attempts that I later discarded.
 
 01/20/2020
+[5 hrs] Finally came up with an infrastructure for peephole optimization that I found satisfactory (and slightly beautiful). First, I created a new templated container type called a `zc::portal` (I know; it's a stupid name -- I just didn't want to spend any more time on what to name it...). It behaves much like `std::optional`, however instead of containing a value `T val` or nothing, a `zc::portal` contains a value `T val` or a pointer to a value `T *ptr`. I then wrapped all existing member fields of the `Value` class and all of its derived classes with the `zc::portal` container. This effectively allowed for the possibility of creating _instruction patterns_. Regular instructions would still be constructed with direct values (e.g. an `ImmediateValue`'s `zc::portal<intmax_t> imm_` field would contain an `intmax_t` integer. Instruction patterns, in contrast, would be constructed with value pointers, which tell any matching function _where_ to store the corresponding matched value.
+For example, to encode the instruction operand `ix+3`, one would write `IndexedRegisterValue(rv_ix, 3)`. In contrast, to encode the instruction pattern `ix+*`, one would write `IndexedRegisterValue(rv_ix, &index)`.
+
+Next, I wrote an instruction matching function `Instruction::Match`, which matches instruction patterns to concrete instructions. Two instructions match iff they are of the same type (e.g. both are a `ld` instruction) and have matching operands. Two operands match iff (1) they are of the same type (e.g. both are `IndexedRegisterValue`s) and (2) their members match. Their members match iff (i) the pattern's member is a pointer, in which case the instance's member value is assigned through that pointer, or (ii) the pattern's member is a direct value and is equal to the instance's member.
+
+This made the instruction pattern matching required for peephole optimizations an order of magnitude easier, since now I don't have to traverse the operand hierarchy to extract a single register value, e.g.
 
 PEEPHOLE OPTIMIZATIONS
 Done
