@@ -2,6 +2,7 @@
 #include "ast.hpp"
 #include "cgen.hpp"
 #include "peephole.hpp"
+#include "ralloc.hpp"
 
 namespace zc {
 
@@ -10,6 +11,9 @@ namespace zc {
    }
 
    void OptimizeIR(CgenEnv& env) {
+      /* pass 0: register allocation */
+      RegisterAllocator::Ralloc(env);
+      
       /* pass 1: peephole optimization */
       for (FunctionImpl& impl : env.impls().impls()) {
          for (const PeepholeOptimization& optim : peephole_optims) {

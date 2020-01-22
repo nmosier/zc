@@ -21,9 +21,11 @@ namespace zc::z80 {
       os << std::endl;
    }
 
+#if 0
    const Value *BinaryInstruction::dst() const { return *operands_.front(); }
    const Value *BinaryInstruction::src() const { return **++operands_.begin(); }
    const Value *UnaryInstruction::dst() const { return *operands_.front(); }
+#endif
 
    bool Instruction::Eq(const Instruction *other) const {
       if (name() != other->name()) {

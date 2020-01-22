@@ -1,0 +1,71 @@
+R: number of registers
+registers: set of registers
+
+`zc_ralloc()`
+   active <- {}
+   for each live interval `i`, in order of increasing start point
+       `expire_old_intervals(i)`
+       if `length(active) = R` then
+          `spill_at_interval(i)`
+       else if \E `reg` in `registers` such that `i` in `free(reg)` then
+          loc(i) <- reg
+          free(reg) <- free(reg) \ i
+       else
+          spill_at_interval(i)
+
+expire_old_intervals(i)
+
+
+ZC Register Allocation (zc_ralloc)
+1. Find variable lifetimes, splitting at variable uses (VARS).
+2. Find register free intervals (REGS).
+3. STACK_SPILLED <- {}; FRAME_SPILLED <- {}
+4. For each variable v in VARS, in decreasing order WRT interval(v)
+4a.  if there exists a register r such that interval(v) is in free(r), then assign_register(v, r)
+4b.  else spill(v)
+5. (Done)
+
+variable_lifetimes()
+# Compute variable lifetimes into VARS.
+1. For each instruction instr,
+1a.  If dst(instr) is not a variable, continue
+1b.  If dst(instr) is in VARS,
+1bi.   If dst(instr) has _begin_ set in VARS,
+          end (VARS[dst(instr)]) <- instr
+          rename dst(instr) in VARS
+          add dst(instr) to vars
+          begin(dst(instr)) <- instr
+1bj,  ...
+
+spill(variable v)
+# Spill a single variable.
+1. If is_stack_spillable(v), then stack_spill(v)
+2. Else frame_spill(v)
+
+is_stack_spillable(variable v)
+# Determine whether variable can be spilled onto the stack.
+1. If v is multibyte value, return false
+1. If |STACK_SPILLED(begin(v))| = |STACK_SPILLED(end(v))| = 0, return true
+2. Return false
+
+stack_spill(variable v)
+# Spill variable onto stack (preffered spilling method).
+1. STACK_SPILLED <- STACK_SPILLED ++ v
+
+frame_spill(variable v)
+# Spill variable into frame (last resort).
+1. FRAME_SPILLED <- FRAME_SPILLED + v
+2. Assign v location in frame. (TODO?)
+
+assign_register(variable v, register r)
+# Assign register r to variable v.
+1. reg(v) <- r
+2. REGS <- REGS ++ {r, interval(v)}
+
+ASSUMPTIONS: Only one variable will ever be used in an instruction. (e.g. add hl,i1, ld i1,i2, etc.)
+REQUIRE: Variable only has one continuous lifetime interval; if variable is used multiple times, then split
+         into multiple variables, each with continuous lifetime interval and used once, and insert
+         assign instructions between variables.
+
+ld i2,hl
+ld hl,i1

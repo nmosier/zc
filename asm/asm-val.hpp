@@ -16,13 +16,17 @@ namespace zc::z80 {
     * VALUES *
     **********/
 
+   class VariableValue;
+   
    /**
     * Base class for values during code generation.
     */
    class Value {
    public:
       int size() const { return size_.get(); }
-      virtual const Register *reg() const = 0;
+      virtual const Register *reg() const { return nullptr; }
+      virtual const VariableValue *var() const { return nullptr; }
+      virtual const Value **varptr(const Value **hint) const { return nullptr; }
       
       virtual void Emit(std::ostream& os) const = 0;
       virtual Value *Add(const intmax_t& offset) const = 0;
@@ -38,29 +42,6 @@ namespace zc::z80 {
       virtual bool Match_(const Value *to) const = 0;
       
       Value(portal<int> size): size_(size) {}
-   };
-
-   /**
-    * Abstract value that hasn't been assigned a storage class.
-    */
-   class AbstractValue: public Value {
-   public:
-      int id() const { return id_; }
-      virtual const Register *reg() const override { return nullptr; }
-      virtual void Emit(std::ostream& os) const override;
-      virtual Value *Add(const intmax_t& offset) const override
-      { throw std::logic_error("attempted to add to abstract value"); }
-
-      AbstractValue(int size): Value(size), id_(id_counter_++) {}
-      
-   protected:
-      int id_;
-      static int id_counter_;
-
-      virtual bool Eq_(const Value *other) const override
-      { throw std::logic_error("attempted to check equality of abstract value"); }
-      virtual bool Match_(const Value *to) const override
-      { throw std::logic_error("attempted to match abstract value"); }
    };
 
    template <class Derived>
@@ -84,12 +65,33 @@ namespace zc::z80 {
    };
 
    /**
+    * Variable that hasn't been assigned a storage class.
+    */
+   class VariableValue: public Value_<VariableValue> {
+   public:
+      int id() const { return id_; }
+      virtual const VariableValue *var() const override { return this; }
+      virtual const Value **varptr(const Value **hint) const override { return hint; }
+      virtual void Emit(std::ostream& os) const override;
+      virtual Value *Add(const intmax_t& offset) const override
+      { throw std::logic_error("attempted to add to abstract value"); }
+
+      VariableValue(int size): Value_(size), id_(id_counter_++) {}
+      
+   protected:
+      int id_;
+      static int id_counter_;
+
+      virtual bool Eq_aux(const VariableValue *other) const override { return id() == other->id(); }
+      virtual bool Match_aux(const VariableValue *to) const override { return Eq_aux(to); }
+   };
+
+   /**
     * Class representing immediate value.
     */
    class ImmediateValue: public Value_<ImmediateValue> {
    public:
       const intmax_t& imm() const { return *imm_; }
-      virtual const Register *reg() const override { return nullptr; }
       
       virtual void Emit(std::ostream& os) const override;
       virtual Value *Add(const intmax_t& offset) const override;
@@ -112,7 +114,6 @@ namespace zc::z80 {
    class LabelValue: public Value_<LabelValue> {
    public:
       const Label *label() const { return label_; }
-      virtual const Register *reg() const override { return nullptr; }      
 
       virtual void Emit(std::ostream& os) const override;
       virtual Value *Add(const intmax_t& offset) const override;
@@ -162,7 +163,7 @@ namespace zc::z80 {
    public:
       const RegisterValue *val() const { return *val_; }
       int8_t index() const { return *index_; }
-      virtual const Register *reg() const override { return val()->reg(); }      
+      virtual const Register *reg() const override { return val()->reg(); }
       
       virtual void Emit(std::ostream& os) const override;
       virtual Value *Add(const intmax_t& offset) const override;
@@ -217,6 +218,9 @@ namespace zc::z80 {
    public:
       const MemoryLocation *loc() const { return *loc_; }
       virtual const Register *reg() const override {return loc()->addr()->reg(); }
+      virtual const VariableValue *var() const override { return loc()->addr()->var(); }
+      //virtual const Value **varptr(const Value **hint) const override { return &loc()->addr_; }
+      /* TODO */
       
       virtual void Emit(std::ostream& os) const override;
       virtual Value *Add(const intmax_t& offset) const override;

@@ -24,6 +24,8 @@ namespace zc::z80 {
    
    class Instruction {
    public:
+      const Value *dst() const { return (operands().size() >= 1) ? *operands().front() : nullptr; }
+      const Value *src() const { return (operands().size() >= 2) ? **++operands().begin() : nullptr; }
       const Values& operands() const { return operands_; }
       Values& operands() { return operands_; }
       const std::string& name() const { return name_; }
@@ -49,8 +51,6 @@ namespace zc::z80 {
 
    class BinaryInstruction: public Instruction {
    public:
-      const Value *dst() const;
-      const Value *src() const;
 
    protected:
       template <typename... Args>
@@ -60,7 +60,7 @@ namespace zc::z80 {
 
    class UnaryInstruction: public Instruction {
    public:
-      const Value *dst() const;
+      // const Value *dst() const;
 
    protected:
       template <typename... Args>

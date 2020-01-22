@@ -42,6 +42,8 @@ namespace zc::z80 {
 
       bool Eq(const Register *other) const;
 
+      void Dump(std::ostream& os) const { os << name(); }
+
    protected:
       const char *name_;
 

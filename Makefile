@@ -18,7 +18,7 @@ BISON_HDR = $(BISON_SRC:.cpp=.hpp)
 FLEX_SRC = lex.yy.c
 FLEX_OBJ = $(FLEX_SRC:.c=.o)
 
-TOP_SRCS = cgen.cpp semant.cpp env.cpp symtab.cpp util.cpp optim.cpp peephole.cpp
+TOP_SRCS = cgen.cpp semant.cpp env.cpp symtab.cpp util.cpp optim.cpp peephole.cpp ralloc.cpp
 TOP_HDRS = $(wildcard *.hpp)
 TOP_OBJS = $(TOP_SRCS:.cpp=.o)
 
