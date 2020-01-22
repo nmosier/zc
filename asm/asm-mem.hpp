@@ -37,6 +37,7 @@ namespace zc::z80 {
     * MEMORY LOCATION *
     *******************/
 
+#if 0
    class Value;
    /**
     * Base class representing a memory location.
@@ -55,6 +56,9 @@ namespace zc::z80 {
    protected:
       const Value *addr_;
    };
+#endif
+
+   
 }
 
 #endif

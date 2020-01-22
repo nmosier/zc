@@ -26,7 +26,6 @@ namespace zc::z80 {
       int size() const { return size_.get(); }
       virtual const Register *reg() const { return nullptr; }
       virtual const VariableValue *var() const { return nullptr; }
-      virtual const Value **varptr(const Value **hint) const { return nullptr; }
       
       virtual void Emit(std::ostream& os) const = 0;
       virtual Value *Add(const intmax_t& offset) const = 0;
@@ -71,7 +70,7 @@ namespace zc::z80 {
    public:
       int id() const { return id_; }
       virtual const VariableValue *var() const override { return this; }
-      virtual const Value **varptr(const Value **hint) const override { return hint; }
+
       virtual void Emit(std::ostream& os) const override;
       virtual Value *Add(const intmax_t& offset) const override
       { throw std::logic_error("attempted to add to abstract value"); }
@@ -216,11 +215,9 @@ namespace zc::z80 {
     */
    class MemoryValue: public Value_<MemoryValue> {
    public:
-      const MemoryLocation *loc() const { return *loc_; }
-      virtual const Register *reg() const override {return loc()->addr()->reg(); }
-      virtual const VariableValue *var() const override { return loc()->addr()->var(); }
-      //virtual const Value **varptr(const Value **hint) const override { return &loc()->addr_; }
-      /* TODO */
+      const Value *addr() const { return *addr_; }
+      virtual const Register *reg() const override {return addr()->reg(); }
+      virtual const VariableValue *var() const override { return addr()->var(); }
       
       virtual void Emit(std::ostream& os) const override;
       virtual Value *Add(const intmax_t& offset) const override;
@@ -228,14 +225,14 @@ namespace zc::z80 {
       MemoryValue *Next(int size) const;
       MemoryValue *Prev(int size) const;
       
-      MemoryValue(portal<const MemoryLocation *> loc, portal<int> size):
-         Value_(size), loc_(loc) {}
+      MemoryValue(portal<const Value *> addr, portal<int> size):
+         Value_(size), addr_(addr) {}
       
    protected:
-      portal<const MemoryLocation *> loc_;
+      portal<const Value *> addr_;
 
       virtual bool Eq_aux(const MemoryValue *other) const override {
-         return loc()->Eq(other->loc());
+         return addr()->Eq(other->addr());
       }
       virtual bool Match_aux(const MemoryValue *to) const override;
    };

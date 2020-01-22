@@ -75,14 +75,13 @@ namespace zc::z80 {
       /* instruction 3: ld (rr1),rr2 | ld rr2,(rr1) */
       if (it == end) { return no_match(); }
       const RegisterValue rr1_3(rr1);
-      const MemoryLocation rr1_loc_3(&rr1_3);
-      const MemoryValue rr1_v_3(&rr1_loc_3, long_size);
+      const MemoryValue rr1_v_3(&rr1_3, long_size);
       const RegisterValue *rr2_3 = new RegisterValue(rr2);
 
       const LoadInstruction instr3a(&rr1_v_3, rr2_3);
       const LoadInstruction instr3b(rr2_3, &rr1_v_3);
       const MemoryValue *memval = new MemoryValue
-         (new MemoryLocation (new IndexedRegisterValue(&rv_ix, frame_index)), long_size);
+         (new IndexedRegisterValue(&rv_ix, frame_index), long_size);
       const Value *dst, *src;
       if (instr3a.Match(*it)) {
          /* instruction 3a: ld (rr1),rr2 */

@@ -13,10 +13,6 @@ namespace zc::z80 {
       os << ":" << std::endl;
    }
 
-   void MemoryLocation::Emit(std::ostream& os) const {
-      addr()->Emit(os);
-   }
-
    Label *Label::Append(const std::string& suffix) const {
       return new Label(name() + suffix);
    }
@@ -25,9 +21,5 @@ namespace zc::z80 {
       return new Label(prefix + name());
    }
 
-   bool MemoryLocation::Eq(const MemoryLocation *other) const {
-      return addr()->Eq(other->addr());
-   }
-                         
 
 }

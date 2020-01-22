@@ -69,21 +69,15 @@ namespace zc {
    /*** PORTAL ***/
    template <typename T>
    struct portal {
-      void send(const T& val) const {
-         *std::get<T*>(v) = val;
-      }
+      void send(const T& val) const { *std::get<T*>(v) = val; }
 
-      const T& get() const {
-         return std::get<T>(v);
-      }
+      T& get() { return std::get<T>(v); }
+      const T& get() const { return std::get<T>(v); }
 
-      operator bool() const {
-         return std::holds_alternative<T>(v);
-      }
-
-      const T& operator*() const {
-         return std::get<T>(v);
-      }
+      operator bool() const { return std::holds_alternative<T>(v); }
+      
+      T& operator*() { return std::get<T>(v); }
+      const T& operator*() const { return std::get<T>(v); }
 
       portal(const T& val): v(val) {}
       portal(T *ptr): v(ptr) {}

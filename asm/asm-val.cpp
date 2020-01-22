@@ -34,7 +34,7 @@ namespace zc::z80 {
 
    void MemoryValue::Emit(std::ostream& os) const {
       os << "(";
-      loc()->Emit(os);
+      addr()->Emit(os);
       os << ")";
    }
 
@@ -64,16 +64,12 @@ namespace zc::z80 {
       throw std::logic_error("attempted to offset a memory value");
    }
 
-   MemoryLocation *MemoryLocation::Advance(const intmax_t& offset) const {
-      return new MemoryLocation(addr()->Add(offset));
-   }
-      
    MemoryValue *MemoryValue::Next(int next_size) const {
-      return new MemoryValue(loc()->Advance(size()), next_size);
+      return new MemoryValue(addr()->Add(size()), next_size);
    }
 
    MemoryValue *MemoryValue::Prev(int next_size) const {
-      return new MemoryValue(loc()->Advance(-next_size), next_size);
+      return new MemoryValue(addr()->Add(-next_size), next_size);
    }
 
 
@@ -138,10 +134,10 @@ namespace zc::z80 {
    }
 
    bool MemoryValue::Match_aux(const MemoryValue *to) const {
-      if (loc_) {
-         return loc()->addr()->Match(to->loc()->addr());
+      if (addr_) {
+         return addr()->Match(to->addr());
       } else {
-         loc_.send(to->loc());
+         addr_.send(to->addr());
          return true;
       }
    }

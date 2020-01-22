@@ -57,9 +57,7 @@ namespace zc {
             addr_ = val_ = label_val;
       } else {
          addr_ = label_val;
-
-         MemoryLocation *mem_loc = new MemoryLocation(label_val);
-         val_ = new MemoryValue(mem_loc, type->bytes());
+         val_ = new MemoryValue(label_val, type->bytes());
       }
    }
 
@@ -68,9 +66,7 @@ namespace zc {
           decl->type()->kind() == ASTType::Kind::TYPE_ARRAY) {
          val_ = addr;
       } else {
-         auto loc = new MemoryLocation(addr);
-         auto val = new MemoryValue(loc, decl->bytes());
-         val_ = val;
+         val_ = new MemoryValue(addr, decl->bytes());
       }
    }
    
@@ -378,10 +374,8 @@ namespace zc {
          block->instrs().push_back
             (new LoadInstruction
              (new MemoryValue
-              (new MemoryLocation
-               (new RegisterValue
-                (&r_hl)
-                ),
+              (new RegisterValue
+               (&r_hl),
                byte_size
                ),
               new RegisterValue
@@ -397,10 +391,8 @@ namespace zc {
          block->instrs().push_back
             (new LoadInstruction
              (new MemoryValue
-              (new MemoryLocation
-               (new RegisterValue
-                (&r_hl)
-                ),
+              (new RegisterValue
+               (&r_hl),
                long_size
                ),
               new RegisterValue
@@ -432,20 +424,12 @@ namespace zc {
             switch (bytes) {
             case byte_size:
                block->instrs().push_back
-                  (new LoadInstruction
-                   (&rv_a,
-                    new MemoryValue
-                    (new MemoryLocation(&rv_hl),
-                     byte_size)));
+                  (new LoadInstruction(&rv_a, new MemoryValue(&rv_hl, byte_size)));
                break;
             case word_size: abort();
             case long_size:
                block->instrs().push_back
-                  (new LoadInstruction
-                   (&rv_hl,
-                    new MemoryValue
-                    (new MemoryLocation(&rv_hl),
-                     long_size)));
+                  (new LoadInstruction (&rv_hl, new MemoryValue (&rv_hl, long_size)));
                break;
             }
             break;
@@ -504,7 +488,7 @@ namespace zc {
       case Kind::UOP_DEC_PRE:
          {
             block = expr()->CodeGen(env, block, ExprKind::EXPR_LVALUE);
-            MemoryValue *memval = new MemoryValue(new MemoryLocation(&rv_hl), bytes);
+            MemoryValue *memval = new MemoryValue(&rv_hl, bytes);
             bool inc = kind() == Kind::UOP_INC_PRE;
             
             switch (bytes) {
@@ -541,7 +525,7 @@ namespace zc {
          {
             bool inc = kind() == Kind::UOP_INC_POST;            
             block = expr()->CodeGen(env, block, ExprKind::EXPR_LVALUE);
-            MemoryValue *memval = new MemoryValue(new MemoryLocation(&rv_hl), bytes);
+            MemoryValue *memval = new MemoryValue(&rv_hl, bytes);
 
             switch (bytes) {
             case byte_size:
@@ -1026,8 +1010,7 @@ namespace zc {
                abort();
             }
          
-            auto memloc = new MemoryLocation(dst);
-            auto memval = new MemoryValue(memloc, type()->bytes());
+            auto memval = new MemoryValue(dst, type()->bytes());
             block->instrs().push_back(new LoadInstruction(&rv_hl, memval));
          }
          break;
@@ -1068,7 +1051,7 @@ namespace zc {
          
       case ExprKind::EXPR_RVALUE:
          {
-            MemoryValue *val = new MemoryValue(new MemoryLocation(&rv_hl), type()->bytes());
+            MemoryValue *val = new MemoryValue(&rv_hl, type()->bytes());
             block->instrs().push_back(new LoadInstruction
                                       (new RegisterValue(return_register(type()->bytes())), val));
          }

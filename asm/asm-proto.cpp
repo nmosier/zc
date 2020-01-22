@@ -3,9 +3,8 @@
 namespace zc::z80 {
 
    static const RegisterValue FP_register_value(&r_ix);
-   const MemoryLocation FP_loc(&FP_register_value);
-   const MemoryValue FP_memval(&FP_loc, long_size); /* NOTE: long size because it'll store
-                                                     * the return address. */
+   const MemoryValue FP_memval(&FP_register_value, long_size); /* NOTE: long size because it'll store
+                                                                * the return address. */
    const IndexedRegisterValue FP_idxval(&rv_ix, (int8_t) 0);
   
 }
