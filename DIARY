@@ -204,7 +204,14 @@ For example, to encode the instruction operand `ix+3`, one would write `IndexedR
 
 Next, I wrote an instruction matching function `Instruction::Match`, which matches instruction patterns to concrete instructions. Two instructions match iff they are of the same type (e.g. both are a `ld` instruction) and have matching operands. Two operands match iff (1) they are of the same type (e.g. both are `IndexedRegisterValue`s) and (2) their members match. Their members match iff (i) the pattern's member is a pointer, in which case the instance's member value is assigned through that pointer, or (ii) the pattern's member is a direct value and is equal to the instance's member.
 
-This made the instruction pattern matching required for peephole optimizations an order of magnitude easier, since now I don't have to traverse the operand hierarchy to extract a single register value, e.g.
+This made the instruction pattern matching required for peephole optimizations an order of magnitude easier, since now I don't have to traverse the operand hierarchy to extract a single register value.
+
+01/21/2020
+register allocation algorithm
+
+01/22/2020
+register allocation algorithm, infrastructure
+todo: remove memory location
 
 PEEPHOLE OPTIMIZATIONS
 Done
