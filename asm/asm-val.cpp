@@ -20,6 +20,10 @@ namespace zc::z80 {
       reg()->Emit(os);
    }
 
+   void VariableValue::Emit(std::ostream& os) const {
+      os << "v" << id();
+   }
+
    void IndexedRegisterValue::Emit(std::ostream& os) const {
       val()->Emit(os);
       os << "+";

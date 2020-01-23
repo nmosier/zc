@@ -62,24 +62,47 @@ namespace zc::z80 {
       
    }
 
-   void RegisterAllocator::ComputeVarLifetimes() {
-      struct cmp {
-         bool operator()(const VariableValue *a, const VariableValue *b) const {
-            return a->Eq(b);
-         }
-      };
-      std::unordered_map<const VariableValue *, VariableRallocInfo,
-                         std::hash<const VariableValue *>, cmp> incomplete_vars_;
+   void VariableRallocInfo::RenameVar() {
+      const VariableValue *newval = val->Rename();
+      (*gen)->operands()[0] = (*(*gen)->operands()[0])->ReplaceVar(val, newval); /* dst */
+      for (auto it : uses) {
+         (*it)->operands()[1] = (*(*it)->operands()[1])->ReplaceVar(val, newval); /* src */
+      }
+      val = newval;
+   }
 
+   void RegisterAllocator::ComputeVarLifetimes() {
       int index = 0;
-      for (const Instruction *instr : block_->instrs()) {
+      for (auto instr_it = block_->instrs().begin();
+           instr_it != block_->instrs().end();
+           ++instr_it) {
+         const Instruction *instr = *instr_it;
          const VariableValue *var;
+
          if (instr->src() && (var = instr->src()->var())) {
-            
+            /* variable used */
+            auto it = vars_.find(var->id());
+            assert(it != vars_.end());
+            it->second.uses.push_back(instr_it);
+            it->second.interval.end = index;
          }
+         
          if (instr->dst() && (var = instr->dst()->var())) {
-            
+            /* variable is generated */
+            auto it = vars_.find(var->id());
+            if (it != vars_.end()) {
+               /* variable is generated again; rename previous occurences */
+               VariableRallocInfo info = it->second;
+               vars_.erase(it);
+               info.RenameVar();
+               vars_.insert({info.val->id(), info});
+            }
+
+            /* add new var */
+            vars_.insert({var->id(), VariableRallocInfo(var, instr_it, index)});
          }
+
+         ++index;
       }
       
    }
@@ -94,13 +117,31 @@ namespace zc::z80 {
       os << std::endl;
    }
 
+   void VariableRallocInfo::Dump(std::ostream& os) const {
+      os << "var v" << val->id() << std::endl;
+      os << "\tinterval:\t";
+      interval.Dump(os);
+      os << std::endl;
+      os << "\tgen:\t";
+      (*gen)->Emit(os); 
+      os << std::endl;
+      for (auto it : uses) {
+         os << "\tuse:\t";
+         (*it)->Emit(os);
+         os << std::endl;
+      }
+   }
+
    void RegisterAllocator::Dump(std::ostream& os) const {
       for (auto it : regs_) {
          it.first->Dump(os);
          os << ": ";
          it.second.Dump(os);
       }
-      /* TODO: incomplete */
+
+      for (auto it : vars_) {
+         it.second.Dump(os);
+      }
    }
 
    /*** ***/

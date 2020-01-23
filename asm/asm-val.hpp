@@ -33,6 +33,9 @@ namespace zc::z80 {
          return size() == other->size() && Eq_(other);
       }
       bool Match(const Value *to) const;
+
+      virtual const Value *ReplaceVar(const VariableValue *var, const Value *with) const
+      { return this; }
       
    protected:
       portal<int> size_;
@@ -75,8 +78,16 @@ namespace zc::z80 {
       virtual Value *Add(const intmax_t& offset) const override
       { throw std::logic_error("attempted to add to abstract value"); }
 
+      /**
+       * Create new variable with distinct name (ID).
+       */
+      VariableValue *Rename() const { return new VariableValue(size()); }
+
+      virtual const Value *ReplaceVar(const VariableValue *var, const Value *with) const override
+      { return with; }
+
       VariableValue(int size): Value_(size), id_(id_counter_++) {}
-      
+
    protected:
       int id_;
       static int id_counter_;
@@ -224,6 +235,9 @@ namespace zc::z80 {
 
       MemoryValue *Next(int size) const;
       MemoryValue *Prev(int size) const;
+
+      virtual const Value *ReplaceVar(const VariableValue *var, const Value *with) const override
+      { return new MemoryValue((*addr_)->ReplaceVar(var, with), size_); }
       
       MemoryValue(portal<const Value *> addr, portal<int> size):
          Value_(size), addr_(addr) {}

@@ -3,6 +3,7 @@
 
 #include <unordered_map>
 #include <set>
+#include <list>
 #include <ostream>
 
 #include "asm.hpp"
@@ -34,13 +35,25 @@ namespace zc::z80 {
     */
    struct VariableRallocInfo {
       const VariableValue *val;
-      const Value **gen; /*!< where the variable is assigned (i.e. generated) */
-      const Value **use; /*!< where the variable is used */
+      Instructions::iterator gen; /*!< where the variable is assigned (i.e. generated) */
+      std::list<Instructions::iterator> uses; /*!< the instructions in which the variable is used */
       RallocInterval interval;
 
-      VariableRallocInfo(const VariableValue *val, const Value **gen, const Value **use,
+      bool dead() const { return interval.length() == 0; }
+      void set_dead() {
+         interval.end = interval.begin;
+         uses.clear();
+      }
+
+      void RenameVar();
+
+      void Dump(std::ostream& os) const;
+      
+      VariableRallocInfo(const VariableValue *val, Instructions::iterator gen, int begin):
+         val(val), gen(gen), interval(begin, begin) {}
+      VariableRallocInfo(const VariableValue *val, Instructions::iterator gen,
                          const RallocInterval& interval):
-         val(val), gen(gen), use(use), interval(interval) {}
+         val(val), gen(gen), interval(interval) {}
    };
 
    /**
