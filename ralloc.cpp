@@ -149,6 +149,7 @@ namespace zc::z80 {
       std::cerr << block->label()->name() << ":" << std::endl;
       RegisterAllocator ralloc(block);
       ralloc.ComputeRegIntervals();
+      ralloc.ComputeVarLifetimes();
       ralloc.Dump(std::cerr);
    }
 
