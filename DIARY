@@ -207,11 +207,60 @@ Next, I wrote an instruction matching function `Instruction::Match`, which match
 This made the instruction pattern matching required for peephole optimizations an order of magnitude easier, since now I don't have to traverse the operand hierarchy to extract a single register value.
 
 01/21/2020
-register allocation algorithm
+I spent most of the day preparing for a grad school interview with U Michigan, so I didn't get much work done.
+[2 hrs] I worked on the high-level design register allocation algorithm. For the pseudocode, see `RALLOC.txt`.
+        This algorithm uses two ways to spill variables: on the frame (called *frame-spilling*) or on the stack (called *stack-spilling*).
+        Frame-spilling involves reserving extra space in the function's activation record, in the same area where it stores locals declared in the C program.
+        Frame-spilled variables are accessed the same way as arguments and locals, indirectly through the frame pointer (which is an index register).
+        Stack-spilling involves pushing the value onto the stack when it's generated and popping it of when it is used.
+        Stack spilling has better space- and time-performance over frame spilling. With respect to space, loading/storing a frame-spilled value requires 3-4 bytes, while loading/storing a stack-spilled value requires 1 byte.
+        Stack spilling has more restrictions with frame-spilling, however. It is hard to stack-spill single byte values (except for the accumulator, `a`), while values of any size can be easily frame-spilled. Furthermore, stack-spills must be fully nested: a value can only be stack-spilled if all other stack-spilled variables during its lifetime are generated _before_ and used _after_ the one in question.
 
 01/22/2020
+Since the register allocation is mostly complete, I moved on to building up necessary infrastructure to required for implementing the algorithm.
+[1 hr] I wrote a new register allocator class. It currently allocates registers for a single basic block at a time. In the future, register allocation could be performed more globally, which would likely produce better results. However, for now, I'll stick with basic block register allocation because it's simpler.
+[1 hr] I wrote a few other new structures: `struct RallocInterval`, which stores a variable lifetime in terms of instruction offsets within the working basic block; `class RallocVarInfo`, which stores information about a variable that needs to be allocated a register; `class RegFreeIntervals`, which keeps track of which registers are free at which instructions.
+[1 hr] I implemented the `RegisterAllocator::ComputeRegFree()` function, which computes the intervals on which particular registers are free.
+[1 hr] I implemented the `RegisterAllocator::ComputeVarLifetime()` function, which computes the lifetime interval of all variables present in the basic block.
+[1 hr] Next, I started working on modifying the existing stack-machine code generator to produce unbound variable values as necessary instead of pushing intermediate results onto the stack.
+
+01/23/2020
+
+
 register allocation algorithm, infrastructure
-todo: remove memory location
+remove memory location
+added ComputeRegFree()
+added ComputeVarLifetime()
+changed code generation for expressions: told what value to generate result into (generally means emitting a load at the end)
+
+[3 hrs] finished with BinaryExpr::CodeGen
+
+CODEGEN WITH VARS
+Stats
+[X] ReturnStat
+[X] ExprStat
+[X] IfStat
+[X] LoopStat
+[X] WhileStat
+[X] ForStat
+[X] BreakStat
+[X] ContinueStat
+[X] GotoStat
+[X] LabeledStat
+[X] LabelDefStat
+
+Exprs
+[X] AssignmentExpr
+[X] UnaryExpr
+[ ] 
+
+
+Other
+[X] emit_nonzero_test
+
+- Added emit_predicate(). 
+
+
 
 PEEPHOLE OPTIMIZATIONS
 Done
@@ -222,3 +271,5 @@ Done
 Todo
 [ ] lea rr,ix+* \ push rr -> pea ix+*
 [ ] ld rr,LL \ push rr \ pop iy \ call _indcall -> call LL
+
+
