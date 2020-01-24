@@ -165,9 +165,9 @@ namespace zc {
       return block;
    }
    Block *ReturnStat::CodeGen(CgenEnv& env, Block *block) {
-      /* generate returned expression 
-       * For now, assume result will be in %a or %hl. */
-      block = expr()->CodeGen(env, block, ASTExpr::ExprKind::EXPR_RVALUE);
+      /* generate returned expression */
+      block = expr()->CodeGen(env, block, return_rv(expr()->type()->bytes()),
+                              ASTExpr::ExprKind::EXPR_RVALUE);
       
       /* append return transition */
       block->transitions().vec().push_back(new ReturnTransition(Cond::ANY));
@@ -179,17 +179,22 @@ namespace zc {
    }
 
    Block *ExprStat::CodeGen(CgenEnv& env, Block *block) {
-      return expr()->CodeGen(env, block, ASTExpr::ExprKind::EXPR_RVALUE);
+      /* pass out = nullptr, since result is thrown away */
+      return expr()->CodeGen(env, block, nullptr, ASTExpr::ExprKind::EXPR_RVALUE);
    }
 
    Block *IfStat::CodeGen(CgenEnv& env, Block *block) {
+
+#if 0
+      const VariableValue *cond_var = new VariableValue(cond()->type()->size());
+      
       /* Evaluate predicate */
-      block = cond()->CodeGen(env, block, ASTExpr::ExprKind::EXPR_RVALUE);
-
-      /* Test predicate 
-       * NOTE: For now, assume result is in %a or %hl. */
-      emit_nonzero_test(env, block, cond()->type()->bytes());
-
+      block = cond()->CodeGen(env, block, cond_var, ASTExpr::ExprKind::EXPR_RVALUE);
+      
+      /* Test predicate */
+      emit_nonzero_test(env, block, cond_var);
+#endif
+      
       /* Create joining label and block. */
       Label *join_label = new_label("if_join");
       Block *join_block = new Block(join_label);
@@ -201,12 +206,17 @@ namespace zc {
       Label *else_label = new_label("else_block");
       Block *else_block = new Block(else_label);
 
+      emit_predicate(env, block, cond(), if_block, else_block);
+
+#if 0
       /* Create block transitions to if, else blocks */
       BlockTransition *if_transition = new JumpTransition(if_block, Cond::NZ);
       BlockTransition *else_transition = new JumpTransition(else_block, Cond::ANY);
 
       block->transitions().vec().push_back(if_transition);
       block->transitions().vec().push_back(else_transition);
+#endif
+
       
       /* Code generate if, else blocks */
       Block *if_end = if_body()->CodeGen(env, if_block);
@@ -229,7 +239,7 @@ namespace zc {
       Label *body_label = new_label("loop_body");
       Block *body_block = new Block(body_label);
       BlockTransition *body_trans = new JumpTransition(body_block, Cond::ANY);
-
+      
       Label *join_label = new_label("loop_join");
       Block *join_block = new Block(join_label);
 
@@ -258,11 +268,15 @@ namespace zc {
       /* push stat info onto statement stack */
       StatInfo *stat_info = new StatInfo(this, body_block, join_block);
       env.stat_stack().Push(stat_info);
-      
-      pred_block = pred()->CodeGen(env, pred_block, ASTExpr::ExprKind::EXPR_RVALUE);
-      emit_nonzero_test(env, pred_block, pred()->type()->bytes()); /* CHANGED */
+
+#if 0
+      pred_block = pred()->CodeGen(env, pred_block, pred_var ASTExpr::ExprKind::EXPR_RVALUE);
+      emit_nonzero_test(env, pred_block, pred_var);
       pred_block->transitions().vec().push_back(new JumpTransition(body_block, Cond::NZ));
       pred_block->transitions().vec().push_back(new JumpTransition(join_block, Cond::ANY));
+#else
+      emit_predicate(env, block, pred(), body_block, join_block);
+#endif
 
       body_block = body()->CodeGen(env, body_block);
       body_block->transitions().vec().push_back(new JumpTransition(pred_block, Cond::ANY));
@@ -285,24 +299,23 @@ namespace zc {
       
       Label *body_label = new_label("for_body");
       Block *body_block = new Block(body_label);
-      BlockTransition *body_trans = new JumpTransition(body_block, Cond::NZ);
+      // BlockTransition *body_trans = new JumpTransition(body_block, Cond::NZ);
 
       Label *join_label = new_label("for_join");
       Block *join_block = new Block(join_label);
-      BlockTransition *join_trans = new JumpTransition(join_block, Cond::ANY);
+      // BlockTransition *join_trans = new JumpTransition(join_block, Cond::ANY);
 
       StatInfo *stat_info = new StatInfo(this, after_block, join_block);
       env.stat_stack().Push(stat_info);
       
-      block = init()->CodeGen(env, block, ASTExpr::ExprKind::EXPR_RVALUE);
+      block = init()->CodeGen(env, block, nullptr, ASTExpr::ExprKind::EXPR_RVALUE);
       block->transitions().vec().push_back(cond_trans);
-      block = pred()->CodeGen(env, cond_block, ASTExpr::ExprKind::EXPR_RVALUE);
-      emit_nonzero_test(env, block, pred()->type()->bytes());
-      block->transitions().vec().push_back(body_trans);
-      block->transitions().vec().push_back(join_trans);
+
+      emit_predicate(env, cond_block, pred(), body_block, join_block);
+      
       block = body()->CodeGen(env, body_block);
       block->transitions().vec().push_back(after_trans);
-      block = after()->CodeGen(env, after_block, ASTExpr::ExprKind::EXPR_RVALUE);
+      block = after()->CodeGen(env, after_block, nullptr, ASTExpr::ExprKind::EXPR_RVALUE);
       block->transitions().vec().push_back(cond_trans);
       
       env.stat_stack().Pop();
@@ -346,235 +359,159 @@ namespace zc {
       return LabeledStat::CodeGen(env, block);
    }
 
-   Block *AssignmentExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
+   Block *AssignmentExpr::CodeGen(CgenEnv& env, Block *block, const Value *out,
+                                  ExprKind mode) {
       assert(mode == ExprKind::EXPR_RVALUE);
-
+      
       /* compute right-hand rvalue */
-      int bytes = rhs()->type()->bytes();
-      block = rhs()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
-
-      /* save right-hand value */
-      switch (bytes) {
-      case byte_size:
-         block->instrs().push_back(new PushInstruction(&rv_af));
-         break;
-      case word_size:
-         abort();
-      case long_size:
-         block->instrs().push_back(new PushInstruction(&rv_hl));
-      }
+      const VariableValue *rhs_var = new VariableValue(rhs()->type()->bytes());
+      block = rhs()->CodeGen(env, block, rhs_var, ExprKind::EXPR_RVALUE);
 
       /* compute left-hand lvalue */
-      block = lhs()->CodeGen(env, block, ExprKind::EXPR_LVALUE);
+      const VariableValue *lhs_var = new VariableValue(long_size);
+      block = lhs()->CodeGen(env, block, lhs_var, ExprKind::EXPR_LVALUE);
 
-      /* restore right-hand value */
-      switch (bytes) {
-      case byte_size:
-         block->instrs().push_back(new PopInstruction(new RegisterValue(&r_af)));
-         block->instrs().push_back
-            (new LoadInstruction
-             (new MemoryValue
-              (new RegisterValue
-               (&r_hl),
-               byte_size
-               ),
-              new RegisterValue
-              (&r_a)
-              )
-             );
-         break;
-         
-      case word_size: throw std::logic_error("not implemented");
-         
-      case long_size:
-         block->instrs().push_back(new PopInstruction(new RegisterValue(&r_de)));
-         block->instrs().push_back
-            (new LoadInstruction
-             (new MemoryValue
-              (new RegisterValue
-               (&r_hl),
-               long_size
-               ),
-              new RegisterValue
-              (&r_de)
-              )
-             );
-         break;
+      /* assign */
+      const MemoryValue *memval = new MemoryValue(lhs_var, type()->bytes());
+      block->instrs().push_back(new LoadInstruction(memval, rhs_var));
+
+      /* propogate result */
+      if (out) {
+         block->instrs().push_back(new LoadInstruction(out, rhs_var));
       }
 
       return block;
    }
 
-   Block *UnaryExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
-      int bytes = type()->bytes();
+   Block *UnaryExpr::CodeGen(CgenEnv& env, Block *block, const Value *out, ExprKind mode) {
+      assert(out->size() == type()->bytes());
+      int bytes = expr()->type()->bytes();
+      const VariableValue *var;
       switch (kind()) {
       case Kind::UOP_ADDR:
          assert(mode == ExprKind::EXPR_RVALUE);
-         
          /* get subexpression as lvalue */
-         block = expr()->CodeGen(env, block, ExprKind::EXPR_LVALUE);
+         block = expr()->CodeGen(env, block, out, ExprKind::EXPR_LVALUE);
          break;
          
       case Kind::UOP_DEREFERENCE:
          /* get address as rvalue */
-         block = expr()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
+         var = new VariableValue(bytes);
+         block = expr()->CodeGen(env, block, var, ExprKind::EXPR_RVALUE);
 
-         switch (mode) {
-         case ExprKind::EXPR_RVALUE:
-            switch (bytes) {
-            case byte_size:
-               block->instrs().push_back
-                  (new LoadInstruction(&rv_a, new MemoryValue(&rv_hl, byte_size)));
-               break;
-            case word_size: abort();
-            case long_size:
-               block->instrs().push_back
-                  (new LoadInstruction (&rv_hl, new MemoryValue (&rv_hl, long_size)));
-               break;
-            }
-            break;
-            
-         case ExprKind::EXPR_LVALUE:
-            break;
-         case ExprKind::EXPR_NONE: abort();
-         }
-
+         /* dereference address into _out_ */
+         block->instrs().push_back(new LoadInstruction(out, new MemoryValue(var, type()->bytes())));
          break;
          
       case Kind::UOP_POSITIVE:
-         block = expr()->CodeGen(env, block, ExprKind::EXPR_RVALUE);         
-         /* nop */
+         block = expr()->CodeGen(env, block, out, ExprKind::EXPR_RVALUE);         
          break;
          
       case Kind::UOP_NEGATIVE:
-         block = expr()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
-         switch (bytes) {
-         case byte_size:
-            block->instrs().push_back(new NegInstruction());
-            break;
-         case word_size: abort();
-         case long_size:
-            block->instrs().push_back(new LoadInstruction(&rv_de, &imm_l<0>));
-            block->instrs().push_back(new ExInstruction(&rv_de, &rv_hl));
-            block->instrs().push_back(new XorInstruction(&rv_a, &rv_a));
-            block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_de));
-            break;
+         {
+            /* select register to load into */
+            const RegisterValue *reg;
+            switch (bytes) {
+            case byte_size: reg = &rv_a; break;
+            case word_size: abort();
+            case long_size: reg = crt_arg1(bytes); break;
+            default:        abort();
+            }
+
+            /* compute subexpr into selected register */
+            block = expr()->CodeGen(env, block, reg, ExprKind::EXPR_RVALUE);
+
+            /* negate result */
+            switch (bytes) {
+            case byte_size:
+               /* neg */
+               block->instrs().push_back(new NegInstruction());
+               break;
+            case word_size: abort();
+            case long_size:
+               /* call __ineg */
+               emit_crt("__ineg", block);
+               break;
+            default: abort();
+            }
+
+            /* load result into destination */
+            block->instrs().push_back(new LoadInstruction(out, reg));
          }
          break;
          
       case Kind::UOP_BITWISE_NOT:
-         block = expr()->CodeGen(env, block, ExprKind::EXPR_RVALUE);         
-         switch (bytes) {
-         case byte_size:
-            block->instrs().push_back(new CplInstruction());
-            break;
-         case word_size: abort();
-         case long_size:
-            /* NOTE: this uses the property of 2's complement that it is 1's complement plus 1. */
-            block->instrs().push_back(new LoadInstruction(&rv_de, &imm_l<0>));
-            block->instrs().push_back(new ExInstruction(&rv_de, &rv_hl));
-            block->instrs().push_back(new ScfInstruction());
-            block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_de));
-            break;
+         {
+            /* select register to load into */
+            const RegisterValue *reg;
+            switch (bytes) {
+            case byte_size: reg = &rv_a; break;
+            case word_size: abort();
+            case long_size: reg = crt_arg1(bytes); break;
+            default:        abort();
+            }
+
+            /* compute subexpr into selected register */
+            block = expr()->CodeGen(env, block, reg, ExprKind::EXPR_RVALUE);
+
+            /* bitwise not */
+            switch (bytes) {
+            case byte_size:
+               /* cpl */
+               block->instrs().push_back(new CplInstruction());
+               break;
+            case word_size: abort();
+            case long_size:
+               /* call __inot */
+               emit_crt("__inot", block);
+               break;
+            default: abort();
+            }
+
+            /* load result into destination */
+            block->instrs().push_back(new LoadInstruction(out, reg));
          }
          break;
          
       case Kind::UOP_LOGICAL_NOT:
-         block = expr()->CodeGen(env, block, ExprKind::EXPR_RVALUE);         
-         emit_logical_not(env, block, bytes);
+         var = new VariableValue(bytes);
+         block = expr()->CodeGen(env, block, var, ExprKind::EXPR_RVALUE);
+         emit_logical_not(env, block, var, out);
          break;
-
+         
       case Kind::UOP_INC_PRE:
       case Kind::UOP_DEC_PRE:
-         {
-            block = expr()->CodeGen(env, block, ExprKind::EXPR_LVALUE);
-            MemoryValue *memval = new MemoryValue(&rv_hl, bytes);
-            bool inc = kind() == Kind::UOP_INC_PRE;
-            
-            switch (bytes) {
-            case byte_size:
-               /* inc/dec (hl)
-                * ld a,(hl)
-                */
-               block->instrs().push_back(inc ?
-                                         (Instruction *) new IncInstruction(memval) :
-                                         (Instruction *) new DecInstruction(memval));
-               block->instrs().push_back(new LoadInstruction(&rv_a, memval));
-               break;
-               
-            case word_size: abort();
-            case long_size:
-               /* ld de,(hl)
-                * inc/dec de
-                * ld (hl),de
-                * ex de,hl
-                */
-               block->instrs().push_back(new LoadInstruction(&rv_de, memval));
-               block->instrs().push_back(inc ?
-                                         (Instruction *) new IncInstruction(&rv_de) :
-                                         (Instruction *) new DecInstruction(&rv_de));
-               block->instrs().push_back(new LoadInstruction(memval, &rv_de));
-               block->instrs().push_back(new ExInstruction(&rv_de, &rv_hl));
-               break;
-            }
-         }
-         break;
-
       case Kind::UOP_INC_POST:
       case Kind::UOP_DEC_POST:
-         {
-            bool inc = kind() == Kind::UOP_INC_POST;            
-            block = expr()->CodeGen(env, block, ExprKind::EXPR_LVALUE);
-            MemoryValue *memval = new MemoryValue(&rv_hl, bytes);
-
-            switch (bytes) {
-            case byte_size:
-               /* ld a,(hl)
-                * inc (hl)
-                */
-               block->instrs().push_back(new LoadInstruction(&rv_a, memval));
-               block->instrs().push_back(inc ?
-                                         (Instruction *) new IncInstruction(memval) :
-                                         (Instruction *) new DecInstruction(memval));
-               break;
-            case word_size: abort();
-            case long_size:
-               /* ld de,(hl)
-                * inc/dec de
-                * ld (hl),de
-                * dec/inc de
-                * ex de,hl
-                */
-               block->instrs().push_back(new LoadInstruction(&rv_de, memval));
-               block->instrs().push_back(inc ?
-                                         (Instruction *) new IncInstruction(&rv_de) :
-                                         (Instruction *) new DecInstruction(&rv_de));
-               block->instrs().push_back(new LoadInstruction(memval, &rv_de));
-               block->instrs().push_back(inc ?
-                                         (Instruction *) new DecInstruction(&rv_de) :
-                                         (Instruction *) new IncInstruction(&rv_de));
-               block->instrs().push_back(new ExInstruction(&rv_de, &rv_hl));
-               break;
-            }
-         }
+         block = emit_incdec(env, block,
+                             kind() == Kind::UOP_INC_PRE || kind() == Kind::UOP_INC_POST,
+                             kind() == Kind::UOP_INC_PRE || kind() == Kind::UOP_DEC_PRE, expr(),
+                             out);
          break;
       }
 
       return block;
    }
 
-   Block *BinaryExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
+   Block *BinaryExpr::CodeGen(CgenEnv& env, Block *block, const Value *out, ExprKind mode) {
+      const VariableValue *lhs_var = new VariableValue(lhs()->type()->bytes());
+      const VariableValue *rhs_var = new VariableValue(rhs()->type()->bytes());
+      
       switch (kind()) {
       case Kind::BOP_LOGICAL_AND:
          /* Short-circuit evaluation dictates that evaluation stops if the first operand 
           * is 0. 
           */
          {
+            assert(out->size() == byte_size);
+            
             /* evaluate lhs */
-            block = lhs()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
-            emit_booleanize(env, block, lhs()->type()->bytes());
-            emit_nonzero_test(env, block, byte_size); /* NOTE: This should be optimized 
-                                                       * away in the future. */
+            block = lhs()->CodeGen(env, block, lhs_var, ExprKind::EXPR_RVALUE);
+            
+            emit_nonzero_test(env, block, lhs_var);
+
+            /* preemptively set result to 0 */
+            block->instrs().push_back(new LoadInstruction(out, &imm_b<0>));
 
             /* create transitions */
             const Label *end_label = new_label("BOP_LOGICAL_AND");
@@ -588,8 +525,8 @@ namespace zc {
             block->transitions().vec().push_back(cont_transition);
 
             /* Evaluate rhs */
-            cont_block = rhs()->CodeGen(env, cont_block, ExprKind::EXPR_RVALUE);
-            emit_booleanize(env, block, rhs()->type()->bytes());
+            cont_block = rhs()->CodeGen(env, cont_block, rhs_var, ExprKind::EXPR_RVALUE);
+            emit_booleanize(env, block, rhs_var, out); /* OPTIMIZABLE */
             cont_block->transitions().vec().push_back(end_transition);
 
             return end_block;
@@ -599,366 +536,345 @@ namespace zc {
          /* Short-circuit evaluation dictates that evaluation continues until an operand is nonzero.
           */
          {
+            assert(out->size() == byte_size);
+            
             /* evaluate lhs */
-            block = lhs()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
-            emit_booleanize(env, block, lhs()->type()->bytes());
-            emit_nonzero_test(env, block, byte_size); /* NOTE: This should be optimized 
-                                                       * away in the future. */
-
+            block = lhs()->CodeGen(env, block, lhs_var, ExprKind::EXPR_RVALUE);
+            emit_nonzero_test(env, block, lhs_var);
+            
+            /* preemptively set out to true */            
+            block->instrs().push_back(new LoadInstruction(out, &imm_b<1>)); 
+            
             /* create transitions */
             const Label *end_label = new_label("BOP_LOGICAL_OR");
             Block *end_block = new Block(end_label);
             BlockTransition *end_transition = new JumpTransition(end_block, Cond::NZ);
             block->transitions().vec().push_back(end_transition);
             
-            const Label *cont_label = new_label("BOP_LOGICAL_AND");
+            const Label *cont_label = new_label("BOP_LOGICAL_OR");
             Block *cont_block = new Block(cont_label);
             BlockTransition *cont_transition = new JumpTransition(end_block, Cond::Z);
             block->transitions().vec().push_back(cont_transition);
 
             /* Evaluate rhs */
-            cont_block = rhs()->CodeGen(env, cont_block, ExprKind::EXPR_RVALUE);
-            emit_booleanize(env, block, rhs()->type()->bytes());
+            cont_block = rhs()->CodeGen(env, cont_block, rhs_var, ExprKind::EXPR_RVALUE);
+            emit_booleanize(env, block, rhs_var, out);
             cont_block->transitions().vec().push_back(end_transition);
             
-            return end_block;            
+            return end_block;
          }
 
       case Kind::BOP_EQ:
       case Kind::BOP_NEQ:
-         block = emit_binop(env, block, this);
-         switch (lhs()->type()->bytes()) {
-         case byte_size:
-            block->instrs().push_back(new CompInstruction(&rv_a, &rv_b));
-            break;
-         case word_size: abort();
-         case long_size:
-            block->instrs().push_back(new XorInstruction(&rv_a, &rv_a));
-            block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_de));
-            break;
-         default:
-            abort();
+         {
+            assert(out->size() == byte_size);
+            bool eq = (kind() == Kind::BOP_EQ);
+            
+            block = emit_binop(env, block, this, lhs_var, rhs_var);
+            switch (lhs_var->size()) {
+            case byte_size:
+               /* ld a,<lhs>
+                * cp a,<rhs>
+                * ld <out>,0/1
+                * jr nz,_
+                * inc/dec <out>
+                * _
+                */
+               block->instrs().push_back(new LoadInstruction(&rv_a, lhs_var));
+               block->instrs().push_back(new CompInstruction(&rv_a, rhs_var));
+               break;
+
+            case word_size: abort();
+            case long_size:
+               /* ld hl,<lhs>
+                * or a,a
+                * sbc hl,<rhs>
+                * add hl,<rhs>
+                * ld <out>,0
+                * jr nz/z,_
+                * inc <out>
+                * _
+                */
+               block->instrs().push_back(new LoadInstruction(&rv_hl, lhs_var));
+               block->instrs().push_back(new OrInstruction(&rv_a, &rv_a));
+               block->instrs().push_back(new SbcInstruction(&rv_hl, rhs_var));
+               block->instrs().push_back(new AddInstruction(&rv_hl, rhs_var));
+               break;
+               
+            default: abort();
+            }
+
+            block->instrs().push_back(new LoadInstruction(&rv_a, &imm_b<0>));
+
+            Block *join_block = new Block(new_label("BOP_EQ_NEQ"));
+            Block *cont_block = new Block(new_label("BOP_EQ_NEQ"));
+
+            block->transitions().vec().push_back
+               (new JumpTransition(join_block, eq ? Cond::NZ : Cond::Z));
+            block->transitions().vec().push_back(new JumpTransition(cont_block, Cond::ANY));
+
+            cont_block->instrs().push_back(new IncInstruction(out));
+            cont_block->transitions().vec().push_back(new JumpTransition(join_block, Cond::ANY));
+               
+            return join_block;
          }
-         block = emit_ld_a_zf(env, block, kind() == Kind::BOP_NEQ);
-         break;
 
       case Kind::BOP_LT:
-         block = emit_binop(env, block, this);
-         switch (lhs()->type()->bytes()) {
-         case byte_size:
-            /* cp a,b
-             * ld a,0
-             * adc a,a
-             */
-            block->instrs().push_back(new CompInstruction(&rv_a, &rv_b));
-            block->instrs().push_back(new LoadInstruction(&rv_a, &imm_b<0>));
-            break;
-                                  
-         case word_size: abort();
-         case long_size:
-            /* xor a,a
-             * sbc hl,de
-             * adc a,a
-             */
-            block->instrs().push_back(new XorInstruction(&rv_a, &rv_a));
-            block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_de));
-            break;
-         default: abort();
-         }
-                               
-         block->instrs().push_back(new AdcInstruction(&rv_a, &rv_a));
-         break;
-
-      case Kind::BOP_LEQ:
-         block = emit_binop(env, block, this);
-         switch (lhs()->type()->bytes()) {
-         case byte_size:
-            /* scf
-             * sbc a,b
-             * ld a,0
-             * adc a,a
-             */
-            block->instrs().push_back(new ScfInstruction());
-            block->instrs().push_back(new SbcInstruction(&rv_a, &rv_b));
-            block->instrs().push_back(new LoadInstruction(&rv_a, &imm_b<0>));
-            break;
-
-         case word_size: abort();
-         case long_size:
-            /* xor a,a
-             * scf
-             * sbc hl,de
-             * adc a,a
-             */
-            block->instrs().push_back(new XorInstruction(&rv_a, &rv_a));
-            block->instrs().push_back(new ScfInstruction());
-            block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_de));
-            break;
-         }
-
-         block->instrs().push_back(new AdcInstruction(&rv_a, &rv_a));
-         break;
-
       case Kind::BOP_GT:
-         block = emit_binop(env, block, this);
-         switch (lhs()->type()->bytes()) {
-         case byte_size:
-            /* dec a
-             * cp a,b
-             * ld a,1
-             * sbc a,0
-             */
-            block->instrs().push_back(new DecInstruction(&rv_a));
-            block->instrs().push_back(new CompInstruction(&rv_a, &rv_b));
-            block->instrs().push_back(new LoadInstruction(&rv_a, &imm_b<1>));
-            block->instrs().push_back(new SbcInstruction(&rv_a, &imm_b<0>));
-            break;
-
-         case word_size: abort();
-         case long_size:
-            /* scf
-             * sbc hl,de
-             * sbc a,a
-             * inc a
-             */
-            block->instrs().push_back(new ScfInstruction());
-            block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_de));
-            block->instrs().push_back(new SbcInstruction(&rv_a, &rv_a));
-            block->instrs().push_back(new IncInstruction(&rv_a));
-            break;
+         {
+            bool lt_not_gt = (kind() == Kind::BOP_LT);
+            block = emit_binop(env, block, this, lhs_var, rhs_var);
+            switch (lhs()->type()->bytes()) {
+            case byte_size:
+               /* ld a,<lhs>/<rhs>
+                * cp a,<rhs>/<lhs>
+                * ld a,0
+                */
+               block->instrs().push_back(new LoadInstruction(&rv_a, lt_not_gt ? lhs_var : rhs_var));
+               block->instrs().push_back(new CompInstruction(&rv_a, lt_not_gt ? rhs_var : lhs_var));
+               block->instrs().push_back(new LoadInstruction(&rv_a, &imm_b<0>));
+               block->instrs().push_back(new AdcInstruction(&rv_a, &rv_a));
+               block->instrs().push_back(new LoadInstruction(out, &rv_a));
+               break;
+                                  
+            case word_size: abort();
+            case long_size:
+               /* ld hl,<lhs>
+                * xor a,a
+                * sbc hl,<rhs>
+                */
+               block->instrs().push_back(new LoadInstruction(&rv_hl, lt_not_gt ? lhs_var : rhs_var));
+               block->instrs().push_back(new XorInstruction(&rv_a, &rv_a));
+               block->instrs().push_back(new SbcInstruction(&rv_hl, lt_not_gt ? rhs_var : lhs_var));
+               block->instrs().push_back(new AdcInstruction(&rv_a, &rv_a));
+               break;
+            
+            default: abort();
+            }
+         
+            block->instrs().push_back(new AdcInstruction(&rv_a, &rv_a));
+            block->instrs().push_back(new LoadInstruction(out, &rv_a));
          }
          break;
 
+         
+      case Kind::BOP_LEQ:
       case Kind::BOP_GEQ:
-         block = emit_binop(env, block, this);
-         switch (lhs()->type()->bytes()) {
-         case byte_size:
-            /* cp a,b
-             * ld a,1
-             * sbc a,0
-             */
-            block->instrs().push_back(new CompInstruction(&rv_a, &rv_b));
-            break;
+         {
+            bool leq_not_geq = (kind() == Kind::BOP_LEQ);
+            block = emit_binop(env, block, this, lhs_var, rhs_var);
+            switch (lhs()->type()->bytes()) {
+            case byte_size:
+               /* scf
+                * ld a,<lhs>/<rhs>
+                * sbc a,<rhs>/<lhs>
+                * ld a,0
+                */
+               block->instrs().push_back(new ScfInstruction());
+               block->instrs().push_back(new LoadInstruction(&rv_a, lhs_var));
+               block->instrs().push_back(new SbcInstruction(&rv_a, rhs_var));
+               block->instrs().push_back(new LoadInstruction(&rv_a, &imm_b<0>));
+               break;
 
-         case word_size: abort();
+            case word_size: abort();
+            case long_size:
+               /* xor a,a
+                * scf
+                * ld hl,<lhs>/<rhs>
+                * sbc hl,<rhs>/<lhs>
+                */
+               block->instrs().push_back(new XorInstruction(&rv_a, &rv_a));
+               block->instrs().push_back(new ScfInstruction());
+               block->instrs().push_back(new LoadInstruction(&rv_hl, leq_not_geq ? lhs_var : rhs_var));
+               block->instrs().push_back(new SbcInstruction(&rv_hl, leq_not_geq ? rhs_var : lhs_var));
+               break;
 
-         case long_size:
-            /* xor a,a
-             * sbc hl,de
-             * ld a,1
-             * sbc a,0
-             */
-            block->instrs().push_back(new XorInstruction(&rv_a, &rv_a));
-            block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_de));
-            break;
+            default: abort();
+            }
+
+            block->instrs().push_back(new AdcInstruction(&rv_a, &rv_a));
          }
-                               
-         block->instrs().push_back(new LoadInstruction(&rv_a, &imm_b<1>));
-         block->instrs().push_back(new SbcInstruction(&rv_a, &imm_b<0>));
          break;
 
       case Kind::BOP_PLUS:
-         block = emit_binop(env, block, this);
-         switch (type()->bytes()) {
-         case byte_size:
-            /* add a,b */
-            block->instrs().push_back(new AddInstruction(&rv_a, &rv_b));
-            break;
-         case word_size: abort();
-         case long_size:
-            /* add hl,de */
-            block->instrs().push_back(new AddInstruction(&rv_hl, &rv_de));
-            break;
-         }
+         block = emit_binop(env, block, this, lhs_var, rhs_var);
+         block->instrs().push_back(new LoadInstruction(accumulator(lhs_var), lhs_var));
+         block->instrs().push_back(new AddInstruction(accumulator(lhs_var), rhs_var));
+         block->instrs().push_back(new LoadInstruction(out, accumulator(lhs_var)));
          break;
 
       case Kind::BOP_MINUS:
-         block = emit_binop(env, block, this);
-         switch (type()->bytes()) {
+         block = emit_binop(env, block, this, lhs_var, rhs_var);
+         switch (lhs_var->size()) {
          case byte_size:
-            /* sub a,b */
-            block->instrs().push_back(new SubInstruction(&rv_a, &rv_b));
+            /* ld a,<lhs>
+             * sub a,<rhs>
+             * ld <out>,a
+             */
+            block->instrs().push_back(new LoadInstruction(&rv_a, lhs_var));
+            block->instrs().push_back(new SubInstruction(&rv_a, rhs_var));
+            block->instrs().push_back(new LoadInstruction(out, &rv_a));
             break;
+            
          case word_size: abort();
          case long_size:
             /* or a,a
-             * sbc hl,de 
+             * ld hl,<lhs>
+             * sbc hl,<rhs>
+             * ld <out>,hl
              */
             block->instrs().push_back(new OrInstruction(&rv_a, &rv_a));
-            block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_de));
+            block->instrs().push_back(new LoadInstruction(&rv_hl, lhs_var));
+            block->instrs().push_back(new SbcInstruction(&rv_hl, rhs_var));
+            block->instrs().push_back(new LoadInstruction(out, &rv_hl));
             break;
          }
          break;
 
       case Kind::BOP_TIMES:
-         block = emit_binop(env, block, this);
-         switch (type()->bytes()) {
+         block = emit_binop(env, block, this, lhs_var, rhs_var);
+         switch (lhs_var->size()) {
          case byte_size:
-            /* ld c,a
+            /* ld b,<lhs>
+             * ld c,<rhs>
              * mlt bc
-             * ld a,c
+             * ld <out>,c
              */
-            block->instrs().push_back(new LoadInstruction(&rv_c, &rv_a));
+            block->instrs().push_back(new LoadInstruction(&rv_b, lhs_var));
+            block->instrs().push_back(new LoadInstruction(&rv_c, rhs_var));
             block->instrs().push_back(new MultInstruction(&rv_bc));
-            block->instrs().push_back(new LoadInstruction(&rv_a, &rv_c));
+            block->instrs().push_back(new LoadInstruction(out, &rv_c));
             break;
+            
          case word_size: abort();
          case long_size:
+            /* ld hl,<lhs>
+             * ld bc,<rhs>
+             * call __imulu
+             * ld <out>,hl
+             */
+            block->instrs().push_back(new LoadInstruction(&rv_hl, lhs_var));
+            block->instrs().push_back(new LoadInstruction(&rv_bc, rhs_var));
             emit_crt("__imulu", block);
+            block->instrs().push_back(new LoadInstruction(out, &rv_hl));
             break;
          }
          break;
 
       case Kind::BOP_DIVIDE:
       case Kind::BOP_MOD:
-         block = emit_binop(env, block, this, &rv_bc);
-         switch (type()->bytes()) {
-         case byte_size:
-            emit_crt("__cdivu", block);
-            if (kind() == Kind::BOP_MOD) {
-               block->instrs().push_back(new LoadInstruction(&rv_a, &rv_b));
+         {
+            bool div_not_mod = (kind() == Kind::BOP_DIVIDE);
+            block = emit_binop(env, block, this, lhs_var, rhs_var);
+            block->instrs().push_back(new LoadInstruction(crt_arg1(lhs_var), lhs_var));
+            block->instrs().push_back(new LoadInstruction(crt_arg2(rhs_var), rhs_var));
+            emit_crt(crt_prefix(lhs_var) + "divu", block);
+            if (div_not_mod) {
+               block->instrs().push_back(new LoadInstruction(out, crt_arg1(lhs_var)));
+            } else {
+               block->instrs().push_back(new LoadInstruction(out, crt_arg2(rhs_var)));
             }
-            break;
-         case word_size: abort();
-         case long_size:
-            emit_crt("__idivu", block);
-            if (kind() == Kind::BOP_MOD) {
-               block->instrs().push_back(new PushInstruction(&rv_bc));
-               block->instrs().push_back(new PopInstruction(&rv_hl));
-            }
-            break;
          }
          break;
          
       case Kind::BOP_BITWISE_AND:
-         block = emit_binop(env, block, this, &rv_bc);
-         switch (type()->bytes()) {
-         case byte_size:
-            block->instrs().push_back(new AndInstruction(&rv_a, &rv_b));
-            break;
-         case word_size: abort();
-         case long_size:
-            emit_crt("__iand", block);
-            break;
-         }
-         break;
-         
       case Kind::BOP_BITWISE_OR:
-         block = emit_binop(env, block, this, &rv_bc);
-         switch (type()->bytes()) {
-         case byte_size:
-            block->instrs().push_back(new OrInstruction(&rv_a, &rv_b));
-            break;
-         case word_size: abort();
-         case long_size:
-            emit_crt("__ior", block);
-            break;
-         }
-         break;
-         
       case Kind::BOP_BITWISE_XOR:
-         block = emit_binop(env, block, this, &rv_bc);
-         switch (type()->bytes()) {
+         block = emit_binop(env, block, this, lhs_var, rhs_var);
+         switch (lhs_var->size()) {
          case byte_size:
-            block->instrs().push_back(new OrInstruction(&rv_a, &rv_b));
+            /* ld a,<lhs>
+             * and/or/xor a,<rhs>
+             * ld <out>,a
+             */
+            block->instrs().push_back(new LoadInstruction(&rv_a, lhs_var));
+            switch (kind()) {
+            case Kind::BOP_BITWISE_AND:
+               block->instrs().push_back(new AndInstruction(&rv_a, rhs_var)); break;
+            case Kind::BOP_BITWISE_OR:
+               block->instrs().push_back(new OrInstruction(&rv_a, rhs_var));  break;
+            case Kind::BOP_BITWISE_XOR:
+               block->instrs().push_back(new XorInstruction(&rv_a, rhs_var)); break;
+            default: abort();
+            }
+            block->instrs().push_back(new LoadInstruction(out, &rv_a));
             break;
+            
          case word_size: abort();
          case long_size:
-            emit_crt("__ixor", block);
+            /* ld hl,<lhs>
+             * ld bc,<rhs>
+             * call __iand/__ior/__ixor
+             * ld <out>,hl
+             */
+            block->instrs().push_back(new LoadInstruction(&rv_hl, lhs_var));
+            block->instrs().push_back(new LoadInstruction(&rv_bc, rhs_var));
+            switch (kind()) {
+            case Kind::BOP_BITWISE_AND: emit_crt("__iand", block); break;
+            case Kind::BOP_BITWISE_OR:  emit_crt("__ior", block);  break;
+            case Kind::BOP_BITWISE_XOR: emit_crt("__ixor", block); break;
+            default: abort();
+            }
+            block->instrs().push_back(new LoadInstruction(out, &rv_hl));
             break;
          }
          break;
 
       case Kind::BOP_COMMA:
-         lhs()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
-         rhs()->CodeGen(env, block, mode);
+         lhs()->CodeGen(env, block, nullptr, ExprKind::EXPR_RVALUE);
+         rhs()->CodeGen(env, block, out, mode);
          break;
       }
 
       return block;
    }
-
-   Block *LiteralExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
-      const RegisterValue *rv;
-      switch (type()->bytes()) {
-      case byte_size:
-         rv = &rv_a;
-         break;
-      case word_size: abort();
-      case long_size:
-         rv = &rv_hl;
-         break;
-      }
+   
+   Block *LiteralExpr::CodeGen(CgenEnv& env, Block *block, const Value *out, ExprKind mode) {
       const ImmediateValue *imm = new ImmediateValue(val(), type()->bytes());
-
-      block->instrs().push_back(new LoadInstruction(rv, imm));
+      block->instrs().push_back(new LoadInstruction(out, imm));
       return block;
    }
    
-   Block *StringExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
+   Block *StringExpr::CodeGen(CgenEnv& env, Block *block, const Value *out, ExprKind mode) {
       assert(mode == ExprKind::EXPR_RVALUE); /* string constants aren't assignable */
-      block->instrs().push_back(new LoadInstruction(&rv_hl, env.strconsts().Ref(*str())));
+      assert(out->size() == long_size);
+      block->instrs().push_back(new LoadInstruction(out, env.strconsts().Ref(*str())));
       return block;
    }
-
-
    
-   Block *IdentifierExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
+   Block *IdentifierExpr::CodeGen(CgenEnv& env, Block *block, const Value *out, ExprKind mode) {
       const SymInfo *id_info = env.symtab().Lookup(id()->id());
-
-
+      
       if (mode == ExprKind::EXPR_LVALUE || type()->kind() == ASTType::Kind::TYPE_ARRAY) {
          /* obtain address of identifier */
          const Value *id_addr = dynamic_cast<const VarSymInfo *>(id_info)->addr();
-         block->instrs().push_back(new LeaInstruction(&rv_hl, id_addr));
+         block->instrs().push_back(new LeaInstruction(out, id_addr));
       } else {
          const Value *id_rval = id_info->val();
          const RegisterValue *rv;
-         
-         switch (type()->bytes()) {
-         case byte_size:
-            rv = &rv_a;
-            break;
-         case word_size: abort();
-         case long_size:
-            rv = &rv_hl;
-            break;
-         default: abort();
-         }
-         block->instrs().push_back(new LoadInstruction(rv, id_rval));
+         block->instrs().push_back(new LoadInstruction(out, id_rval));
       }
 
       return block;
    }
 
-   Block *CallExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
+   Block *CallExpr::CodeGen(CgenEnv& env, Block *block, const Value *out, ExprKind mode) {
       /* push arguments onto stack (1st arg is highest on stack) */
 
       /* codegen params */
       for (auto it = params()->vec().rbegin(), end = params()->vec().rend(); it != end; ++it) {
          auto param = *it;
-         block = param->CodeGen(env, block, ExprKind::EXPR_RVALUE);
-         const RegisterValue *rv;
-         switch (param->type()->Decay()->bytes()) {
-         case byte_size:
-            rv = &rv_af;
-            break;
-         case word_size:
-         case long_size:
-            rv = &rv_hl;
-            break;
-         }
-         block->instrs().push_back(new PushInstruction(rv));
+         int param_bytes = param->type()->Decay()->bytes();
+         const VariableValue *param_var = new VariableValue(param_bytes);
+         block = param->CodeGen(env, block, param_var, ExprKind::EXPR_RVALUE);
+         block->instrs().push_back(new PushInstruction(param_var));
       }
 
       /* codegen callee */
-      block = fn()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
-      
-      /* call fn */
-      block->instrs().push_back(new PushInstruction(&rv_hl));
-      block->instrs().push_back(new PopInstruction(&rv_iy));
-      block->instrs().push_back(new CallInstruction(&crt_lv_indcall));
+      block = fn()->CodeGen(env, block, &rv_iy, ExprKind::EXPR_RVALUE);
 
+      emit_crt("__indcall", block);
+      
       /* pop off args */
       for (ASTExpr *param : params()->vec()) {
          /* TODO: this could be optimized. */
@@ -968,94 +884,85 @@ namespace zc {
       return block;
    }
 
-   Block *CastExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
+   Block *CastExpr::CodeGen(CgenEnv& env, Block *block, const Value *out, ExprKind mode) {
       assert(mode == ExprKind::EXPR_RVALUE);
 
-      const Register *src = return_register(expr()->type()->bytes());
-      const Register *dst = return_register(type()->bytes());
-
-      expr()->CodeGen(env, block, mode);
-      dst->Cast(block, src);
+      const VariableValue *var = new VariableValue(expr()->type()->bytes());
+      block = expr()->CodeGen(env, block, var, mode);
+      block->instrs().push_back(new LoadInstruction(accumulator(var), var));
+      accumulator(type()->bytes())->reg()->Cast(block, &r_hl);
+      block->instrs().push_back(new LoadInstruction(out, accumulator(var)));
 
       return block;
    }
 
-   Block *MembExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
+   Block *MembExpr::CodeGen(CgenEnv& env, Block *block, const Value *out, ExprKind mode) {
       /* code generate struct as lvalue */
-      block = expr()->CodeGen(env, block, ExprKind::EXPR_LVALUE);
+      block = expr()->CodeGen(env, block, &rv_hl, ExprKind::EXPR_LVALUE);
       
       /* get internal offset */
       int offset = dynamic_cast<CompoundType *>(expr()->type())->offset(memb());
       ImmediateValue *imm = new ImmediateValue(offset, long_size);
-      block->instrs().push_back(new LoadInstruction(&rv_de, imm));
-      block->instrs().push_back(new AddInstruction(&rv_hl, &rv_de));
+
+      const VariableValue *offset_var = new VariableValue(long_size);
+      /* ld <off>,#off
+       * add hl,<off>
+       */
+      block->instrs().push_back(new LoadInstruction(offset_var, imm));
+      block->instrs().push_back(new AddInstruction(&rv_hl, offset_var));
       
       switch (mode) {
       case ExprKind::EXPR_LVALUE:
+         block->instrs().push_back(new LoadInstruction(out, &rv_hl));
          break; /* already computed address */
          
       case ExprKind::EXPR_RVALUE:
-         {
-            const RegisterValue *dst;
-         
-            switch (type()->bytes()) {
-            case byte_size:
-               dst = &rv_a;
-               break;
-            case word_size: abort();
-            case long_size:
-               dst = &rv_hl;
-               break;
-            default:
-               abort();
-            }
-         
-            auto memval = new MemoryValue(dst, type()->bytes());
-            block->instrs().push_back(new LoadInstruction(&rv_hl, memval));
-         }
+         /* ld <out>,(hl) */
+         block->instrs().push_back
+            (new LoadInstruction(out, new MemoryValue(&rv_hl, type()->bytes())));
          break;
 
-      case ExprKind::EXPR_NONE:
-         abort();
+      case ExprKind::EXPR_NONE: abort();
       }
 
       return block;
    }
 
-   Block *SizeofExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
+   Block *SizeofExpr::CodeGen(CgenEnv& env, Block *block, const Value *out, ExprKind mode) {
       struct CodeGenVisitor {
          int operator()(const ASTType *type) { return type->bytes(); }
          int operator()(const ASTExpr *expr) { return expr->type()->bytes(); }
       };
 
-      int bytes = std::visit(CodeGenVisitor(), variant_);
-      block->instrs().push_back(new LoadInstruction(&rv_hl, new ImmediateValue(bytes, long_size)));
+      int imm = std::visit(CodeGenVisitor(), variant_);
+      block->instrs().push_back(new LoadInstruction(out, new ImmediateValue(imm, out->size())));
+
       return block;
    }
 
-   Block *IndexExpr::CodeGen(CgenEnv& env, Block *block, ExprKind mode) {
-      block = index()->CodeGen(env, block, ExprKind::EXPR_RVALUE);
+   Block *IndexExpr::CodeGen(CgenEnv& env, Block *block, const Value *out, ExprKind mode) {
+      /* generate index */
+      block = index()->CodeGen(env, block, &rv_hl, ExprKind::EXPR_RVALUE);
       block->instrs().push_back
-         (new LoadInstruction
-          (&rv_bc,
-           new ImmediateValue(type()->bytes(), long_size)));
+         (new LoadInstruction(&rv_bc, new ImmediateValue(type()->bytes(), long_size)));
       emit_crt("__imuls", block);
-      block->instrs().push_back(new PushInstruction(&rv_hl));
-      block = base()->CodeGen(env, block, ExprKind::EXPR_LVALUE);
-      block->instrs().push_back(new PopInstruction(&rv_de));
-      block->instrs().push_back(new AddInstruction(&rv_hl, &rv_de));
+      const VariableValue *index_var = new VariableValue(long_size);
+      block->instrs().push_back(new LoadInstruction(index_var, &rv_hl));
+
+      /* generate base */
+      block = base()->CodeGen(env, block, &rv_hl, ExprKind::EXPR_LVALUE);
+      block->instrs().push_back(new AddInstruction(&rv_hl, index_var));
 
       switch (mode) {
       case ExprKind::EXPR_LVALUE:
+         block->instrs().push_back(new LoadInstruction(out, &rv_hl));
          break;
          
       case ExprKind::EXPR_RVALUE:
-         {
-            MemoryValue *val = new MemoryValue(&rv_hl, type()->bytes());
-            block->instrs().push_back(new LoadInstruction
-                                      (new RegisterValue(return_register(type()->bytes())), val));
-         }
+         block->instrs().push_back
+            (new LoadInstruction(out, new MemoryValue(&rv_hl, type()->bytes())));
          break;
+         
       case ExprKind::EXPR_NONE: abort();
       }
       return block;
@@ -1067,15 +974,63 @@ namespace zc {
 
    static int label_counter = 0;
 
+   const Register *return_register(const Value *val) { return return_register(val->size()); }
    const Register *return_register(int bytes) {
       switch (bytes) {
-      case byte_size:
-         return &r_a;
-      case word_size:
-      case long_size:
-         return &r_hl;
-      default:
-         abort();
+      case byte_size: return &r_a;
+      case word_size: return &r_hl;
+      case long_size: return &r_hl;
+      default:        abort();
+      }
+   }
+
+   const RegisterValue *return_rv(const Value *val) { return return_rv(val->size()); }
+   const RegisterValue *return_rv(int bytes) {
+      switch (bytes) {
+      case byte_size: return &rv_a;
+      case word_size: return &rv_hl;
+      case long_size: return &rv_hl;
+      default:        abort();
+      }
+   }
+
+   const RegisterValue *crt_arg1(const Value *val) { return crt_arg1(val->size()); }
+   const RegisterValue *crt_arg1(int bytes) {
+      switch (bytes) {
+      case byte_size: return &rv_a;
+      case word_size: return &rv_hl;
+      case long_size: return &rv_hl;
+      default:        abort();
+      }
+   }
+
+   const RegisterValue *crt_arg2(const Value *val) { return crt_arg2(val->size()); }   
+   const RegisterValue *crt_arg2(int bytes) {
+      switch (bytes) {
+      case byte_size: return &rv_b;
+      case word_size: return &rv_bc;
+      case long_size: return &rv_bc;
+      default:        abort();
+      }
+   }
+
+   std::string crt_prefix(const Value *val) { return crt_prefix(val->size()); }
+   std::string crt_prefix(int bytes) {
+      switch (bytes) {
+      case byte_size: return "__b";
+      case word_size: return "__s";
+      case long_size: return "__i";
+      default:        abort();
+      }
+   }
+
+   const RegisterValue *accumulator(const Value *val) { return accumulator(val->size()); }
+   const RegisterValue *accumulator(int bytes) {
+      switch (bytes) {
+      case byte_size: return &rv_a;
+      case word_size: abort();
+      case long_size: return &rv_hl;
+      default:        abort();
       }
    }
 
@@ -1085,138 +1040,217 @@ namespace zc {
       return new Label(s);
    }
 
-   void emit_nonzero_test(CgenEnv& env, Block *block, int bytes) {
-      Instructions& instrs = block->instrs();
-      
+   void emit_nonzero_test(CgenEnv& env, Block *block, const Value *in) {
+      int bytes = in->size();
       switch (bytes) {
       case byte_size:
-         /* or a,a */
-         instrs.push_back(new OrInstruction(new RegisterValue(&r_a),
-                                            new RegisterValue(&r_a)));
+         /* ld a,<out>
+          * or a,a
+          */
+         block->instrs().push_back(new LoadInstruction(new RegisterValue(&r_a), in));
+         block->instrs().push_back
+            (new OrInstruction(new RegisterValue(&r_a), new RegisterValue(&r_a)));
          break;
          
-      case word_size:
-      case long_size:
-         /* ld de,0
-          * xor a,a
-          * sbc hl,de
-          */
-         instrs.push_back(new LoadInstruction(new RegisterValue(&r_de),
-                                              new ImmediateValue((intmax_t) 0, long_size)));
-         instrs.push_back(new XorInstruction(new RegisterValue(&r_a), new RegisterValue(&r_a)));
-         instrs.push_back(new SbcInstruction(new RegisterValue(&r_hl), new RegisterValue(&r_de)));
-         break;
-      }
-   }
-
-   void emit_logical_not(CgenEnv& env, Block *block, int bytes) {
-      Instructions& instrs = block->instrs();
-      
-      switch (bytes) {
-      case byte_size:
-         /* cp a,1   ; CF set iff a == 0
-          * ld a,0   ; 
-          * adc a,a  ; a <- 1 if CF set; a <- 0 if CF reset
-          */
-         instrs.push_back(new CompInstruction(&rv_a, &imm_b<1>));
-         instrs.push_back(new LoadInstruction(&rv_a, &imm_b<0>));
-         instrs.push_back(new AdcInstruction(&rv_a, &rv_a)); /* save one byte */
-         break;
-
       case word_size: abort();
-         
       case long_size:
-         /* ld de,0
-          * scf 
-          * sbc hl,de
-          * ex de,hl
-          * adc hl,hl
+         /* ld hl,<in> 
+          * call _icmpzero
           */
-         instrs.push_back(new LoadInstruction(&rv_de, &imm_l<0>));
-         instrs.push_back(new ScfInstruction());
-         instrs.push_back(new SbcInstruction(&rv_hl, &rv_de));
-         instrs.push_back(new ExInstruction(&rv_de, &rv_hl));
-         instrs.push_back(new AdcInstruction(&rv_hl, &rv_hl));
+         block->instrs().push_back(new LoadInstruction(&rv_hl, in));
+         emit_crt("__icmpzero", block);
          break;
       }
    }
 
-   void emit_booleanize(CgenEnv& env, Block *block, int bytes) {
-      Instructions& instrs = block->instrs();
+   /* NOTE: Doesn't return block because it's sealed by transitions.
+    */
+   void emit_predicate(CgenEnv& env, Block *block, ASTExpr *expr, Block *take, Block *leave) {
+      const VariableValue *var = new VariableValue(expr->type()->bytes());
+      block = expr->CodeGen(env, block, var, ASTExpr::ExprKind::EXPR_RVALUE);
+      emit_nonzero_test(env, block, var);
 
+      /* transitions */
+      block->transitions().vec().push_back(new JumpTransition(take, Cond::NZ));
+      block->transitions().vec().push_back(new JumpTransition(leave, Cond::Z));
+   }
+
+   void emit_logical_not(CgenEnv& env, Block *block, const Value *in, const Value *out) {
+      Instructions& is = block->instrs();
+
+      int bytes = in->size();
       switch (bytes) {
       case byte_size:
-         /* neg
+         /* ld a,<in>
+          * cp a,1
           * ld a,0
           * adc a,a
+          * ld <out>,a
           */
-         instrs.push_back(new NegInstruction());
-         instrs.push_back(new LoadInstruction(&rv_a, &imm_b<0>));
-         instrs.push_back(new AdcInstruction(&rv_a, &rv_a));
+         is.push_back(new LoadInstruction(&rv_a, in));
+         is.push_back(new CompInstruction(&rv_a, &imm_b<0>));
+         is.push_back(new LoadInstruction(&rv_a, &imm_b<0>));
+         is.push_back(new AdcInstruction(&rv_a, &rv_a));
+         is.push_back(new LoadInstruction(out, &rv_a));
          break;
-         
+
       case word_size: abort();
          
       case long_size:
-         /* ex de,hl
-          * ld hl,0
-          * xor a,a
-          * sbc hl,de
-          * adc a,a
+         /* or a,a
+          * sbc hl,hl  ; ld hl,0
+          * sbc hl,<in> ; CF <- <in> is nonzero
+          * sbc hl,hl ; ld hl,-1 (c), ld hl,0 (nc)
+          * inc hl
+          * ld <out>,hl
           */
-         instrs.push_back(new ExInstruction(&rv_de, &rv_hl));
-         instrs.push_back(new LoadInstruction(&rv_hl, &imm_l<0>));
-         instrs.push_back(new XorInstruction(&rv_a, &rv_a));
-         instrs.push_back(new SbcInstruction(&rv_hl, &rv_de));
-         instrs.push_back(new AdcInstruction(&rv_a, &rv_a));
+         is.push_back(new OrInstruction(&rv_a, &rv_a));
+         is.push_back(new SbcInstruction(&rv_hl, &rv_hl));
+         is.push_back(new SbcInstruction(&rv_hl, in));
+         is.push_back(new SbcInstruction(&rv_hl, &rv_hl));
+         is.push_back(new IncInstruction(&rv_hl));
+         is.push_back(new LoadInstruction(out, &rv_hl));
          break;
-
-      default:
-         abort();
       }
    }
 
-   Block *emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr) {
-      return emit_binop(env, block, expr, &rv_de);
-   }
-   
-   Block *emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr,
-                     const RegisterValue *long_rhs_reg) {
-      Instructions& instrs = block->instrs();
-      int bytes = expr->type()->bytes();
-      int lhs_bytes = expr->lhs()->type()->bytes();
-      int rhs_bytes = expr->rhs()->type()->bytes();
+   void emit_booleanize(CgenEnv& env, Block *block, const Value *in, const Value *out) {
+      Instructions& is = block->instrs();
 
-      /* evaluate rhs first */
-      block = expr->rhs()->CodeGen(env, block, ASTBinaryExpr::ExprKind::EXPR_RVALUE);
-
-      /* save rhs result */
-      switch (rhs_bytes) {
+      int bytes = in->size();
+      switch (bytes) {
       case byte_size:
-         block->instrs().push_back(new PushInstruction(&rv_af));
+         /* xor a,a
+          * cp a,<in>
+          * adc a,a
+          * ld <out>,a
+          */
+         is.push_back(new XorInstruction(&rv_a, &rv_a));
+         is.push_back(new CompInstruction(&rv_a, in));
+         is.push_back(new AdcInstruction(&rv_a, &rv_a));
+         is.push_back(new LoadInstruction(out, &rv_a));
          break;
+         
       case word_size: abort();
+         
       case long_size:
-         block->instrs().push_back(new PushInstruction(&rv_hl));
+         /* ld hl,0
+          * or a,a
+          * sbc hl,<in>
+          * adc a,a
+          * ld <out>,a
+          */
+         is.push_back(new LoadInstruction(&rv_hl, &imm_l<0>));
+         is.push_back(new OrInstruction(&rv_a, &rv_a));
+         is.push_back(new SbcInstruction(&rv_hl, in));
+         is.push_back(new AdcInstruction(&rv_a, &rv_a));
+         is.push_back(new LoadInstruction(out, &rv_a));
          break;
+
       default:
          abort();
       }
+   }
+
+   Block *emit_incdec(CgenEnv& env, Block *block, bool inc_not_dec, bool pre_not_post,
+                      ASTExpr *subexpr, const Value *out) {
+      const VariableValue *lval = new VariableValue(long_size);
+      block = subexpr->CodeGen(env, block, lval, ASTExpr::ExprKind::EXPR_LVALUE);
+      Instructions& is = block->instrs();
+
+      /* preincrement if necessary */
+      if (pre_not_post) {
+         switch (out->size()) {
+         case byte_size:
+            /* ld a,(<lval>)
+             * inc/dec a
+             * ld (<lval>),a
+             * ld <out>,a
+             * NOTE: Target for peephole optimization.
+             */
+            {
+               const MemoryValue *memval = new MemoryValue(lval, subexpr->type()->bytes());
+               is.push_back(new LoadInstruction(&rv_a, memval));
+               if (inc_not_dec) { is.push_back(new IncInstruction(&rv_a)); }
+               else { is.push_back(new DecInstruction(&rv_a)); }
+               is.push_back(new LoadInstruction(memval, &rv_a));
+               if (out) { is.push_back(new LoadInstruction(out, &rv_a)); }
+            }
+            break;
+         case word_size: abort();
+         case long_size:
+            /* ld hl,<lval>
+             * ld <rval>,(hl)
+             * inc/dec <rval>
+             * ld (hl),<rval>
+             * ld <out>,<rval>
+             */
+            {
+               const VariableValue *rval = new VariableValue(long_size);
+               const MemoryValue *memval = new MemoryValue(&rv_hl, long_size);
+               is.push_back(new LoadInstruction(&rv_hl, lval));
+               is.push_back(new LoadInstruction(rval, memval));
+               if (inc_not_dec) { is.push_back(new IncInstruction(rval)); }
+               else { is.push_back(new DecInstruction(rval)); }
+               is.push_back(new LoadInstruction(memval, rval));
+               if (out) { is.push_back(new LoadInstruction(out, rval)); }
+            }
+            break;
+         }
+      } else {
+         /* post inc/dec */
+         switch (out->size()) {
+         case byte_size:
+            /* ld a,(<lval>)
+             * ld <out>,a
+             * inc/dec a
+             * ld (<lval>),a
+             */
+            {
+               const MemoryValue *memval = new MemoryValue(lval, byte_size);
+               is.push_back(new LoadInstruction(&rv_a, memval));
+               is.push_back(new LoadInstruction(out, &rv_a));
+               if (inc_not_dec) { is.push_back(new IncInstruction(&rv_a)); }
+               else { is.push_back(new DecInstruction(&rv_a)); }
+               is.push_back(new LoadInstruction(memval, &rv_a));
+            }
+            break;
+         case word_size: abort();
+         case long_size:
+            /* ld hl,<lval>
+             * ld <rval>,(hl)
+             * ld <out>,<rval>
+             * inc/dec <rval>
+             * ld (hl),<rval>
+             */
+            {
+               const VariableValue *rval = new VariableValue(long_size);
+               const MemoryValue *memval = new MemoryValue(&rv_hl, long_size);
+               is.push_back(new LoadInstruction(&rv_hl, lval));
+               is.push_back(new LoadInstruction(rval, memval));
+               is.push_back(new LoadInstruction(out, rval));
+               if (inc_not_dec) { is.push_back(new IncInstruction(rval)); }
+               else { is.push_back(new DecInstruction(rval)); }
+               is.push_back(new LoadInstruction(memval, rval));
+            }
+            break;
+         }
+      }
+
+      return block;
+   }
+
+   
+   
+   Block *emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr, const Value *out_lhs,
+                     const Value *out_rhs) {
+      Instructions& instrs = block->instrs();
 
       /* evaluate lhs */
-      block = expr->lhs()->CodeGen(env, block, ASTBinaryExpr::ExprKind::EXPR_RVALUE);
-
-      /* restore rhs result */
-      switch (rhs_bytes) {
-      case byte_size:
-         block->instrs().push_back(new PopInstruction(&rv_bc));
-         break;
-      case word_size: abort();
-      case long_size:
-         block->instrs().push_back(new PopInstruction(long_rhs_reg));
-         break;
-      default: abort();
-      }
+      block = expr->lhs()->CodeGen(env, block, out_lhs, ASTBinaryExpr::ExprKind::EXPR_RVALUE);
+      
+      /* evaluate rhs */
+      block = expr->rhs()->CodeGen(env, block, out_rhs, ASTBinaryExpr::ExprKind::EXPR_RVALUE);
 
       return block;
    }
@@ -1226,28 +1260,6 @@ namespace zc {
       block->instrs().push_back(new CallInstruction(lv));
    }
 
-   Block *emit_ld_a_zf(CgenEnv& env, Block *block, bool inverted) {
-      block->instrs().push_back(new LoadInstruction(&rv_a, &imm_b<0>));
-      
-      const Label *end_label = new_label();
-      Block *end_block = new Block(end_label);
-      BlockTransition *end_transition = new JumpTransition(end_block,
-                                                           inverted ? Cond::Z : Cond::NZ);
-      const Label *cont_label = new_label();
-      Block *cont_block = new Block(cont_label);
-      BlockTransition *cont_transition = new JumpTransition(cont_block,
-                                                            inverted ? Cond::NZ : Cond::Z);
-      
-      block->transitions().vec().push_back(end_transition);
-      block->transitions().vec().push_back(cont_transition);
-      
-      cont_block->instrs().push_back(new IncInstruction(&rv_a));
-
-      /* join */
-      cont_block->transitions().vec().push_back(new JumpTransition(end_block, Cond::ANY));
-
-      return end_block;
-   }
 
    void emit_frameset(CgenEnv& env, Block *block) {
       /* push ix
@@ -1270,10 +1282,9 @@ namespace zc {
        * pop ix
        * ret
        */
-      block->instrs().push_back
-         (new LeaInstruction
-          (&rv_ix, new IndexedRegisterValue
-           (&rv_ix, env.ext_env().frame().locals_bytes())));
+      block->instrs().push_back(new LeaInstruction
+                                (&rv_ix, new IndexedRegisterValue
+                                 (&rv_ix, env.ext_env().frame().locals_bytes())));
       block->instrs().push_back(new LoadInstruction(&rv_sp, &rv_ix));
       block->instrs().push_back(new PopInstruction(&rv_ix));
       block->instrs().push_back(new RetInstruction());
@@ -1337,14 +1348,6 @@ namespace zc {
       }
    }
 
-#if 0
-   void FunctionImpl::DumpAsm(std::ostream& os) const {
-      std::unordered_set<const Block *> emitted_blocks;
-      entry()->DumpAsm(os, emitted_blocks, this);
-      fin()->DumpAsm(os, emitted_blocks, this);
-   }
-#else
-
    void Block::DumpAsm(const Block *block, std::ostream& os, const FunctionImpl *impl) {
       /* emit label */
       block->label()->EmitDef(os);
@@ -1368,44 +1371,6 @@ namespace zc {
       entry()->for_each_block(visited, fn, os, this);
       fin()->for_each_block(visited, fn, os, this);      
    }
-   
-#endif
-#if 0
-   void Block::DumpAsm(std::ostream& os,
-                       std::unordered_set<const Block *>& emitted_blocks,
-                       const FunctionImpl *impl) const {
-      /* check if already emitted */
-      if (emitted_blocks.find(this) != emitted_blocks.end()) {
-         return;
-      } else {
-         emitted_blocks.insert(this);
-      }
-      
-      label()->EmitDef(os);
-
-      for (const Instruction *instr : instrs()) {
-         instr->Emit(os);
-      }
-
-      /* emit transitions */
-      Blocks dsts;
-      transitions().DumpAsm(os, dsts, impl);
-
-      /* emit destination blocks */
-      for (const Block *block : dsts) {
-         block->DumpAsm(os, emitted_blocks, impl);
-      }
-   }
-#endif
-
-#if 0
-   void BlockTransitions::DumpAsm(std::ostream& os, Blocks& to_emit, const FunctionImpl *impl) const
-   {
-      for (const BlockTransition *trans : vec()) {
-         trans->DumpAsm(os, to_emit, impl);
-      }
-   }
-#endif
 
    void JumpTransition::DumpAsm(std::ostream& os, const FunctionImpl *impl) const {
       os << "\tjp\t";
