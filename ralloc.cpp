@@ -9,7 +9,7 @@
 namespace zc::z80 {
 
    int RallocInterval::length() const {
-      assert(begin >= 0 && end > begin);
+      assert(begin >= 0 && end >= begin);
       return end - begin;
    }
 
@@ -41,6 +41,7 @@ namespace zc::z80 {
       return intervals_.end();
    }
 
+#if 0
    void RegisterAllocator::ComputeRegIntervals() {
       /* 1. For each instruction in block,
        * 1a.  If destination is register, then mark register as used at this instruction index.
@@ -64,6 +65,7 @@ namespace zc::z80 {
       }
       
    }
+#endif
 
    void VariableRallocInfo::RenameVar() {
       const VariableValue *newval = val->Rename();
@@ -113,8 +115,10 @@ namespace zc::z80 {
    void RegisterAllocator::ComputeIntervals() {
       enum class mode {GEN, USE};
       std::list<const Value *> gens, uses;
-      std::unordered_map<const ByteRegister *, std::map<int,mode>> byte_regs;
-      std::unordered_map<int, std::map<int,mode>> vars;
+      std::unordered_map<const ByteRegister *,
+                         std::map<int,std::pair<Instructions::iterator,mode>>> byte_regs;
+      std::unordered_map<const VariableValue *,
+                         std::map<int,std::pair<Instructions::iterator,mode>>> vars;
 
       /* populate local regs maps with all alloc'able regs */
       for (const ByteRegister *reg : {&r_a, &r_b, &r_c, &r_d, &r_e, &r_h, &r_l}) {
@@ -135,6 +139,9 @@ namespace zc::z80 {
             {
                for (const Value *val : (m == mode::GEN) ? gens : uses) {
                   const Register *reg = val->reg();
+                  const VariableValue *var = val->var();
+                  
+                  /* add register */
                   if (reg) {
                      /* process byte reg lifetimes */
                      std::list<const ByteRegister *> cur_regs;
@@ -147,9 +154,14 @@ namespace zc::z80 {
                      for (const ByteRegister *byte_reg : cur_regs) {
                         auto it = byte_regs.find(byte_reg);
                         if (it != byte_regs.end()) {
-                           it->second.insert({instr_index, m});
+                           it->second.insert({instr_index, {instr_it, m}});
                         }
                      }
+                  }
+
+                  /* add variable */
+                  if (var) {
+                     vars[var].insert({instr_index, {instr_it, m}});
                   }
                }
             };
@@ -158,14 +170,70 @@ namespace zc::z80 {
          fn(mode::GEN);
       }
 
-      /* print out results */
+      /* convert results to intervals */
+
+      /* compute register free intervals, backwards */
       for (auto reg_it : byte_regs) {
-         std::cerr << reg_it.first->name() << ":\t";
-         for (auto event_it : reg_it.second) {
-            std::cerr << event_it.first << " " << (event_it.second == mode::GEN ? "gen" : "use")
-                      << ", ";
+         RallocIntervals reg_free_ints;
+         auto info_it = reg_it.second.rbegin();
+         auto info_end = reg_it.second.rend();
+         RallocInterval cur_int;
+
+         /* loop invariant: end set */
+         cur_int.end = block()->instrs().size() - 1;
+         cur_int.end_it = --block()->instrs().end();
+         do {
+            /* Find 1st `use'. */
+            while (info_it != info_end && info_it->second.second != mode::USE) {
+               ++info_it;
+            }
+            if (info_it == info_end) {
+               cur_int.begin = 0;
+               cur_int.begin_it = block()->instrs().begin();
+            } else {
+               cur_int.begin = info_it->first;
+               auto tmp_it = info_it->second.first;
+               cur_int.begin_it = tmp_it;
+            }
+
+            if (cur_int.begin <= cur_int.end) {
+               reg_free_ints.insert(cur_int);
+            }
+
+            /* skip until `gen' */
+            while (info_it != info_end && info_it->second.second != mode::GEN) {
+               ++info_it;
+            }
+            if (info_it != info_end) {
+               cur_int.end = info_it->first;
+               cur_int.end_it = (Instructions::iterator) info_it->second.first;
+            }
+         } while (info_it != info_end);
+
+         /* insert into ralloc list */
+         regs_.insert({reg_it.first, reg_free_ints});
+      }      
+
+      /* process variable lifetime intervals */
+      for (auto var_it : vars) {
+         auto info_it = var_it.second.begin();
+         auto info_end = var_it.second.end();
+         assert(info_it->second.second == mode::GEN);
+
+         VariableRallocInfo info(var_it.first, info_it->second.first, info_it->first);
+
+         /* add uses */
+         ++info_it;
+         while (info_it != info_end) {
+            info.uses.push_back(info_it->second.first);
+            info.interval.end_it = info_it->second.first;
+            info.interval.end = info_it->first;
+
+            ++info_it;
          }
-         std::cerr << std::endl;
+
+         /* add to vars_ */
+         vars_.insert({var_it.first->id(), info});
       }
       
    }
@@ -181,7 +249,8 @@ namespace zc::z80 {
    }
 
    void VariableRallocInfo::Dump(std::ostream& os) const {
-      os << "var v" << val->id() << std::endl;
+      val->Emit(os);
+      os << std::endl;
       os << "\tinterval:\t";
       interval.Dump(os);
       os << std::endl;
@@ -199,7 +268,11 @@ namespace zc::z80 {
       for (auto it : regs_) {
          it.first->Dump(os);
          os << ": ";
-         it.second.Dump(os);
+         for (auto interval : it.second) {
+            interval.Dump(os);
+            os << " ";
+         }
+         os << std::endl;
       }
 
       for (auto it : vars_) {
@@ -211,10 +284,8 @@ namespace zc::z80 {
    void RegisterAllocator::RallocBlock(Block *block) {
       std::cerr << block->label()->name() << ":" << std::endl;
       RegisterAllocator ralloc(block);
-      // ralloc.ComputeRegIntervals();
-      // ralloc.ComputeVarLifetimes();
       ralloc.ComputeIntervals();
-      // ralloc.Dump(std::cerr);
+      ralloc.Dump(std::cerr);
    }
 
    void RegisterAllocator::Ralloc(FunctionImpl& impl) {

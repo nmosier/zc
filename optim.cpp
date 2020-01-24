@@ -4,6 +4,8 @@
 #include "peephole.hpp"
 #include "ralloc.hpp"
 
+#define PEEPHOLE 0
+
 namespace zc {
 
    void OptimizeAST(TranslationUnit *root) {
@@ -13,13 +15,15 @@ namespace zc {
    void OptimizeIR(CgenEnv& env) {
       /* pass 0: register allocation */
       RegisterAllocator::Ralloc(env);
-      
+
+#if PEEPHOLE
       /* pass 1: peephole optimization */
       for (FunctionImpl& impl : env.impls().impls()) {
          for (const PeepholeOptimization& optim : peephole_optims) {
             optim.Pass(&impl);
          }
       }
+#endif
    }
    
 

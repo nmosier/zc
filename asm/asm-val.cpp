@@ -21,7 +21,14 @@ namespace zc::z80 {
    }
 
    void VariableValue::Emit(std::ostream& os) const {
-      os << "v" << id();
+      os << (requires_reg() ? 'r' : 'v');
+      switch (size()) {
+      case byte_size: os << 'b'; break;
+      case word_size: os << 'w'; break;
+      case long_size: os << 'l'; break;
+      default: abort();
+      }
+      os << id();
    }
 
    void IndexedRegisterValue::Emit(std::ostream& os) const {

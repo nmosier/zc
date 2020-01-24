@@ -15,7 +15,9 @@ namespace zc::z80 {
     */
    struct RallocInterval {
       int begin = -1;
+      Instructions::iterator begin_it;
       int end = -1;
+      Instructions::iterator end_it;
 
       int length() const;
 
@@ -26,10 +28,20 @@ namespace zc::z80 {
       void Dump(std::ostream& os) const { os << "[" << begin << "," << end << "]"; }
 
       RallocInterval(int begin, int end): begin(begin), end(end) {}
+      RallocInterval() {}
    };
 
    typedef std::set<RallocInterval> RallocIntervals;
 
+#if 0
+   struct VariableRallocTraits {
+      int uses; /*!< number of times this variable is used */
+      int bytes; /*!< variable byte size */
+      bool is_stack_spillable; /*!< can be spilled onto stack */
+      bool requires_reg; /*!< requires register when used */
+   };
+#endif
+   
    /**
     * Variable info for the register allocator.
     */
@@ -98,7 +110,7 @@ namespace zc::z80 {
    protected:
       Block *block_;
       std::unordered_map<int, VariableRallocInfo> vars_;
-      std::unordered_map<const Register *, RegisterFreeIntervals> regs_;
+      std::unordered_map<const ByteRegister *, RallocIntervals> regs_;
 
       static void RallocBlock(Block *block);
    };

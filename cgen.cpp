@@ -372,7 +372,8 @@ namespace zc {
       block = lhs()->CodeGen(env, block, lhs_var, ExprKind::EXPR_LVALUE);
 
       /* assign */
-      const MemoryValue *memval = new MemoryValue(lhs_var, type()->bytes());
+      block->instrs().push_back(new LoadInstruction(&rv_hl, lhs_var));
+      const MemoryValue *memval = new MemoryValue(&rv_hl, type()->bytes());
       block->instrs().push_back(new LoadInstruction(memval, rhs_var));
 
       /* propogate result */
