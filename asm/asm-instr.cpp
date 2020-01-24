@@ -63,4 +63,23 @@ namespace zc::z80 {
       return it == end && other_it == other_end;
    }
 
+   /*** GEN & USE ***/
+   
+   void BitwiseInstruction::Gen(std::list<const Value *>& vals) const {
+      if (!dst()->Eq(src())) { vals.push_back(dst()); }
+   }
+
+   void BitwiseInstruction::Use(std::list<const Value *>& vals) const {
+      if (!dst()->Eq(src())) { vals.push_back(dst()); vals.push_back(src()); }
+   }
+
+   void CplInstruction::Gen(std::list<const Value *>& vals) const { vals.push_back(&rv_a); }
+   void CplInstruction::Use(std::list<const Value *>& vals) const { vals.push_back(&rv_a); }
+
+   void NegInstruction::Gen(std::list<const Value *>& vals) const { vals.push_back(&rv_a); }
+   void NegInstruction::Use(std::list<const Value *>& vals) const { vals.push_back(&rv_a); }
+
+   void DjnzInstruction::Gen(std::list<const Value *>& vals) const { vals.push_back(&rv_b); }
+   void DjnzInstruction::Use(std::list<const Value *>& vals) const { vals.push_back(&rv_b); }
+   
 }

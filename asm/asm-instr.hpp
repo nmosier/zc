@@ -25,11 +25,19 @@ namespace zc::z80 {
    class Instruction {
    public:
       const Value *dst() const { return (operands().size() >= 1) ? *operands().front() : nullptr; }
-      const Value *src() const { return (operands().size() >= 2) ? **++operands().begin() : nullptr; }
+      const Value *src() const {
+         return (operands().size() >= 2) ? **++operands().begin() : nullptr;
+      }
       const Values& operands() const { return operands_; }
       Values& operands() { return operands_; }
       const std::string& name() const { return name_; }
       FlagMod flagmod(const Flag& flag) const;
+
+      virtual void Gen(std::list<const Value *>& vals) const {}
+      virtual void Use(std::list<const Value *>& vals) const {}      
+      
+      virtual std::list<const Value *> gen() const = 0;
+      virtual std::list<const Value *> use() const = 0;
 
       void Emit(std::ostream& os) const;
 
@@ -51,7 +59,11 @@ namespace zc::z80 {
 
    class BinaryInstruction: public Instruction {
    public:
-
+      virtual void Gen(std::list<const Value *>& vals) const override { vals.push_back(dst()); }
+      virtual void Use(std::list<const Value *>& vals) const override {
+         vals.push_back(dst()); vals.push_back(src());
+      }
+      
    protected:
       template <typename... Args>
       BinaryInstruction(const Value *dst, const Value *src, Args... args):
@@ -60,12 +72,23 @@ namespace zc::z80 {
 
    class UnaryInstruction: public Instruction {
    public:
-      // const Value *dst() const;
-
+      virtual void Gen(std::list<const Value *>& vals) const override { vals.push_back(dst()); }
+      virtual void Use(std::list<const Value *>& vals) const override { vals.push_back(dst()); }
+      
    protected:
       template <typename... Args>
       UnaryInstruction(const Value *dst, Args... args):
          Instruction(Values {dst}, args...) {}
+   };
+
+   class BitwiseInstruction: public BinaryInstruction {
+   public:
+      virtual void Gen(std::list<const Value *>& vals) const override;
+      virtual void Use(std::list<const Value *>& vals) const override;
+
+   protected:
+      template <typename... Args>
+      BitwiseInstruction(Args... args): BinaryInstruction(args...) {}
    };
 
    /***********************
@@ -94,7 +117,7 @@ namespace zc::z80 {
    /**
     * "AND" instruction class.
     */
-   class AndInstruction: public BinaryInstruction {
+   class AndInstruction: public BitwiseInstruction {
    public:
       template <typename... Args>
       AndInstruction(Args... args): BinaryInstruction(args..., "and") {}
@@ -105,6 +128,10 @@ namespace zc::z80 {
     */
    class CallInstruction: public UnaryInstruction {
    public:
+      /* TODO -- this might need to be marked as using everything... */
+      virtual void Gen(std::list<const Value *>& vals) const override {}
+      virtual void Use(std::list<const Value *>& vals) const override {}
+      
       template <typename... Args>
       CallInstruction(Args... args): UnaryInstruction(args..., "call") {}
    };
@@ -123,6 +150,8 @@ namespace zc::z80 {
     */
    class CompInstruction: public BinaryInstruction {
    public:
+      virtual void Gen(std::list<const Value *>& vals) const override {}
+
       template <typename... Args>
       CompInstruction(Args... args): BinaryInstruction(args..., "cp") {}
    };
@@ -132,6 +161,9 @@ namespace zc::z80 {
     */
    class CplInstruction: public Instruction {
    public:
+      virtual void Gen(std::list<const Value *>& vals) const override;
+      virtual void Use(std::list<const Value *>& vals) const override;
+      
       template <typename... Args>
       CplInstruction(Args... args): Instruction(args..., "cpl") {}
    };
@@ -150,6 +182,9 @@ namespace zc::z80 {
     */
    class DjnzInstruction: public UnaryInstruction {
    public:
+      virtual void Gen(std::list<const Value *>& vals) const override;
+      virtual void Use(std::list<const Value *>& vals) const override;
+
       template <typename... Args>
       DjnzInstruction(Args... args): UnaryInstruction(args..., "djnz") {}
    };
@@ -159,6 +194,8 @@ namespace zc::z80 {
     */
    class ExInstruction: public BinaryInstruction {
    public:
+      /* TODO -- Gen and Use are nuanced. */
+      
       template <typename... Args>
       ExInstruction(Args... args): BinaryInstruction(args..., "ex") {}
    };
@@ -168,6 +205,7 @@ namespace zc::z80 {
     */
    class IncInstruction: public UnaryInstruction {
    public:
+      
       template <typename... Args>
       IncInstruction(Args... args): UnaryInstruction(args..., "inc") {}
    };
@@ -177,6 +215,9 @@ namespace zc::z80 {
     */
    class JumpInstruction: public UnaryInstruction {
    public:
+      virtual void Gen(std::list<const Value *>& vals) const override {}
+      virtual void Use(std::list<const Value *>& vals) const override {}
+      
       template <typename... Args>
       JumpInstruction(Args... args): UnaryInstruction(args..., "jp") {}
    protected:
@@ -189,8 +230,6 @@ namespace zc::z80 {
    public:
       const FlagState *cond() const { return cond_; }
       
-      // virtual void Emit(std::ostream& os) const override;
-
       template <typename... Args>
       JumpCondInstruction(const FlagState *cond, bool state, Args... args):
          JumpInstruction(args...), cond_(cond) {}
@@ -204,6 +243,9 @@ namespace zc::z80 {
     */
    class LoadInstruction: public BinaryInstruction {
    public:
+      virtual void Gen(std::list<const Value *>& vals) const override { vals.push_back(dst()); }
+      virtual void Use(std::list<const Value *>& vals) const override { vals.push_back(src()); }
+      
       template <typename... Args>
       LoadInstruction(Args... args): BinaryInstruction(args..., "ld") {}
    };
@@ -213,6 +255,8 @@ namespace zc::z80 {
     */
    class LeaInstruction: public BinaryInstruction {
    public:
+      virtual void Use(std::list<const Value *>& vals) const override {}
+      
       template <typename... Args>
       LeaInstruction(Args... args): BinaryInstruction(args..., "lea") {}
    };
@@ -231,6 +275,9 @@ namespace zc::z80 {
     */
    class NegInstruction: public Instruction {
    public:
+      virtual void Gen(std::list<const Value *>& vals) const override;
+      virtual void Use(std::list<const Value *>& vals) const override;
+
       template <typename... Args>
       NegInstruction(Args... args): Instruction(args..., "neg") {}
    };
@@ -238,7 +285,7 @@ namespace zc::z80 {
    /**
     * "OR" instruction class
     */
-   class OrInstruction: public BinaryInstruction {
+   class OrInstruction: public BitwiseInstruction {
    public:
       template <typename... Args>
       OrInstruction(Args... args): BinaryInstruction(args..., "or") {}
@@ -249,6 +296,8 @@ namespace zc::z80 {
     */
    class PeaInstruction: public UnaryInstruction {
    public:
+      virtual void Use(std::list<const Value *>& vals) const override {}
+      
       template <typename... Args>
       PeaInstruction(Args... args): UnaryInstruction(args..., "pea") {}
    };
@@ -258,6 +307,8 @@ namespace zc::z80 {
     */
    class PopInstruction: public UnaryInstruction {
    public:
+      virtual void Use(std::list<const Value *>& vals) const override {}
+      
       template <typename... Args>
       PopInstruction(Args... args): UnaryInstruction(args..., "pop") {}
    };
@@ -267,6 +318,8 @@ namespace zc::z80 {
     */
    class PushInstruction: public UnaryInstruction {
    public:
+      virtual void Gen(std::list<const Value *>& vals) const override {}
+
       template <typename... Args>
       PushInstruction(Args... args): UnaryInstruction(args..., "push") {}
    };
@@ -287,8 +340,6 @@ namespace zc::z80 {
    public:
       const FlagState *cond() const { return cond_; }
 
-      // virtual void Emit(std::ostream& os) const override;
-      
       template <typename... Args>
       RetCondInstruction(const FlagState *cond, Args... args):
          RetInstruction(args...), cond_(cond) {}
@@ -390,7 +441,7 @@ namespace zc::z80 {
    /**
     * "XOR" instruction class
     */
-   class XorInstruction: public BinaryInstruction {
+   class XorInstruction: public BitwiseInstruction {
    public:
       template <typename... Args>
       XorInstruction(Args... args): BinaryInstruction(args..., "xor") {}
