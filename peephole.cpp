@@ -156,6 +156,7 @@ namespace zc::z80 {
       int8_t index;
 
       /* instruction 1 */
+      if (it == end) { return no_match(); }
       const RegisterValue rv_1(&rr, long_size);
       const IndexedRegisterValue ir_1(&rv_ix, &index);
       const LeaInstruction instr1(&rv_1, &ir_1);
@@ -163,6 +164,7 @@ namespace zc::z80 {
       ++it;
 
       /* instruction 2 */
+      if (it == end) { return no_match(); }      
       const RegisterValue rv_2(rr);
       const PushInstruction instr2(&rv_2);
       if (!instr2.Match(*it)) { return no_match(); }
@@ -172,13 +174,34 @@ namespace zc::z80 {
       out.push_back(new PeaInstruction(new IndexedRegisterValue(&rv_ix, index)));
       return it;
    }
+
+   Instructions::const_iterator peephole_self_load(Instructions::const_iterator begin,
+                                                   Instructions::const_iterator end,
+                                                   Instructions& out) {
+      /* ld r,r */      
+      Instructions::const_iterator it = begin;
+      const auto no_match = [&](){ out.clear(); return begin; };      
+
+      /* unbound values */
+      const Register *r;
+      int size;
+      
+      if (it == end) { return no_match(); }
+      const RegisterValue r_1(&r, &size);
+      const LoadInstruction instr1(&r_1, &r_1);
+      if (!instr1.Match(*it)) { return no_match(); }
+      ++it;
+
+      return it;
+   }
    
 
 
    const std::forward_list<PeepholeOptimization> peephole_optims = 
       {PeepholeOptimization(peephole_indexed_load_store),
        PeepholeOptimization(peephole_push_pop), 
-       PeepholeOptimization(peephole_pea),      
+       PeepholeOptimization(peephole_pea),
+       PeepholeOptimization(peephole_self_load),
       };
 
    
