@@ -64,4 +64,5 @@ echo \"_$SYM\" @ 0x"$REAL_ADDR"
 # print out dump
 REAL_ADDR=$(printf %06x $((0x$REAL_ADDR)))
 L=$(awk '/^'$REAL_ADDR':/ { print NR; exit 0 }' "$DUMP")
-tail -n +"$L" "$DUMP" | head -n "$LINES"
+# tail -n +"$L" "$DUMP" | head -n "$LINES"
+tail -n +"$L" "$DUMP" | awk '{ print $0; } /\<ret\>/ { exit 0; }'
