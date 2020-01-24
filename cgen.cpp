@@ -384,7 +384,6 @@ namespace zc {
    }
 
    Block *UnaryExpr::CodeGen(CgenEnv& env, Block *block, const Value *out, ExprKind mode) {
-      assert(out->size() == type()->bytes());
       int bytes = expr()->type()->bytes();
       const VariableValue *var;
       switch (kind()) {
@@ -503,8 +502,6 @@ namespace zc {
           * is 0. 
           */
          {
-            assert(out->size() == byte_size);
-            
             /* evaluate lhs */
             block = lhs()->CodeGen(env, block, lhs_var, ExprKind::EXPR_RVALUE);
             
@@ -536,8 +533,6 @@ namespace zc {
          /* Short-circuit evaluation dictates that evaluation continues until an operand is nonzero.
           */
          {
-            assert(out->size() == byte_size);
-            
             /* evaluate lhs */
             block = lhs()->CodeGen(env, block, lhs_var, ExprKind::EXPR_RVALUE);
             emit_nonzero_test(env, block, lhs_var);
@@ -567,7 +562,6 @@ namespace zc {
       case Kind::BOP_EQ:
       case Kind::BOP_NEQ:
          {
-            assert(out->size() == byte_size);
             bool eq = (kind() == Kind::BOP_EQ);
             
             block = emit_binop(env, block, this, lhs_var, rhs_var);
@@ -837,7 +831,6 @@ namespace zc {
    
    Block *StringExpr::CodeGen(CgenEnv& env, Block *block, const Value *out, ExprKind mode) {
       assert(mode == ExprKind::EXPR_RVALUE); /* string constants aren't assignable */
-      assert(out->size() == long_size);
       block->instrs().push_back(new LoadInstruction(out, env.strconsts().Ref(*str())));
       return block;
    }
@@ -935,7 +928,9 @@ namespace zc {
       };
 
       int imm = std::visit(CodeGenVisitor(), variant_);
-      block->instrs().push_back(new LoadInstruction(out, new ImmediateValue(imm, out->size())));
+      if (out) {
+         block->instrs().push_back(new LoadInstruction(out, new ImmediateValue(imm, out->size())));
+      }
 
       return block;
    }
@@ -1157,10 +1152,11 @@ namespace zc {
       const VariableValue *lval = new VariableValue(long_size);
       block = subexpr->CodeGen(env, block, lval, ASTExpr::ExprKind::EXPR_LVALUE);
       Instructions& is = block->instrs();
+      int bytes = subexpr->type()->bytes();
 
       /* preincrement if necessary */
       if (pre_not_post) {
-         switch (out->size()) {
+         switch (bytes) {
          case byte_size:
             /* ld a,(<lval>)
              * inc/dec a
@@ -1199,7 +1195,7 @@ namespace zc {
          }
       } else {
          /* post inc/dec */
-         switch (out->size()) {
+         switch (bytes) {
          case byte_size:
             /* ld a,(<lval>)
              * ld <out>,a
