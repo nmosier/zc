@@ -32,7 +32,7 @@ namespace zc::z80 {
     */
    class Register {
    public:
-      enum Kind {REG_BYTE, REG_MULTIBYTE};
+      enum class Kind {REG_BYTE, REG_MULTIBYTE};
       virtual Kind kind() const = 0;
       const char *name() const { return name_; }
       virtual int size() const = 0;

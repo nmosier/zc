@@ -73,6 +73,13 @@ namespace zc::z80 {
       if (!dst()->Eq(src())) { vals.push_back(dst()); vals.push_back(src()); }
    }
 
+   void CallInstruction::Gen(std::list<const Value *>& vals) const {
+         vals.push_back(&rv_hl); vals.push_back(&rv_bc);
+      }
+   void CallInstruction::Use(std::list<const Value *>& vals) const {
+      vals.push_back(&rv_hl); vals.push_back(&rv_bc);
+   }
+   
    void CplInstruction::Gen(std::list<const Value *>& vals) const { vals.push_back(&rv_a); }
    void CplInstruction::Use(std::list<const Value *>& vals) const { vals.push_back(&rv_a); }
 

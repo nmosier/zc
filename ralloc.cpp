@@ -1,4 +1,7 @@
 #include <cassert>
+#include <list>
+#include <unordered_map>
+#include <map>
 
 #include "ralloc.hpp"
 #include "cgen.hpp"
@@ -107,6 +110,66 @@ namespace zc::z80 {
       
    }
 
+   void RegisterAllocator::ComputeIntervals() {
+      enum class mode {GEN, USE};
+      std::list<const Value *> gens, uses;
+      std::unordered_map<const ByteRegister *, std::map<int,mode>> byte_regs;
+      std::unordered_map<int, std::map<int,mode>> vars;
+
+      /* populate local regs maps with all alloc'able regs */
+      for (const ByteRegister *reg : {&r_a, &r_b, &r_c, &r_d, &r_e, &r_h, &r_l}) {
+         byte_regs[reg];
+      }
+
+      /* iterate thru instructions */
+      int instr_index = 0;
+      for (auto instr_it = block()->instrs().begin();
+           instr_it != block()->instrs().end();
+           ++instr_it, ++instr_index, gens.clear(), uses.clear()) {
+         /* get gens and uses in instruction */
+         (*instr_it)->Gen(gens);
+         (*instr_it)->Use(uses);
+
+         auto fn =
+            [&](mode m)
+            {
+               for (const Value *val : (m == mode::GEN) ? gens : uses) {
+                  const Register *reg = val->reg();
+                  if (reg) {
+                     /* process byte reg lifetimes */
+                     std::list<const ByteRegister *> cur_regs;
+                     if (reg->kind() == Register::Kind::REG_MULTIBYTE) {
+                        auto arr = dynamic_cast<const MultibyteRegister *>(reg)->regs();
+                        cur_regs.insert(cur_regs.end(), arr.begin(), arr.end());
+                     } else {
+                        cur_regs = {dynamic_cast<const ByteRegister *>(reg)};
+                     }
+                     for (const ByteRegister *byte_reg : cur_regs) {
+                        auto it = byte_regs.find(byte_reg);
+                        if (it != byte_regs.end()) {
+                           it->second.insert({instr_index, m});
+                        }
+                     }
+                  }
+               }
+            };
+
+         fn(mode::USE);
+         fn(mode::GEN);
+      }
+
+      /* print out results */
+      for (auto reg_it : byte_regs) {
+         std::cerr << reg_it.first->name() << ":\t";
+         for (auto event_it : reg_it.second) {
+            std::cerr << event_it.first << " " << (event_it.second == mode::GEN ? "gen" : "use")
+                      << ", ";
+         }
+         std::cerr << std::endl;
+      }
+      
+   }
+
 
    /*** DUMPS ***/
    void RegisterFreeIntervals::Dump(std::ostream& os) const {
@@ -148,9 +211,10 @@ namespace zc::z80 {
    void RegisterAllocator::RallocBlock(Block *block) {
       std::cerr << block->label()->name() << ":" << std::endl;
       RegisterAllocator ralloc(block);
-      ralloc.ComputeRegIntervals();
-      ralloc.ComputeVarLifetimes();
-      ralloc.Dump(std::cerr);
+      // ralloc.ComputeRegIntervals();
+      // ralloc.ComputeVarLifetimes();
+      ralloc.ComputeIntervals();
+      // ralloc.Dump(std::cerr);
    }
 
    void RegisterAllocator::Ralloc(FunctionImpl& impl) {

@@ -36,9 +36,6 @@ namespace zc::z80 {
       virtual void Gen(std::list<const Value *>& vals) const {}
       virtual void Use(std::list<const Value *>& vals) const {}      
       
-      virtual std::list<const Value *> gen() const = 0;
-      virtual std::list<const Value *> use() const = 0;
-
       void Emit(std::ostream& os) const;
 
       bool Eq(const Instruction *other) const;
@@ -120,7 +117,7 @@ namespace zc::z80 {
    class AndInstruction: public BitwiseInstruction {
    public:
       template <typename... Args>
-      AndInstruction(Args... args): BinaryInstruction(args..., "and") {}
+      AndInstruction(Args... args): BitwiseInstruction(args..., "and") {}
    };
 
    /**
@@ -129,8 +126,8 @@ namespace zc::z80 {
    class CallInstruction: public UnaryInstruction {
    public:
       /* TODO -- this might need to be marked as using everything... */
-      virtual void Gen(std::list<const Value *>& vals) const override {}
-      virtual void Use(std::list<const Value *>& vals) const override {}
+      virtual void Gen(std::list<const Value *>& vals) const override;
+      virtual void Use(std::list<const Value *>& vals) const override;
       
       template <typename... Args>
       CallInstruction(Args... args): UnaryInstruction(args..., "call") {}
@@ -288,7 +285,7 @@ namespace zc::z80 {
    class OrInstruction: public BitwiseInstruction {
    public:
       template <typename... Args>
-      OrInstruction(Args... args): BinaryInstruction(args..., "or") {}
+      OrInstruction(Args... args): BitwiseInstruction(args..., "or") {}
    };
 
    /**
@@ -444,7 +441,7 @@ namespace zc::z80 {
    class XorInstruction: public BitwiseInstruction {
    public:
       template <typename... Args>
-      XorInstruction(Args... args): BinaryInstruction(args..., "xor") {}
+      XorInstruction(Args... args): BitwiseInstruction(args..., "xor") {}
    };
 
    

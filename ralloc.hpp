@@ -86,6 +86,7 @@ namespace zc::z80 {
 
       void ComputeRegIntervals();
       void ComputeVarLifetimes();
+      void ComputeIntervals();
 
       void Dump(std::ostream& os) const;
       
