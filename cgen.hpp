@@ -305,7 +305,34 @@ namespace zc {
       FunctionImpls impls_;
    };
 
+   /**
+    * Get register that return value should be held in given value size.
+    */
+   const Register *return_register(const Value *val);
    const Register *return_register(int bytes);
+   const RegisterValue *return_rv(const Value *val);
+   const RegisterValue *return_rv(int bytes);
+
+   /**
+    * Get register arguments for CRT routines.
+    */
+   const RegisterValue *crt_arg1(const Value *val);
+   const RegisterValue *crt_arg1(int bytes);
+   const RegisterValue *crt_arg2(const Value *val);
+   const RegisterValue *crt_arg2(int bytes);
+
+   /**
+    * Get prefix for CRT routines given value size.
+    */
+   std::string crt_prefix(const Value *val);
+   std::string crt_prefix(int bytes);
+
+   /**
+    * Get accumulator register for given size.
+    */
+   const RegisterValue *accumulator(const Value *val);
+   const RegisterValue *accumulator(int bytes);
+   
    Label *new_label();
    Label *new_label(const std::string& prefix);
 
@@ -313,30 +340,41 @@ namespace zc {
     * Check whether expression is nonzero (i.e. evaluates to true as a predicate).
     * Zero flag (ZF) is set accordingly.
     */
-   void emit_nonzero_test(CgenEnv& env, Block *block, int bytes);
+   void emit_nonzero_test(CgenEnv& env, Block *block, const Value *in);
 
    /**
     * Emit logical not on expression.
     */
-   void emit_logical_not(CgenEnv& env, Block *block, int bytes);
+   void emit_logical_not(CgenEnv& env, Block *block, const Value *in, const Value *out);
 
    /**
     * Emit code that converts integral value into boolean (0 or 1).
     */
-   void emit_booleanize(CgenEnv& env, Block *block, int bytes);
+   void emit_booleanize(CgenEnv& env, Block *block, const Value *in, const Value *out);
 
    /**
-    * Generic emission routine for performing binary operation on two integers.
-    * Post condition: lhs in %a or %hl; hs in %b or %de, depending on size.
+    * Emit code for predicate.
+    */ 
+   void emit_predicate(CgenEnv& env, Block *block, ASTExpr *expr, Block *take, Block *leave);  
+
+   /**
+    * Emit increment/decrement.
+    * @param env codegen environment
+    * @param block block to write instructions to
+    * @param inc_not_dec whether to increment or decrement
+    * @param pre_not_post whether output value should reflect update
+    * @param subexpr subexpression to generate
+    * @param out output value
+    * @return continuation block
     */
-   Block *emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr);
-   Block *emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr,
-                     const RegisterValue *long_rhs_reg);
+   Block *emit_incdec(CgenEnv& env, Block *block, bool inc_not_dec, bool pre_not_post,
+                      ASTExpr *subexpr, const Value *out);
    
    /**
-    * Emit instructions that move the contents of the zero flag (ZF) into register %a.
+    * Generic emission routine for performing binary operation on two integers.
     */
-   Block *emit_ld_a_zf(CgenEnv& env, Block *block, bool inverted = false);
+   Block *emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr,
+                     const Value *out_lhs, const Value *out_rhs);
 
    /**
     * Emit CRT frameset.
