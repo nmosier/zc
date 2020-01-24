@@ -15,7 +15,7 @@ namespace zc::z80 {
       r_iy(MultibyteRegister::ByteRegs{&r_iyh, &r_iyl}, "iy"),
       r_sp(MultibyteRegister::ByteRegs{nullptr, nullptr}, "sp");
 
-   RegisterValue rv_a(&r_a, byte_size),
+   const RegisterValue rv_a(&r_a, byte_size),
       rv_b(&r_b),
       rv_c(&r_c),
       rv_d(&r_d),
@@ -27,7 +27,7 @@ namespace zc::z80 {
       rv_ixl(&r_ixl),
       rv_iyh(&r_iyh),
       rv_iyl(&r_iyl);
-   RegisterValue rv_af(&r_af),
+   const RegisterValue rv_af(&r_af),
       rv_bc(&r_bc),
       rv_de(&r_de),
       rv_hl(&r_hl),
