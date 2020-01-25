@@ -17,9 +17,10 @@ expire_old_intervals(i)
 
 
 ZC Register Allocation (zc_ralloc)
-1. Find variable lifetimes, splitting at variable uses (VARS).
+1. Find variable lifetimes (VARS).
 2. Find register free intervals (REGS).
 3. STACK_SPILLED <- {}; FRAME_SPILLED <- {}
+4. Assign registers to all register variables.
 4. For each variable v in VARS, in decreasing order WRT interval(v)
 4a.  if there exists a register r such that interval(v) is in free(r), then assign_register(v, r)
 4b.  else spill(v)

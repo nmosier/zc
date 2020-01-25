@@ -13,60 +13,6 @@ namespace zc::z80 {
       return end - begin;
    }
 
-   void RegisterFreeIntervals::Use(int index) {
-      if (index > cur_begin_) {
-         /* add free interval */
-         intervals_.insert(RallocInterval(cur_begin_, index));
-      }
-      cur_begin_ = instrs_end_; 
-   }
-   
-   void RegisterFreeIntervals::Free(int index) {
-      cur_begin_ = index;
-   }
-
-   void RegisterFreeIntervals::Done() {
-      Use(instrs_end_); /* if was last marked free, then mark as free until end */
-   }
-
-   RallocIntervals::iterator RegisterFreeIntervals::superinterval(const RallocInterval& interval)
-      const {
-      for (auto it = intervals_.lower_bound(interval);
-           it != intervals_.end();
-           ++it) {
-         if (it->begin <= interval.begin && it->end >= interval.end) {
-            return it;
-         }
-      }
-      return intervals_.end();
-   }
-
-#if 0
-   void RegisterAllocator::ComputeRegIntervals() {
-      /* 1. For each instruction in block,
-       * 1a.  If destination is register, then mark register as used at this instruction index.
-       * 1b.  If source is register, then mark register as free at this instruction index.
-       */
-
-      int index = 0;
-      for (const Instruction *instr : block_->instrs()) {
-         const Register *reg;
-         if (instr->src() && (reg = instr->src()->reg())) {
-            const Register *reg = instr->src()->reg();
-            regs_.try_emplace(reg, block_->instrs().size());
-            regs_.at(reg).Free(index);
-         }
-         if (instr->dst() && (reg = instr->dst()->reg())) {
-            regs_.try_emplace(reg, block_->instrs().size());
-            regs_.at(reg).Use(index);
-         }
-         
-         ++index;
-      }
-      
-   }
-#endif
-
    void VariableRallocInfo::RenameVar() {
       const VariableValue *newval = val->Rename();
       (*gen)->operands()[0] = (*(*gen)->operands()[0])->ReplaceVar(val, newval); /* dst */
@@ -74,42 +20,6 @@ namespace zc::z80 {
          (*it)->operands()[1] = (*(*it)->operands()[1])->ReplaceVar(val, newval); /* src */
       }
       val = newval;
-   }
-
-   void RegisterAllocator::ComputeVarLifetimes() {
-      int index = 0;
-      for (auto instr_it = block_->instrs().begin();
-           instr_it != block_->instrs().end();
-           ++instr_it) {
-         const Instruction *instr = *instr_it;
-         const VariableValue *var;
-
-         if (instr->src() && (var = instr->src()->var())) {
-            /* variable used */
-            auto it = vars_.find(var->id());
-            assert(it != vars_.end());
-            it->second.uses.push_back(instr_it);
-            it->second.interval.end = index;
-         }
-         
-         if (instr->dst() && (var = instr->dst()->var())) {
-            /* variable is generated */
-            auto it = vars_.find(var->id());
-            if (it != vars_.end()) {
-               /* variable is generated again; rename previous occurences */
-               VariableRallocInfo info = it->second;
-               vars_.erase(it);
-               info.RenameVar();
-               vars_.insert({info.val->id(), info});
-            }
-
-            /* add new var */
-            vars_.insert({var->id(), VariableRallocInfo(var, instr_it, index)});
-         }
-
-         ++index;
-      }
-      
    }
 
    void RegisterAllocator::ComputeIntervals() {
@@ -211,7 +121,7 @@ namespace zc::z80 {
          } while (info_it != info_end);
 
          /* insert into ralloc list */
-         regs_.insert({reg_it.first, reg_free_ints});
+         regs_.insert({reg_it.first, RegisterFreeIntervals(reg_free_ints)});
       }      
 
       /* process variable lifetime intervals */
@@ -238,10 +148,185 @@ namespace zc::z80 {
       
    }
 
+   bool RegisterAllocator::TryRegAllocVar(const VariableValue *var) {
+      /* get candidate registers */
+      std::unordered_set<const Register *> candidate_regs;      
+      GetAssignableRegs(var, std::inserter(candidate_regs, candidate_regs.begin()));
+
+      /* determine nearby regs */
+      VariableRallocInfo& var_info = vars_.at(var->id());
+      std::unordered_map<const Register *, int> nearby_regs;     
+      
+      const RegisterValue *var_src = dynamic_cast<const RegisterValue *>((*var_info.gen)->src());
+      if (var_src) {
+         ++(nearby_regs[var_src->reg()]);
+      }
+
+      for (auto use : var_info.uses) {
+         auto var_dst = dynamic_cast<const RegisterValue *>((*use)->dst());
+         if (var_dst) {
+            ++(nearby_regs[var_dst->reg()]);
+         }
+      }
+
+      /* remove unfree regs */
+      for (auto pair : nearby_regs) {
+         if (candidate_regs.find(pair.first) == candidate_regs.end()) {
+            nearby_regs.erase(pair.first);
+         }
+      }
+      
+      /* find ``nearest'' reg */
+      if (nearby_regs.empty()) {
+         return false;
+      }
+
+      const Register *nearest_reg =
+         std::max_element(nearby_regs.begin(), nearby_regs.end(),
+                          [](const auto acc, const auto next) -> bool {
+                             return acc.second > next.second;
+                          })->first;
+
+      /* allocate reg to var */
+      var_info.AssignReg(new RegisterValue(nearest_reg));
+      
+      /* remove register free intervals */
+      switch (nearest_reg->kind()) {
+      case Register::Kind::REG_BYTE:
+         regs_.at(dynamic_cast<const ByteRegister *>(nearest_reg)).
+            remove_interval(var_info.interval);
+         break;
+         
+      case Register::Kind::REG_MULTIBYTE:
+         {
+            auto multibyte_reg = dynamic_cast<const MultibyteRegister *>(nearest_reg);
+            for (auto byte_reg : multibyte_reg->regs()) {
+               regs_.at(byte_reg).remove_interval(var_info.interval);
+            }
+         }
+         break;
+      default: abort();
+      }
+
+      return true;
+   }
+   
+   void RegisterAllocator::AllocateVar(const VariableValue *var) {
+      
+   }
+
+   void RegisterAllocator::RunAllocation() {
+      for (auto var_pair : vars_) {
+         bool success = TryRegAllocVar(var_pair.second.val);
+
+         var_pair.second.val->Emit(std::cerr);
+         std::cerr << " has reg: " << (success ? "true" : "false") << std::endl;
+      }
+      
+#if 0
+      for (auto var_it : vars_) {
+         std::list<const Register *> candidate_regs;
+         GetAssignableRegs(var_it.second.val, std::back_inserter(candidate_regs));
+
+         var_it.second.val->Emit(std::cerr);
+         std::cerr << " assignable to ";
+         for (auto candidate_reg : candidate_regs) {
+            candidate_reg->Emit(std::cerr);
+            std::cerr << " ";
+         }
+         std::cerr << std::endl;
+      }
+
+      
+      /* 1. Assign registers to variables that require registers. */
+      for (auto var_it : vars_) {
+         if (var_it.second.val->requires_reg()) {
+            VariableRallocInfo& var_info = var_it.second;
+
+            /* find variable src */
+            const RegisterValue *var_src = dynamic_cast<const RegisterValue *>
+               ((*var_info.gen)->src());
+
+            /* find variable dsts */
+            std::unordered_map<const RegisterValue *, int> var_dsts;
+            for (auto use : var_info.uses) {
+               auto var_dst = dynamic_cast<const RegisterValue *>((*use)->dst());
+               if (var_dst) {
+                  ++var_dsts[var_dst];
+               }
+            }
+
+            /* find most frequent dst */
+            const RegisterValue *var_dst = nullptr;
+            if (!var_dsts.empty()) {
+               var_dst = std::max_element(var_dsts.begin(), var_dsts.end(),
+                                          [](const auto acc, const auto next) -> bool {
+                                             return acc.second > next.second;
+                                          })->first;
+            }
+
+            /* assign */
+            const RegisterValue *reg;
+            if (var_dst) {
+               reg = var_dst;
+
+            } else if (var_src) {
+               reg = var_src;
+            } else {
+               throw std::logic_error("not enough registers to allocate register-only value");
+            }
+
+#if 0
+            std::cerr << "assigning ";
+            reg->Emit(std::cerr);
+            std::cerr << " to ";
+            var_info.val->Emit(std::cerr);
+            std::cerr << std::endl;
+#endif
+            
+            var_info.AssignReg(reg);
+            regs_.at(reg).remove_interval(var_info.interval);
+            
+         }
+      }
+
+
+
+      /* TODO */
+#endif
+      
+   }
+
+   RallocIntervals::iterator RegisterFreeIntervals::superinterval(const RallocInterval& interval)
+      const {
+      auto it = intervals.begin(), end = intervals.end();      
+      for (; it != end; ++it) {
+         if (interval.in(*it)) {
+            break;
+         }
+      }
+      return it;
+   }
+
+   void RegisterFreeIntervals::remove_interval(const RallocInterval& interval) {
+      auto it = superinterval(interval);
+      if (it == intervals.end()) { throw std::logic_error("asked to remove interval not present"); }
+      intervals.insert(RallocInterval(it->begin, it->begin_it, interval.begin, interval.begin_it));
+      intervals.insert(RallocInterval(interval.end, interval.end_it, it->end, it->end_it));
+      intervals.erase(it);
+   }
+
+   void VariableRallocInfo::AssignReg(const RegisterValue *reg) {
+      (*gen)->ReplaceVar(val, reg);
+      for (auto use : uses) {
+         (*use)->ReplaceVar(val, reg);
+      }
+   }
+
 
    /*** DUMPS ***/
    void RegisterFreeIntervals::Dump(std::ostream& os) const {
-      for (const RallocInterval& interval : intervals_) {
+      for (const RallocInterval& interval : intervals) {
          interval.Dump(os);
          os << ","; 
       }
@@ -268,7 +353,7 @@ namespace zc::z80 {
       for (auto it : regs_) {
          it.first->Dump(os);
          os << ": ";
-         for (auto interval : it.second) {
+         for (auto interval : it.second.intervals) {
             interval.Dump(os);
             os << " ";
          }
@@ -285,6 +370,10 @@ namespace zc::z80 {
       std::cerr << block->label()->name() << ":" << std::endl;
       RegisterAllocator ralloc(block);
       ralloc.ComputeIntervals();
+
+      /* TMP */
+      ralloc.RunAllocation();
+      
       ralloc.Dump(std::cerr);
    }
 

@@ -36,7 +36,7 @@ namespace zc::z80 {
       virtual Kind kind() const = 0;
       const char *name() const { return name_; }
       virtual int size() const = 0;
-
+      
       void Emit(std::ostream& os) const { os << name(); }
       virtual void Cast(Block *block, const Register *from) const = 0;
 

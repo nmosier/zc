@@ -88,5 +88,13 @@ namespace zc::z80 {
 
    void DjnzInstruction::Gen(std::list<const Value *>& vals) const { vals.push_back(&rv_b); }
    void DjnzInstruction::Use(std::list<const Value *>& vals) const { vals.push_back(&rv_b); }
-   
+
+   /*** VARS ***/
+   void Instruction::ReplaceVar(const VariableValue *var, const Value *with) {
+      for (Values::iterator operand_it = operands_.begin(), operand_end = operands_.end();
+           operand_it != operand_end;
+           ++operand_it) {
+         *operand_it = (**operand_it)->ReplaceVar(var, with);
+      }
+   }
 }

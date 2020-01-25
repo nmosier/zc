@@ -17,6 +17,7 @@
 namespace zc::z80 {
 
    class Value;
+   class VariableValue;
    typedef std::vector<portal<const Value *>> Values;
 
    class Instruction;
@@ -34,7 +35,9 @@ namespace zc::z80 {
       FlagMod flagmod(const Flag& flag) const;
 
       virtual void Gen(std::list<const Value *>& vals) const {}
-      virtual void Use(std::list<const Value *>& vals) const {}      
+      virtual void Use(std::list<const Value *>& vals) const {}
+
+      void ReplaceVar(const VariableValue *var, const Value *with);
       
       void Emit(std::ostream& os) const;
 
