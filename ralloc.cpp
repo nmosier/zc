@@ -152,6 +152,7 @@ namespace zc::z80 {
       /* get candidate registers */
       std::unordered_set<const Register *> candidate_regs;      
       GetAssignableRegs(var, std::inserter(candidate_regs, candidate_regs.begin()));
+      if (candidate_regs.empty()) { return false; }
 
       /* determine nearby regs */
       VariableRallocInfo& var_info = vars_.at(var->id());
@@ -175,31 +176,33 @@ namespace zc::z80 {
             nearby_regs.erase(pair.first);
          }
       }
+
+      const Register *reg;
       
       /* find ``nearest'' reg */
       if (nearby_regs.empty()) {
-         return false;
+         /* IMPROVE -- might need to pick better */
+         reg = *candidate_regs.begin(); // NOTE: guaranteed at this point to be at least one.
+      } else {
+         reg = std::max_element(nearby_regs.begin(), nearby_regs.end(),
+                                [](const auto acc, const auto next) -> bool {
+                                   return acc.second > next.second;
+                                })->first;
       }
-
-      const Register *nearest_reg =
-         std::max_element(nearby_regs.begin(), nearby_regs.end(),
-                          [](const auto acc, const auto next) -> bool {
-                             return acc.second > next.second;
-                          })->first;
-
+      
       /* allocate reg to var */
-      var_info.AssignReg(new RegisterValue(nearest_reg));
+      var_info.AssignReg(new RegisterValue(reg));
       
       /* remove register free intervals */
-      switch (nearest_reg->kind()) {
+      switch (reg->kind()) {
       case Register::Kind::REG_BYTE:
-         regs_.at(dynamic_cast<const ByteRegister *>(nearest_reg)).
+         regs_.at(dynamic_cast<const ByteRegister *>(reg)).
             remove_interval(var_info.interval);
          break;
          
       case Register::Kind::REG_MULTIBYTE:
          {
-            auto multibyte_reg = dynamic_cast<const MultibyteRegister *>(nearest_reg);
+            auto multibyte_reg = dynamic_cast<const MultibyteRegister *>(reg);
             for (auto byte_reg : multibyte_reg->regs()) {
                regs_.at(byte_reg).remove_interval(var_info.interval);
             }
@@ -211,90 +214,109 @@ namespace zc::z80 {
       return true;
    }
    
-   void RegisterAllocator::AllocateVar(const VariableValue *var) {
+   AllocKind RegisterAllocator::AllocateVar(const VariableValue *var) {
+      VariableRallocInfo& var_info = vars_.at(var->id());      
+      bool has_reg = TryRegAllocVar(var);
+      if (has_reg) {
+         var_info.alloc_kind = AllocKind::ALLOC_REG;
+         return AllocKind::ALLOC_REG;
+      }
+      if (var_info.requires_reg()) {
+         throw std::logic_error("could not allocate register to variable that requires register");
+      }
+
+      /* check whether stack-spillable */
+      if (var_info.is_stack_spillable()) {
+         /* try to stack-spill */
+         if (stack_spills_.try_add(var_info.interval)) {
+            var_info.StackSpill(block()->instrs());
+            return AllocKind::ALLOC_STACK;
+         }
+
+      }
+
+      return var_info.alloc_kind = AllocKind::ALLOC_NONE; /* TODO */ 
+   }
+
+   bool VariableRallocInfo::requires_reg() const {
+      if (val->force_reg()) { return true; }
+      if (val->size() == byte_size) { return false; }
+
+      /* check if generated from immediate */
+      intmax_t imm;
+      const ImmediateValue iv(&imm, val->size());
+      const LoadInstruction gen_instr(val, &iv);
+      if (gen_instr.Match(*gen)) { return true; }
+
+      /* check if stored to memory value */
+      const Value *addr;
+      const MemoryValue mv(&addr, val->size());
+      const LoadInstruction use_instr(&mv, val);
+      if (std::any_of(uses.begin(), uses.end(),
+                  [&](auto it) -> bool {
+                     return use_instr.Match(*it);
+                  })) {
+         return true;
+      }
       
+      return false; // might need to check more things 
+   }
+
+   bool VariableRallocInfo::is_stack_spillable() const {
+      if (val->size() == byte_size) { return false; } /* must be word/long to be spilled */
+
+      /* verify that gen instruction can be translated into `push' */
+      const Register *reg_ptr;
+      const RegisterValue reg_val(&reg_ptr, val->size());
+      const LoadInstruction gen_instr(val, &reg_val);
+      if (!gen_instr.Match(*gen)) { return false; }
+
+      /* verify that each use can be translated into `pop' into register */
+      if (!std::all_of(uses.begin(), uses.end(),
+                       [&](auto use) -> bool {
+                          const Register *reg_ptr;
+                          const RegisterValue reg_val(&reg_ptr, val->size());
+                          const LoadInstruction use_instr(&reg_val, val);
+                          return use_instr.Match(*use);
+                       })) {
+         return false;
+      }
+      
+      return true;
+   }
+
+   void VariableRallocInfo::StackSpill(Instructions& instrs) {
+      *gen = new PushInstruction((*gen)->src());
+      int i = uses.size();
+      for (Instructions::iterator use : uses) {
+         auto rv = (*use)->dst();
+         *use++ = new PopInstruction(rv);
+         if (i > 1) {
+            instrs.insert(use, new PushInstruction(rv));
+         }
+         
+         --i;
+      }
+      
+      alloc_kind = AllocKind::ALLOC_STACK;
+   }
+   
+   std::ostream& operator<<(std::ostream& os, AllocKind kind) {
+      switch (kind) {
+      case AllocKind::ALLOC_NONE: os << "ALLOC_NONE"; return os;
+      case AllocKind::ALLOC_REG: os << "ALLOC_REG"; return os;
+      case AllocKind::ALLOC_STACK: os << "ALLOC_STACK"; return os;
+      case AllocKind::ALLOC_FRAME: os << "ALLOC_FRAME"; return os;
+      }
    }
 
    void RegisterAllocator::RunAllocation() {
-      for (auto var_pair : vars_) {
-         bool success = TryRegAllocVar(var_pair.second.val);
+      for (auto& var_pair : vars_) {
+         AllocateVar(var_pair.second.val);
 
          var_pair.second.val->Emit(std::cerr);
-         std::cerr << " has reg: " << (success ? "true" : "false") << std::endl;
+         std::cerr << ":\t" << var_pair.second.alloc_kind << std::endl;
       }
-      
-#if 0
-      for (auto var_it : vars_) {
-         std::list<const Register *> candidate_regs;
-         GetAssignableRegs(var_it.second.val, std::back_inserter(candidate_regs));
-
-         var_it.second.val->Emit(std::cerr);
-         std::cerr << " assignable to ";
-         for (auto candidate_reg : candidate_regs) {
-            candidate_reg->Emit(std::cerr);
-            std::cerr << " ";
-         }
-         std::cerr << std::endl;
-      }
-
-      
-      /* 1. Assign registers to variables that require registers. */
-      for (auto var_it : vars_) {
-         if (var_it.second.val->requires_reg()) {
-            VariableRallocInfo& var_info = var_it.second;
-
-            /* find variable src */
-            const RegisterValue *var_src = dynamic_cast<const RegisterValue *>
-               ((*var_info.gen)->src());
-
-            /* find variable dsts */
-            std::unordered_map<const RegisterValue *, int> var_dsts;
-            for (auto use : var_info.uses) {
-               auto var_dst = dynamic_cast<const RegisterValue *>((*use)->dst());
-               if (var_dst) {
-                  ++var_dsts[var_dst];
-               }
-            }
-
-            /* find most frequent dst */
-            const RegisterValue *var_dst = nullptr;
-            if (!var_dsts.empty()) {
-               var_dst = std::max_element(var_dsts.begin(), var_dsts.end(),
-                                          [](const auto acc, const auto next) -> bool {
-                                             return acc.second > next.second;
-                                          })->first;
-            }
-
-            /* assign */
-            const RegisterValue *reg;
-            if (var_dst) {
-               reg = var_dst;
-
-            } else if (var_src) {
-               reg = var_src;
-            } else {
-               throw std::logic_error("not enough registers to allocate register-only value");
-            }
-
-#if 0
-            std::cerr << "assigning ";
-            reg->Emit(std::cerr);
-            std::cerr << " to ";
-            var_info.val->Emit(std::cerr);
-            std::cerr << std::endl;
-#endif
-            
-            var_info.AssignReg(reg);
-            regs_.at(reg).remove_interval(var_info.interval);
-            
-         }
-      }
-
-
-
-      /* TODO */
-#endif
-      
    }
 
    RallocIntervals::iterator RegisterFreeIntervals::superinterval(const RallocInterval& interval)
@@ -371,10 +393,11 @@ namespace zc::z80 {
       RegisterAllocator ralloc(block);
       ralloc.ComputeIntervals();
 
+      ralloc.Dump(std::cerr);
+
       /* TMP */
       ralloc.RunAllocation();
-      
-      ralloc.Dump(std::cerr);
+
    }
 
    void RegisterAllocator::Ralloc(FunctionImpl& impl) {
@@ -389,5 +412,18 @@ namespace zc::z80 {
          Ralloc(impl);
       }
    }
-   
+
+   /*** ***/
+   bool NestedRallocIntervals::try_add(const RallocInterval& interval) {
+      for (auto nested_interval : intervals_) {
+         if (interval.intersects(nested_interval) && !interval.in(nested_interval) &&
+             nested_interval.in(interval)) {
+            /* overlaps */
+            return false;
+         }
+      }
+      
+      intervals_.insert(interval);
+      return true;
+   }
 }

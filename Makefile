@@ -30,12 +30,12 @@ CLEAN_SRCS = $(BISON_SRC) $(FLEX_SRC)
 CLEAN_HDRS = $(BISON_HDR)
 
 .PHONY: all
-all: c.tab.o flex lexer-main parser-main semant-main cgen-main $(AST_OBJS) $(ASM_OBJS)
+all: cgen-main # $(AST_OBJS) $(ASM_OBJS)
 
 .PHONY: bison
 bison: $(BISON_OBJ)
 
-$(BISON_SRC) $(BISON_HDR): c.ypp $(AST_HDRS)
+$(BISON_SRC) $(BISON_HDR): c.ypp $(AST_HDRS) semant.hpp
 	bison $(BISON_FLAGS) $<
 $(BISON_OBJ): $(BISON_SRC)
 	c++ -c $(CXXFLAGS) -o $@ $^
@@ -43,13 +43,21 @@ $(BISON_OBJ): $(BISON_SRC)
 .PHONY: flex
 flex: $(FLEX_OBJ)
 
-$(FLEX_SRC): c.l $(AST_HDRS)
+$(FLEX_SRC): c.l $(AST_HDRS) $(BISON_HDR)
 	flex $<
 
 $(FLEX_OBJ): $(FLEX_SRC)
 	c++ -c $(CXXFLAGS) -o $@ $^
 
 asm/%.o: asm/%.cpp $(ASM_HDRS)
+	c++ -c $(CXXFLAGS) -o $@ $<
+
+ast/%.o: ast/%.cpp $(AST_HDRS) cgen.hpp semant.hpp env.hpp symtab.hpp util.hpp
+
+semant.o: semant.cpp $(AST_HDRS) $(ASM_HDRS) symtab.hpp semant.hpp $(BISON_HDR) util.hpp env.hpp scopedtab.hpp
+	c++ -c $(CXXFLAGS) -o $@ $<
+
+cgen.o: cgen.cpp $(AST_HDRS) $(ASM_HDRS) scopedtab.hpp optim.hpp
 	c++ -c $(CXXFLAGS) -o $@ $<
 
 %.o: %.cpp $(HDRS)

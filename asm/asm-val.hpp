@@ -71,7 +71,7 @@ namespace zc::z80 {
     */
    class VariableValue: public Value_<VariableValue> {
    public:
-      bool requires_reg() const { return requires_reg_; }
+      bool force_reg() const { return force_reg_; }
       int id() const { return id_; }
       virtual const VariableValue *var() const override { return this; }
 
@@ -87,12 +87,13 @@ namespace zc::z80 {
       virtual const Value *ReplaceVar(const VariableValue *var, const Value *with) const override
       { return with; }
 
-      VariableValue(int size, bool requires_reg = false):
-         Value_(size), id_(id_counter_++), requires_reg_(requires_reg) {}
+      VariableValue(int size, bool force_reg = false):
+         Value_(size), id_(id_counter_++), force_reg_(force_reg) {}
 
    protected:
       int id_;
-      bool requires_reg_;
+      bool force_reg_;
+      
       static int id_counter_;
 
       virtual bool Eq_aux(const VariableValue *other) const override { return id() == other->id(); }
@@ -162,7 +163,7 @@ namespace zc::z80 {
       
    protected:
       portal<const Register *> reg_;
-
+      
       virtual bool Eq_aux(const RegisterValue *other) const override {
          return reg()->Eq(other->reg());
       }

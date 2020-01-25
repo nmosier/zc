@@ -21,7 +21,7 @@ namespace zc::z80 {
    }
 
    void VariableValue::Emit(std::ostream& os) const {
-      os << (requires_reg() ? 'r' : 'v');
+      os << (force_reg() ? 'r' : 'v');
       switch (size()) {
       case byte_size: os << 'b'; break;
       case word_size: os << 'w'; break;

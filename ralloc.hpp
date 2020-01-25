@@ -29,6 +29,11 @@ namespace zc::z80 {
          return begin >= other.begin && end <= other.end;
       }
 
+      bool intersects(const RallocInterval& other) const {
+         return (begin >= other.begin && begin <= other.end) ||
+            (end >= other.begin && end <= other.end);
+      }
+
       void Dump(std::ostream& os) const { os << "[" << begin << "," << end << "]"; }
 
       RallocInterval(int begin, Instructions::iterator begin_it,
@@ -39,6 +44,17 @@ namespace zc::z80 {
 
    typedef std::set<RallocInterval> RallocIntervals;
 
+   class NestedRallocIntervals {
+   public:
+      bool try_add(const RallocInterval& interval);
+      
+   protected:
+      RallocIntervals intervals_;
+   };
+
+   enum class AllocKind {ALLOC_NONE, ALLOC_REG, ALLOC_STACK, ALLOC_FRAME};
+   std::ostream& operator<<(std::ostream& os, AllocKind kind);
+   
    /**
     * Variable info for the register allocator.
     */
@@ -47,9 +63,15 @@ namespace zc::z80 {
       Instructions::iterator gen; /*!< where the variable is assigned (i.e. generated) */
       std::list<Instructions::iterator> uses; /*!< the instructions in which the variable is used */
       RallocInterval interval;
+      AllocKind alloc_kind;
 
       void RenameVar();
       void AssignReg(const RegisterValue *reg);
+
+      bool is_stack_spillable() const;
+      void StackSpill(Instructions& instrs);
+
+      bool requires_reg() const;
 
       void Dump(std::ostream& os) const;
 
@@ -96,8 +118,9 @@ namespace zc::z80 {
       Block *block_;
       std::unordered_map<int, VariableRallocInfo> vars_;
       std::unordered_map<const ByteRegister *, RegisterFreeIntervals> regs_;
+      NestedRallocIntervals stack_spills_;
 
-      void AllocateVar(const VariableValue *var);
+      AllocKind AllocateVar(const VariableValue *var);
 
 
       /**

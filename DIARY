@@ -226,7 +226,6 @@ Since the register allocation is mostly complete, I moved on to building up nece
 
 01/23/2020
 
-
 register allocation algorithm, infrastructure
 remove memory location
 added ComputeRegFree()
@@ -260,7 +259,16 @@ Other
 
 - Added emit_predicate(). 
 
+01/24/2020
+[3 hrs] More register allocation stuff. Rewrote code for computing live intervals; made it much more rigorous.
+<DECSRIBE HOW INTERVALS ARE COMPUTED>.
 
+[2 hrs] Continued writing code for computing live intervals, then moved on to basic register allocation subroutines.
+
+01/25/2020
+[2 hrs] Continued working on register allocaiton subroutines. Currently checks tries to assign all variables to registers; doesn't do much beyond that.
+        Confirmed success with `simple.c` -- optimally assigns registers.
+        Definitely doesn't work with `memcpy.c`, though.
 
 PEEPHOLE OPTIMIZATIONS
 Done

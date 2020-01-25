@@ -8,6 +8,8 @@
 #include "optim.hpp"
 #include "cgen.hpp"
 
+#define PREDUMP 1
+
 namespace zc {
 
    static Block dead_block;
@@ -17,6 +19,9 @@ namespace zc {
       CgenEnv env;
       root->CodeGen(env);
 
+#if PREDUMP
+      env.DumpAsm(os);
+#endif
       OptimizeIR(env);
       env.DumpAsm(os);
    }
