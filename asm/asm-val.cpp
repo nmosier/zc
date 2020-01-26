@@ -37,11 +37,7 @@ namespace zc::z80 {
       os << (int) index(); 
    }
 
-   void FrameValue::Emit(std::ostream& os) const {
-      val()->Emit(os);
-      os << "+";
-      os << (int) index();
-   }
+   void FrameValue::Emit(std::ostream& os) const { os << (int) index(); }
 
    void OffsetValue::Emit(std::ostream& os) const {
       base()->Emit(os);
@@ -78,7 +74,7 @@ namespace zc::z80 {
           offset < std::numeric_limits<int8_t>::min()) {
          throw std::logic_error("offset too large");
       }
-      return new FrameValue(indices_, indices_.insert(pos_, offset));
+      return new FrameValue(indices_, indices_->insert(pos_, offset));
    }
 
    Value *OffsetValue::Add(const intmax_t& new_offset) const {
@@ -169,6 +165,15 @@ namespace zc::z80 {
 
    /*** OTHER ***/
    int8_t FrameValue::index() const {
-      return std::reduce(indices_.begin(), pos_, 0);
+      int8_t i = std::reduce(indices_->begin(), pos_, 0);
+      return negate_ ? -i : i;
+   }
+
+   int8_t IndexedRegisterValue::index() const {
+      struct IndexVisitor {
+         int8_t operator()(int8_t i) const { return i; }
+         int8_t operator()(const FrameValue *fv) const { return fv->index(); }
+      };
+      return std::visit(IndexVisitor(), *index_);
    }
 }

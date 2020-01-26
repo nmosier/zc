@@ -1277,16 +1277,14 @@ namespace zc {
 
    void emit_frameset(CgenEnv& env, Block *block) {
       /* push ix
-       * ld ix,0
-       * lea ix,ix-<locals+tmps>
+       * ld ix,-<frame>
        * add ix,sp
        * ld sp,ix
-       * -------
-       * MAKE SURE TO OPTIMIZE USING PEEPHOLE.
        */
+      const FrameValue *bytes = env.ext_env().frame().neg_callee_bytes();
       Instructions instrs
          {new PushInstruction(&rv_ix),
-          new LoadInstruction(&rv_ix, new ImmediateValue(-frame_bytes, long_size)),
+          new LoadInstruction(&rv_ix, bytes),
           new AddInstruction(&rv_ix, &rv_sp),
           new LoadInstruction(&rv_sp, &rv_ix)
          };
@@ -1460,14 +1458,15 @@ namespace zc {
 
    /*** FRAME GEN & STACK FRAME ***/
 
-   StackFrame::StackFrame(): sizes_(),
-                             saved_fp_(sizes_.insert(sizes_.end(), long_size)),
-                             saved_ra_(sizes_.insert(sizes_.end(), long_size)) {}
+   StackFrame::StackFrame(): sizes_(new FrameIndices()),
+                             saved_fp_(sizes_->insert(sizes_->end(), long_size)),
+                             saved_ra_(sizes_->insert(sizes_->end(), long_size)) {}
+
    
    StackFrame::StackFrame(const VarDeclarations *params):
-      sizes_(),
-      saved_fp_(sizes_.insert(sizes_.end(), long_size)),
-      saved_ra_(sizes_.insert(sizes_.end(), long_size)) {
+      sizes_(new FrameIndices()),
+      saved_fp_(sizes_->insert(sizes_->end(), long_size)),
+      saved_ra_(sizes_->insert(sizes_->end(), long_size)) {
       for (const VarDeclaration *var_decl : *params) {
          /* TODO? */
       }
@@ -1476,20 +1475,29 @@ namespace zc {
    // void StackFrame::add_local(const VarDeclaration *local) { add_local(local->bytes()); }
 
    VarSymInfo *StackFrame::next_arg(const VarDeclaration *arg) {
-      auto it = sizes_.insert(sizes_.end(), arg->bytes());
-      return new VarSymInfo(new FrameValue(sizes_, it), arg);
+      auto it = sizes_->insert(sizes_->end(), arg->bytes());
+      auto offset = new FrameValue(sizes_, it);
+      auto val = new IndexedRegisterValue(&rv_ix, IndexedRegisterValue::Index(offset));
+      return new VarSymInfo(val, arg);
    }
 
    VarSymInfo *StackFrame::next_local(const VarDeclaration *decl) {
-      auto it = sizes_.insert(saved_fp_, decl->bytes());
-      return VarSymInfo(new FrameValue(sizes_, it), decl);
+      auto it = sizes_->insert(saved_fp_, decl->bytes());
+      auto offset = new FrameValue(sizes_, it);
+      auto val = new IndexedRegisterValue(&rv_ix, IndexedRegisterValue::Index(offset));
+      return new VarSymInfo(val, decl);
    }
 
    const Value *StackFrame::next_tmp(const VariableValue *tmp) {
-      auto it = sizes_.insert(sizes_.begin(), tmp->size());
-      return new FrameValue(sizes_, it);
+      auto it = sizes_->insert(sizes_->begin(), tmp->size());
+      auto offset = new FrameValue(sizes_, it);
+      return new IndexedRegisterValue(&rv_ix, IndexedRegisterValue::Index(offset));
    }
 
+   const FrameValue *StackFrame::callee_bytes() { return new FrameValue(sizes_, saved_fp_); }
+   const FrameValue *StackFrame::neg_callee_bytes() {
+      return new FrameValue(sizes_, saved_fp_, true);
+   }
 
     void FunctionDef::FrameGen(StackFrame& frame) const {
        comp_stat()->FrameGen(frame);

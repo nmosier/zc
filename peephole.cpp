@@ -54,7 +54,7 @@ namespace zc::z80 {
       /* unbound values */
       const Register *rr1;
       const Register *rr2;
-      int8_t frame_index;
+      IndexedRegisterValue::Index frame_index;
       
       /* instruction 1: lea rr1,ix+* */
       if (it == end) { return no_match(); }
@@ -153,7 +153,7 @@ namespace zc::z80 {
 
       /* unbound values */
       const Register *rr;
-      int8_t index;
+      IndexedRegisterValue::Index index;
 
       /* instruction 1 */
       if (it == end) { return no_match(); }

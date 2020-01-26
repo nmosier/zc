@@ -81,7 +81,8 @@ namespace zc {
    public:
       typedef std::list<int8_t> FrameIndices;
 
-      int callee_bytes() { return std::reduce(sizes_.begin(), saved_fp_); }
+      const FrameValue *callee_bytes();
+      const FrameValue *neg_callee_bytes();
 
       const Value *saved_fp();
       const Value *saved_ra();
@@ -94,7 +95,7 @@ namespace zc {
       StackFrame(const VarDeclarations *params);
       
    protected:
-      FrameIndices sizes_; /*!< list of sizes */
+      FrameIndices *sizes_; /*!< list of sizes */
       FrameIndices::iterator saved_fp_; /*!< caller's frame pointer */
       FrameIndices::iterator saved_ra_; /*!< return address */
    };

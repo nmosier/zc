@@ -183,25 +183,30 @@
     /**
      * Class representing an indexed register value.
      */
+    class FrameValue;
     class IndexedRegisterValue: public Value_<IndexedRegisterValue> {
     public:
+       typedef std::variant<int8_t, const FrameValue *> Index;
+       
        const RegisterValue *val() const { return *val_; }
-       int8_t index() const { return *index_; }
+       int8_t index() const;
        virtual const Register *reg() const override { return val()->reg(); }
     
        virtual void Emit(std::ostream& os) const override;
        virtual Value *Add(const intmax_t& offset) const override;
 
-       IndexedRegisterValue(const RegisterValue *val, const portal<int8_t>& index):
+       IndexedRegisterValue(const RegisterValue *val, int8_t index):
+          Value_(long_size), val_(val), index_(Index(index)) {}
+       IndexedRegisterValue(const RegisterValue *val, const portal<Index>& index):
           Value_(long_size), val_(val), index_(index) {}
-       IndexedRegisterValue(const RegisterValue **val, const portal<int8_t>& index,
+       IndexedRegisterValue(const RegisterValue **val, const portal<Index>& index,
                             const portal<int>& size):
           Value_(size), val_(val), index_(index) {}
 
     
     protected:
        portal<const RegisterValue *> val_;
-       portal<int8_t> index_;
+       portal<Index> index_;
 
        virtual bool Eq_aux(const IndexedRegisterValue *other) const override {
           return val()->Eq(other->val()) && index() == other->index();
@@ -214,18 +219,18 @@
        // using FrameIndices = StackFrame::FrameIndices;
        typedef std::list<int8_t> FrameIndices;
       
-      const RegisterValue *val() const { return &rv_ix; }
       int8_t index() const;
 
       virtual void Emit(std::ostream& os) const override;
       virtual Value *Add(const intmax_t& offset) const override;
 
-      FrameValue(FrameIndices& indices, FrameIndices::iterator pos):
-         Value_<FrameValue>(*pos), indices_(indices), pos_(pos) {}
+      FrameValue(FrameIndices *indices, FrameIndices::iterator pos, bool negate = false):
+         Value_<FrameValue>(*pos), indices_(indices), pos_(pos), negate_(negate) {}
       
    protected:
       FrameIndices::iterator pos_;
-      FrameIndices& indices_;
+      FrameIndices *indices_;
+       bool negate_;
 
       virtual bool Eq_aux(const FrameValue *other) const override { return pos_ == other->pos_; }
       virtual bool Match_aux(const FrameValue *to) const override { return Eq_aux(to); }
@@ -237,19 +242,19 @@
    class OffsetValue: public Value_<OffsetValue> {
    public:
       const Value *base() const { return base_; }
-      const intmax_t& offset() const { return offset_; }
+      intmax_t offset() const { return offset_; }
       virtual const Register *reg() const override { return base()->reg(); }
 
       virtual void Emit(std::ostream& os) const override;
       virtual Value *Add(const intmax_t& offset) const override;
 
       template <typename... Args>
-      OffsetValue(const Value *base, const intmax_t& offset, Args... args):
+      OffsetValue(const Value *base, intmax_t offset, Args... args):
          Value_(args...), base_(base), offset_(offset) {}
 
    protected:
       const Value *base_;
-      const intmax_t offset_;
+      intmax_t offset_;
 
       virtual bool Eq_aux(const OffsetValue *other) const override {
          return base()->Eq(other->base()) && offset() == other->offset();
