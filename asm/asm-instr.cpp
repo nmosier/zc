@@ -107,4 +107,24 @@ namespace zc::z80 {
          *operand_it = (**operand_it)->ReplaceVar(var, with);
       }
    }
+
+   /*** RESOLUTION ***/
+   void LoadInstruction::Resolve(Instructions& out) {
+      const Register *r1, *r2;
+      int sz1, sz2;
+      const RegisterValue rv1(&r1, &sz1);
+      const RegisterValue rv2(&r2, &sz2);
+      const LoadInstruction instr(&rv1, &rv2);
+      if (instr.Match(this) && r1 != &r_sp) {
+         if (sz1 == sz2 && (sz1 == word_size || sz1 == long_size)) {
+            /* push rr1 \ pop rr2 */
+            out.push_back(new PushInstruction(src()));
+            out.push_back(new PopInstruction(dst()));
+            return;
+         }
+      }
+
+      out.push_back(this);
+   }
+   
 }

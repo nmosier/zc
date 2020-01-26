@@ -39,6 +39,12 @@ namespace zc::z80 {
 
       void ReplaceVar(const VariableValue *var, const Value *with);
 
+      /**
+       * Convert complex pseudo-instructions (e.g. ld hl,bc) to basic instructions 
+       * (e.g. push bc \ pop bc)
+       */
+      virtual void Resolve(Instructions& out) { out.push_back(this); }
+                           
       void Emit(std::ostream& os ) const;
 
       bool Eq(const Instruction *other) const;
@@ -244,6 +250,8 @@ namespace zc::z80 {
       virtual void Gen(std::list<const Value *>& vals) const override;
       virtual void Use(std::list<const Value *>& vals) const override;
 
+      virtual void Resolve(Instructions& out) override;
+      
       template <typename... Args>
       LoadInstruction(Args... args): BinaryInstruction(args..., "ld") {}
    };
