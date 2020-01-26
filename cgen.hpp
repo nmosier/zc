@@ -192,6 +192,11 @@ namespace zc {
       static void DumpAsm(const Block *block, std::ostream& os, const FunctionImpl *impl);
 
       /**
+       * Resolve block's instructions.
+       */
+      static void ResolveInstrs(Block *block);
+      
+      /**
        * Apply function to each block.
        * @tparam Func type of functor to apply. `this' is always passed as first argument.
        * @tparam Args arguments to pass to each invokation
@@ -240,6 +245,7 @@ namespace zc {
       const LabelValue *addr() const { return addr_; }
       
       void DumpAsm(std::ostream& os) const;
+      void ResolveInstrs();
 
       FunctionImpl(const CgenEnv& env, Block *entry, Block *fin);
       
@@ -292,6 +298,7 @@ namespace zc {
       CgenEnv(): Env<SymInfo, TaggedType, StatInfo, CgenExtEnv>(), strconsts_(), impls_() {}
 
       void DumpAsm(std::ostream& os) const;
+      void ResolveInstrs();
       
    protected:
       /**

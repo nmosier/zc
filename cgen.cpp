@@ -23,6 +23,10 @@ namespace zc {
       env.DumpAsm(os);
 #endif
       OptimizeIR(env);
+
+      /* resolve */
+      env.ResolveInstrs();
+      
       env.DumpAsm(os);
    }
 
@@ -1421,8 +1425,29 @@ namespace zc {
       impl->fin()->label()->EmitRef(os);
 
       os << std::endl;
-   }   
-   
+   }
+
+   /*** INSTRUCTION RESOLUTION ***/
+   void Block::ResolveInstrs(Block *block) {
+      Instructions resolved_instrs;
+      for (auto instr : block->instrs()) {
+         instr->Resolve(resolved_instrs);
+      }
+      block->instrs_ = resolved_instrs;
+   }
+
+   void FunctionImpl::ResolveInstrs() {
+      Blocks visited;
+      void (*fn)(Block *block) = Block::ResolveInstrs;
+      entry()->for_each_block(visited, fn);
+      fin()->for_each_block(visited, fn);
+   }
+
+   void CgenEnv::ResolveInstrs() {
+      for (auto impl : impls().impls()) {
+         impl.ResolveInstrs();
+      }
+   }
 
    /*** FRAME GEN & STACK FRAME ***/
 
