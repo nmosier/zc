@@ -40,7 +40,7 @@ namespace zc::z80 {
       for (auto instr_it = block()->instrs().begin();
            instr_it != block()->instrs().end();
            ++instr_it, ++instr_index, gens.clear(), uses.clear()) {
-         /* get gens and uses in instruction */
+         /* get gens and uses in instrution */
          (*instr_it)->Gen(gens);
          (*instr_it)->Use(uses);
 
@@ -148,10 +148,53 @@ namespace zc::z80 {
       
    }
 
+   void RegisterAllocator::GetAssignableRegs(const VariableValue *var,
+                                             std::unordered_set<const Register *>& out) const {
+      /* get variable lifetime */
+      const VariableRallocInfo& varinfo = vars_.at(var->id());
+      const RallocInterval& varint = varinfo.interval;
+         
+      /* look thru byte regs to find free */
+      std::unordered_set<const ByteRegister *> byte_regs_;
+      for (auto reg_it : regs_) {
+         auto super_it = reg_it.second.superinterval(varint);
+         if (super_it != reg_it.second.intervals.end()) {
+            byte_regs_.insert(reg_it.first);
+         }
+      }
+
+      /* if multibyte var, find register pairs in available byte regs */
+      switch (var->size()) {
+      case byte_size:
+         for (auto byte_reg : byte_regs_) {
+            out.insert(byte_reg);
+            // *out++ = byte_reg;
+         }
+         break;
+            
+      case long_size:
+         for (const MultibyteRegister *multibyte_reg : {&r_bc, &r_de, &r_hl}) {
+            auto subregs = multibyte_reg->regs();
+            if (std::all_of(subregs.begin(), subregs.end(),
+                            [&](const ByteRegister *byte_reg) -> bool {
+                               return byte_regs_.find(byte_reg) != byte_regs_.end();
+                            })) {
+               out.insert(multibyte_reg);
+               // *out++ = multibyte_reg;
+            }
+         }
+         break;
+            
+      default: abort();
+      }
+   }
+   
+   ;
    bool RegisterAllocator::TryRegAllocVar(const VariableValue *var) {
       /* get candidate registers */
       std::unordered_set<const Register *> candidate_regs;      
-      GetAssignableRegs(var, std::inserter(candidate_regs, candidate_regs.begin()));
+      // GetAssignableRegs(var, std::inserter(candidate_regs, candidate_regs.begin()));
+      GetAssignableRegs(var, candidate_regs);
       if (candidate_regs.empty()) { return false; }
 
       /* determine nearby regs */
@@ -160,20 +203,22 @@ namespace zc::z80 {
       
       const RegisterValue *var_src = dynamic_cast<const RegisterValue *>((*var_info.gen)->src());
       if (var_src) {
-         ++(nearby_regs[var_src->reg()]);
+         nearby_regs[var_src->reg()] += 1;
       }
 
       for (auto use : var_info.uses) {
          auto var_dst = dynamic_cast<const RegisterValue *>((*use)->dst());
          if (var_dst) {
-            ++(nearby_regs[var_dst->reg()]);
+            nearby_regs[var_dst->reg()] += 1;
          }
       }
 
       /* remove unfree regs */
-      for (auto pair : nearby_regs) {
-         if (candidate_regs.find(pair.first) == candidate_regs.end()) {
-            nearby_regs.erase(pair.first);
+      for (auto it = nearby_regs.begin(), end = nearby_regs.end(); it != end; ) {
+         if (candidate_regs.find(it->first) == candidate_regs.end()) {
+            it = nearby_regs.erase(it);
+         } else {
+            ++it;
          }
       }
 

@@ -136,44 +136,10 @@ namespace zc::z80 {
        * @param var variable
        * @param out output list of registers
        */
-      template <typename OutputIt>
-      void GetAssignableRegs(const VariableValue *var, OutputIt out) const {
-         /* get variable lifetime */
-         const VariableRallocInfo& varinfo = vars_.at(var->id());
-         const RallocInterval& varint = varinfo.interval;
-         
-         /* look thru byte regs to find free */
-         std::unordered_set<const ByteRegister *> byte_regs_;
-         for (auto reg_it : regs_) {
-            auto super_it = reg_it.second.superinterval(varint);
-            if (super_it != reg_it.second.intervals.end()) {
-               byte_regs_.insert(reg_it.first);
-            }
-         }
-
-         /* if multibyte var, find register pairs in available byte regs */
-         switch (var->size()) {
-         case byte_size:
-            for (auto byte_reg : byte_regs_) {
-               *out++ = byte_reg;
-            }
-            break;
-            
-         case long_size:
-            for (const MultibyteRegister *multibyte_reg : {&r_bc, &r_de, &r_hl}) {
-               auto subregs = multibyte_reg->regs();
-               if (std::all_of(subregs.begin(), subregs.end(),
-                           [&](const ByteRegister *byte_reg) -> bool {
-                              return byte_regs_.find(byte_reg) != byte_regs_.end();
-                           })) {
-                  *out++ = multibyte_reg;
-               }
-            }
-            break;
-            
-         default: abort();
-         }
-      }
+      //template <typename OutputIt>
+      //void GetAssignableRegs(const VariableValue *var, OutputIt out) const {
+      void GetAssignableRegs(const VariableValue *var,
+                             std::unordered_set<const Register *>& out) const;
       
       /**
        * Try to assign register to variable.
