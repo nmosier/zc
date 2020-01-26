@@ -183,13 +183,15 @@ namespace zc::z80 {
       const auto no_match = [&](){ out.clear(); return begin; };      
 
       /* unbound values */
-      const Register *r;
+      const Register *r1, *r2;
       int size;
       
       if (it == end) { return no_match(); }
-      const RegisterValue r_1(&r, &size);
-      const LoadInstruction instr1(&r_1, &r_1);
-      if (!instr1.Match(*it)) { return no_match(); }
+      const RegisterValue rv1(&r1, &size);
+      const RegisterValue rv2(&r2, &size);
+      const LoadInstruction instr(&rv1, &rv2);
+      if (!instr.Match(*it)) { return no_match(); }
+      if (!r1->Eq(r2)) { return no_match(); }
       ++it;
 
       return it;

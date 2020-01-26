@@ -25,7 +25,7 @@ namespace zc::z80 {
    public:
       int size() const { return size_.get(); }
       virtual const Register *reg() const { return nullptr; }
-      virtual const VariableValue *var() const { return nullptr; }
+      // virtual const VariableValue *var() const { return nullptr; }
       
       virtual void Emit(std::ostream& os) const = 0;
       virtual Value *Add(const intmax_t& offset) const = 0;
@@ -33,6 +33,9 @@ namespace zc::z80 {
          return size() == other->size() && Eq_(other);
       }
       bool Match(const Value *to) const;
+
+      virtual void Gen(std::list<const Value *>& vals) const {}
+      virtual void Use(std::list<const Value *>& vals) const {}
 
       virtual const Value *ReplaceVar(const VariableValue *var, const Value *with) const
       { return this; }
@@ -73,8 +76,11 @@ namespace zc::z80 {
    public:
       bool force_reg() const { return force_reg_; }
       int id() const { return id_; }
-      virtual const VariableValue *var() const override { return this; }
+      // virtual const VariableValue *var() const override { return this; }
 
+      virtual void Gen(std::list<const Value *>& vals) const override { vals.push_back(this); }
+      virtual void Use(std::list<const Value *>& vals) const override { vals.push_back(this); }
+      
       virtual void Emit(std::ostream& os) const override;
       virtual Value *Add(const intmax_t& offset) const override
       { throw std::logic_error("attempted to add to abstract value"); }
@@ -155,6 +161,9 @@ namespace zc::z80 {
       virtual void Emit(std::ostream& os) const override;
       virtual Value *Add(const intmax_t& offset) const override;
 
+      virtual void Gen(std::list<const Value *>& vals) const override { vals.push_back(this); }
+      virtual void Use(std::list<const Value *>& vals) const override { vals.push_back(this); }
+
       RegisterValue(const ByteRegister *reg): Value_(byte_size), reg_(reg) {}
       RegisterValue(const MultibyteRegister *reg): Value_(long_size), reg_(reg) {}
       RegisterValue(const Register *reg): Value_(reg->size()), reg_(reg) {}            
@@ -232,13 +241,15 @@ namespace zc::z80 {
    public:
       const Value *addr() const { return *addr_; }
       virtual const Register *reg() const override {return addr()->reg(); }
-      virtual const VariableValue *var() const override { return addr()->var(); }
+      // virtual const VariableValue *var() const override { return addr()->var(); }
       
       virtual void Emit(std::ostream& os) const override;
       virtual Value *Add(const intmax_t& offset) const override;
 
       MemoryValue *Next(int size) const;
       MemoryValue *Prev(int size) const;
+
+      virtual void Use(std::list<const Value *>& vals) const override { addr()->Use(vals); }
 
       virtual const Value *ReplaceVar(const VariableValue *var, const Value *with) const override
       { return new MemoryValue((*addr_)->ReplaceVar(var, with), size_); }

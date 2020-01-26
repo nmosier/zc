@@ -269,6 +269,10 @@ Other
 [2 hrs] Continued working on register allocaiton subroutines. Currently checks tries to assign all variables to registers; doesn't do much beyond that.
         Confirmed success with `simple.c` -- optimally assigns registers.
         Definitely doesn't work with `memcpy.c`, though.
+[3 hrs] Register-only allocation mostly working. Haven't tested stack-spilling yet.
+
+[1 hr] Added Resolve() for instructions. <EXPLAIN>.
+
 
 PEEPHOLE OPTIMIZATIONS
 Done

@@ -49,7 +49,7 @@ namespace zc::z80 {
             {
                for (const Value *val : (m == mode::GEN) ? gens : uses) {
                   const Register *reg = val->reg();
-                  const VariableValue *var = val->var();
+                  const VariableValue *var = dynamic_cast<const VariableValue *>(val);
                   
                   /* add register */
                   if (reg) {

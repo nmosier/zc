@@ -21,12 +21,6 @@ namespace zc::z80 {
       os << std::endl;
    }
 
-#if 0
-   const Value *BinaryInstruction::dst() const { return *operands_.front(); }
-   const Value *BinaryInstruction::src() const { return **++operands_.begin(); }
-   const Value *UnaryInstruction::dst() const { return *operands_.front(); }
-#endif
-
    bool Instruction::Eq(const Instruction *other) const {
       if (name() != other->name()) {
          return false;
@@ -64,30 +58,46 @@ namespace zc::z80 {
    }
 
    /*** GEN & USE ***/
-   
-   void BitwiseInstruction::Gen(std::list<const Value *>& vals) const {
-      if (!dst()->Eq(src())) { vals.push_back(dst()); }
+
+   void BinaryInstruction::Gen(std::list<const Value *>& vals) const { dst()->Gen(vals); }
+   void BinaryInstruction::Use(std::list<const Value *>& vals) const {
+      dst()->Use(vals); src()->Use(vals);
    }
 
+   void UnaryInstruction::Gen(std::list<const Value *>& vals) const { dst()->Gen(vals); }
+   void UnaryInstruction::Use(std::list<const Value *>& vals) const { dst()->Use(vals); }
+
+   void LoadInstruction::Gen(std::list<const Value *>& vals) const { dst()->Gen(vals); }
+   void LoadInstruction::Use(std::list<const Value *>& vals) const {
+      src()->Use(vals);
+      auto mv = dynamic_cast<const MemoryValue *>(dst());
+      if (mv) { mv->Use(vals); } /* ugh, this is hideous */
+   }
+   
+   void BitwiseInstruction::Gen(std::list<const Value *>& vals) const {
+      if (!dst()->Eq(src())) { dst()->Gen(vals); }
+   }
    void BitwiseInstruction::Use(std::list<const Value *>& vals) const {
-      if (!dst()->Eq(src())) { vals.push_back(dst()); vals.push_back(src()); }
+      if (!dst()->Eq(src())) { dst()->Use(vals); src()->Use(vals); }
    }
 
    void CallInstruction::Gen(std::list<const Value *>& vals) const {
-         vals.push_back(&rv_hl); vals.push_back(&rv_bc);
+      rv_hl.Gen(vals);
+      rv_bc.Gen(vals);
       }
    void CallInstruction::Use(std::list<const Value *>& vals) const {
-      vals.push_back(&rv_hl); vals.push_back(&rv_bc);
+      rv_hl.Use(vals);
+      rv_bc.Use(vals);
    }
    
-   void CplInstruction::Gen(std::list<const Value *>& vals) const { vals.push_back(&rv_a); }
-   void CplInstruction::Use(std::list<const Value *>& vals) const { vals.push_back(&rv_a); }
+   void CplInstruction::Gen(std::list<const Value *>& vals) const { rv_a.Gen(vals); }
+   void CplInstruction::Use(std::list<const Value *>& vals) const { rv_a.Use(vals); }
 
-   void NegInstruction::Gen(std::list<const Value *>& vals) const { vals.push_back(&rv_a); }
-   void NegInstruction::Use(std::list<const Value *>& vals) const { vals.push_back(&rv_a); }
+   void NegInstruction::Gen(std::list<const Value *>& vals) const { rv_a.Gen(vals); }
+   void NegInstruction::Use(std::list<const Value *>& vals) const { rv_a.Use(vals); }
 
-   void DjnzInstruction::Gen(std::list<const Value *>& vals) const { vals.push_back(&rv_b); }
-   void DjnzInstruction::Use(std::list<const Value *>& vals) const { vals.push_back(&rv_b); }
+   void DjnzInstruction::Gen(std::list<const Value *>& vals) const { rv_b.Gen(vals); }
+   void DjnzInstruction::Use(std::list<const Value *>& vals) const { rv_b.Use(vals); }
 
    /*** VARS ***/
    void Instruction::ReplaceVar(const VariableValue *var, const Value *with) {

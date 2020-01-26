@@ -38,8 +38,8 @@ namespace zc::z80 {
       virtual void Use(std::list<const Value *>& vals) const {}
 
       void ReplaceVar(const VariableValue *var, const Value *with);
-      
-      void Emit(std::ostream& os) const;
+
+      void Emit(std::ostream& os ) const;
 
       bool Eq(const Instruction *other) const;
       bool Match(const Instruction *to) const;
@@ -59,10 +59,8 @@ namespace zc::z80 {
 
    class BinaryInstruction: public Instruction {
    public:
-      virtual void Gen(std::list<const Value *>& vals) const override { vals.push_back(dst()); }
-      virtual void Use(std::list<const Value *>& vals) const override {
-         vals.push_back(dst()); vals.push_back(src());
-      }
+      virtual void Gen(std::list<const Value *>& vals) const override;
+      virtual void Use(std::list<const Value *>& vals) const override;
       
    protected:
       template <typename... Args>
@@ -72,8 +70,8 @@ namespace zc::z80 {
 
    class UnaryInstruction: public Instruction {
    public:
-      virtual void Gen(std::list<const Value *>& vals) const override { vals.push_back(dst()); }
-      virtual void Use(std::list<const Value *>& vals) const override { vals.push_back(dst()); }
+      virtual void Gen(std::list<const Value *>& vals) const override;
+      virtual void Use(std::list<const Value *>& vals) const override;
       
    protected:
       template <typename... Args>
@@ -243,9 +241,9 @@ namespace zc::z80 {
     */
    class LoadInstruction: public BinaryInstruction {
    public:
-      virtual void Gen(std::list<const Value *>& vals) const override { vals.push_back(dst()); }
-      virtual void Use(std::list<const Value *>& vals) const override { vals.push_back(src()); }
-      
+      virtual void Gen(std::list<const Value *>& vals) const override;
+      virtual void Use(std::list<const Value *>& vals) const override;
+
       template <typename... Args>
       LoadInstruction(Args... args): BinaryInstruction(args..., "ld") {}
    };

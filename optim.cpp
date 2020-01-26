@@ -4,7 +4,7 @@
 #include "peephole.hpp"
 #include "ralloc.hpp"
 
-#define PEEPHOLE 0
+#define PEEPHOLE 1
 
 namespace zc {
 
