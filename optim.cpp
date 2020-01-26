@@ -29,8 +29,6 @@ namespace zc {
 
    /*** CONSTANTS ***/
 
-   // TODO: add optimizer
-
    void TranslationUnit::ReduceConst() {
       for (auto decl : decls()->vec()) {
          decl->ReduceConst();
