@@ -6,6 +6,8 @@
 #define __ASM_VAL_HPP
 
 #include <ostream>
+#include <numeric>
+
 
 #include "asm-reg.hpp"
 #include "util.hpp"
@@ -206,6 +208,27 @@ namespace zc::z80 {
          return val()->Eq(other->val()) && index() == other->index();
       }
       virtual bool Match_aux(const IndexedRegisterValue *to) const override;
+   };
+
+   class FrameValue: public Value_<FrameValue> {
+   public:
+      typedef std::list<int8_t> FrameIndices;
+      
+      const RegisterValue *val() const { return &rv_ix; }
+      int8_t index() const;
+
+      virtual void Emit(std::ostream& os) const override;
+      virtual Value *Add(const intmax_t& offset) const override;
+
+      FrameValue(FrameIndices& indices, FrameIndices::iterator pos, const portal<int>& size):
+         Value_<FrameValue>(size), indices_(indices), pos_(pos) {}
+      
+   protected:
+      FrameIndices::iterator pos_;
+      FrameIndices& indices_;
+
+      virtual bool Eq_aux(const FrameValue *other) const override { return pos_ == other->pos_; }
+      virtual bool Match_aux(const FrameValue *to) const override { return Eq_aux(to); }
    };
 
    /**
