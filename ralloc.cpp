@@ -345,6 +345,11 @@ namespace zc::z80 {
       
       alloc_kind = AllocKind::ALLOC_STACK;
    }
+
+   void VariableRallocInfo::FrameSpill(StackFrame& frame) {
+      // frame.add_local(
+      /* TODO */
+   }
    
    std::ostream& operator<<(std::ostream& os, AllocKind kind) {
       switch (kind) {
@@ -433,9 +438,9 @@ namespace zc::z80 {
    }
 
    /*** ***/
-   void RegisterAllocator::RallocBlock(Block *block) {
+   void RegisterAllocator::RallocBlock(Block *block, StackFrame& stack_frame) {
       std::cerr << block->label()->name() << ":" << std::endl;
-      RegisterAllocator ralloc(block);
+      RegisterAllocator ralloc(block, stack_frame);
       ralloc.ComputeIntervals();
 
       ralloc.Dump(std::cerr);
@@ -445,16 +450,16 @@ namespace zc::z80 {
 
    }
 
-   void RegisterAllocator::Ralloc(FunctionImpl& impl) {
+   void RegisterAllocator::Ralloc(FunctionImpl& impl, StackFrame& frame) {
       Blocks visited;
-      void (*fn)(Block *) = RegisterAllocator::RallocBlock;
-      impl.entry()->for_each_block(visited, fn);
-      impl.fin()->for_each_block(visited, fn);
+      void (*fn)(Block *, StackFrame&) = RegisterAllocator::RallocBlock;
+      impl.entry()->for_each_block(visited, fn, frame);
+      impl.fin()->for_each_block(visited, fn, frame);
    }
 
    void RegisterAllocator::Ralloc(CgenEnv& env) {
       for (FunctionImpl& impl : env.impls().impls()) {
-         Ralloc(impl);
+         Ralloc(impl, env.ext_env().frame());
       }
    }
 

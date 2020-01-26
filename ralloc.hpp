@@ -65,13 +65,15 @@ namespace zc::z80 {
       RallocInterval interval;
       AllocKind alloc_kind;
 
-      void RenameVar();
+      void RenameVar(); /* TODO: delete this? */
+
       void AssignReg(const RegisterValue *reg);
+      bool requires_reg() const;
 
       bool is_stack_spillable() const;
       void StackSpill(Instructions& instrs);
 
-      bool requires_reg() const;
+      void FrameSpill(StackFrame& frame); 
 
       void Dump(std::ostream& os) const;
 
@@ -109,19 +111,20 @@ namespace zc::z80 {
 
       void Dump(std::ostream& os) const;
       
-      RegisterAllocator(Block *block): block_(block) {}
+      RegisterAllocator(Block *block, StackFrame& stack_frame):
+         block_(block), stack_frame_(stack_frame) {}
 
-      static void Ralloc(FunctionImpl& impl);
+      static void Ralloc(FunctionImpl& impl, StackFrame& stack_frame);
       static void Ralloc(CgenEnv& env);
       
    protected:
-      Block *block_;
+      Block *block_; /*!< block containing instructions. */
+      StackFrame& stack_frame_; /*!< stack frame for spilling locals. */
       std::unordered_map<int, VariableRallocInfo> vars_;
       std::unordered_map<const ByteRegister *, RegisterFreeIntervals> regs_;
-      NestedRallocIntervals stack_spills_;
+      NestedRallocIntervals stack_spills_; /*!< intervals on which vars are stack-spilled */
 
       AllocKind AllocateVar(const VariableValue *var);
-
 
       /**
        * Try to allocate register to variable.
@@ -148,7 +151,7 @@ namespace zc::z80 {
        */
       bool TryAssignReg(VariableRallocInfo& varinfo);
       
-      static void RallocBlock(Block *block);
+      static void RallocBlock(Block *block, StackFrame& stack_frame);
    };
    
 }
