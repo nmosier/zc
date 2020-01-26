@@ -78,7 +78,7 @@ namespace zc::z80 {
           offset < std::numeric_limits<int8_t>::min()) {
          throw std::logic_error("offset too large");
       }
-      return new FrameValue(indices_, indices_.insert(pos_, offset), size_);
+      return new FrameValue(indices_, indices_.insert(pos_, offset));
    }
 
    Value *OffsetValue::Add(const intmax_t& new_offset) const {

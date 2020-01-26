@@ -1,218 +1,218 @@
-#ifndef __ASM_HPP
-#error "include \"asm.hpp\""
-#endif
+ #ifndef __ASM_HPP
+ #error "include \"asm.hpp\""
+ #endif
 
-#ifndef __ASM_VAL_HPP
-#define __ASM_VAL_HPP
+ #ifndef __ASM_VAL_HPP
+ #define __ASM_VAL_HPP
 
-#include <ostream>
-#include <numeric>
+ #include <ostream>
+ #include <numeric>
 
 
-#include "asm-reg.hpp"
-#include "util.hpp"
+ #include "asm-reg.hpp"
+ #include "util.hpp"
 
-namespace zc::z80 {
+ namespace zc::z80 {
 
-   /**********
-    * VALUES *
-    **********/
+    /**********
+     * VALUES *
+     **********/
 
-   class VariableValue;
-   
-   /**
-    * Base class for values during code generation.
-    */
-   class Value {
-   public:
-      int size() const { return size_.get(); }
-      virtual const Register *reg() const { return nullptr; }
-      // virtual const VariableValue *var() const { return nullptr; }
-      
-      virtual void Emit(std::ostream& os) const = 0;
-      virtual Value *Add(const intmax_t& offset) const = 0;
-      bool Eq(const Value *other) const {
-         return size() == other->size() && Eq_(other);
-      }
-      bool Match(const Value *to) const;
+    class VariableValue;
+ 
+    /**
+     * Base class for values during code generation.
+     */
+    class Value {
+    public:
+       int size() const { return size_.get(); }
+       virtual const Register *reg() const { return nullptr; }
+       // virtual const VariableValue *var() const { return nullptr; }
+    
+       virtual void Emit(std::ostream& os) const = 0;
+       virtual Value *Add(const intmax_t& offset) const = 0;
+       bool Eq(const Value *other) const {
+          return size() == other->size() && Eq_(other);
+       }
+       bool Match(const Value *to) const;
 
-      virtual void Gen(std::list<const Value *>& vals) const {}
-      virtual void Use(std::list<const Value *>& vals) const {}
+       virtual void Gen(std::list<const Value *>& vals) const {}
+       virtual void Use(std::list<const Value *>& vals) const {}
 
-      virtual const Value *ReplaceVar(const VariableValue *var, const Value *with) const
-      { return this; }
-      
-   protected:
-      portal<int> size_;
+       virtual const Value *ReplaceVar(const VariableValue *var, const Value *with) const
+       { return this; }
+    
+    protected:
+       portal<int> size_;
 
-      virtual bool Eq_(const Value *other) const = 0;
-      virtual bool Match_(const Value *to) const = 0;
-      
-      Value(portal<int> size): size_(size) {}
-   };
+       virtual bool Eq_(const Value *other) const = 0;
+       virtual bool Match_(const Value *to) const = 0;
+    
+       Value(portal<int> size): size_(size) {}
+    };
 
-   template <class Derived>
-   class Value_: public Value {
-   protected:
-      virtual bool Eq_(const Value *other) const override {
-         auto derived = dynamic_cast<const Derived *>(other);
-         return derived ? Eq_aux(derived) : false;
-      }
+    template <class Derived>
+    class Value_: public Value {
+    protected:
+       virtual bool Eq_(const Value *other) const override {
+          auto derived = dynamic_cast<const Derived *>(other);
+          return derived ? Eq_aux(derived) : false;
+       }
 
-      virtual bool Match_(const Value *to) const override {
-         auto derived = dynamic_cast<const Derived *>(to);
-         return derived ? Match_aux(derived) : false;
-      }
+       virtual bool Match_(const Value *to) const override {
+          auto derived = dynamic_cast<const Derived *>(to);
+          return derived ? Match_aux(derived) : false;
+       }
 
-      virtual bool Eq_aux(const Derived *other) const = 0;
-      virtual bool Match_aux(const Derived *to) const = 0;
-      
-      template <typename... Args>
-      Value_(Args... args): Value(args...) {}
-   };
+       virtual bool Eq_aux(const Derived *other) const = 0;
+       virtual bool Match_aux(const Derived *to) const = 0;
+    
+       template <typename... Args>
+       Value_(Args... args): Value(args...) {}
+    };
 
-   /**
-    * Variable that hasn't been assigned a storage class.
-    */
-   class VariableValue: public Value_<VariableValue> {
-   public:
-      bool force_reg() const { return force_reg_; }
-      int id() const { return id_; }
-      // virtual const VariableValue *var() const override { return this; }
+    /**
+     * Variable that hasn't been assigned a storage class.
+     */
+    class VariableValue: public Value_<VariableValue> {
+    public:
+       bool force_reg() const { return force_reg_; }
+       int id() const { return id_; }
 
-      virtual void Gen(std::list<const Value *>& vals) const override { vals.push_back(this); }
-      virtual void Use(std::list<const Value *>& vals) const override { vals.push_back(this); }
-      
-      virtual void Emit(std::ostream& os) const override;
-      virtual Value *Add(const intmax_t& offset) const override
-      { throw std::logic_error("attempted to add to abstract value"); }
+       virtual void Gen(std::list<const Value *>& vals) const override { vals.push_back(this); }
+       virtual void Use(std::list<const Value *>& vals) const override { vals.push_back(this); }
+    
+       virtual void Emit(std::ostream& os) const override;
+       virtual Value *Add(const intmax_t& offset) const override
+       { throw std::logic_error("attempted to add to abstract value"); }
 
-      /**
-       * Create new variable with distinct name (ID).
-       */
-      VariableValue *Rename() const { return new VariableValue(size()); }
+       /**
+        * Create new variable with distinct name (ID).
+        */
+       VariableValue *Rename() const { return new VariableValue(size()); }
 
-      virtual const Value *ReplaceVar(const VariableValue *var, const Value *with) const override
-      { return with; }
+       virtual const Value *ReplaceVar(const VariableValue *var, const Value *with) const override
+       { return with; }
 
-      VariableValue(int size, bool force_reg = false):
-         Value_(size), id_(id_counter_++), force_reg_(force_reg) {}
+       VariableValue(int size, bool force_reg = false):
+          Value_(size), id_(id_counter_++), force_reg_(force_reg) {}
 
-   protected:
-      int id_;
-      bool force_reg_;
-      
-      static int id_counter_;
+    protected:
+       int id_;
+       bool force_reg_;
+    
+       static int id_counter_;
 
-      virtual bool Eq_aux(const VariableValue *other) const override { return id() == other->id(); }
-      virtual bool Match_aux(const VariableValue *to) const override { return Eq_aux(to); }
-   };
+       virtual bool Eq_aux(const VariableValue *other) const override { return id() == other->id(); }
+       virtual bool Match_aux(const VariableValue *to) const override { return Eq_aux(to); }
+    };
 
-   /**
-    * Class representing immediate value.
-    */
-   class ImmediateValue: public Value_<ImmediateValue> {
-   public:
-      const intmax_t& imm() const { return *imm_; }
-      
-      virtual void Emit(std::ostream& os) const override;
-      virtual Value *Add(const intmax_t& offset) const override;
-      
-      ImmediateValue(portal<intmax_t> imm, portal<int> size): Value_(size), imm_(imm) {}
-      ImmediateValue(const intmax_t& imm); /* infers size */
-      
-   protected:
-      portal<intmax_t> imm_;
-      
-      virtual bool Eq_aux(const ImmediateValue *other) const override {
-         return imm() == other->imm();
-      }
-      virtual bool Match_aux(const ImmediateValue *to) const override;
-   };
+    /**
+     * Class representing immediate value.
+     */
+    class ImmediateValue: public Value_<ImmediateValue> {
+    public:
+       const intmax_t& imm() const { return *imm_; }
+    
+       virtual void Emit(std::ostream& os) const override;
+       virtual Value *Add(const intmax_t& offset) const override;
+    
+       ImmediateValue(portal<intmax_t> imm, portal<int> size): Value_(size), imm_(imm) {}
+       ImmediateValue(const intmax_t& imm); /* infers size */
+    
+    protected:
+       portal<intmax_t> imm_;
+    
+       virtual bool Eq_aux(const ImmediateValue *other) const override {
+          return imm() == other->imm();
+       }
+       virtual bool Match_aux(const ImmediateValue *to) const override;
+    };
 
-   /**
-    * Class representing the value of a label (i.e. its address).
-    */
-   class LabelValue: public Value_<LabelValue> {
-   public:
-      const Label *label() const { return label_; }
+    /**
+     * Class representing the value of a label (i.e. its address).
+     */
+    class LabelValue: public Value_<LabelValue> {
+    public:
+       const Label *label() const { return label_; }
 
-      virtual void Emit(std::ostream& os) const override;
-      virtual Value *Add(const intmax_t& offset) const override;
+       virtual void Emit(std::ostream& os) const override;
+       virtual Value *Add(const intmax_t& offset) const override;
 
-      template <typename... Args>
-      LabelValue(const Label *label, Args... args): Value_(args..., long_size), label_(label) {}
-      
-   protected:
-      const Label *label_;
+       template <typename... Args>
+       LabelValue(const Label *label, Args... args): Value_(args..., long_size), label_(label) {}
+    
+    protected:
+       const Label *label_;
 
-      virtual bool Eq_aux(const LabelValue *other) const override {
-         return label()->Eq(other->label());
-      }
-      virtual bool Match_aux(const LabelValue *to) const override { return Eq_aux(to); }
-   };
+       virtual bool Eq_aux(const LabelValue *other) const override {
+          return label()->Eq(other->label());
+       }
+       virtual bool Match_aux(const LabelValue *to) const override { return Eq_aux(to); }
+    };
 
-   class Register;
-   /**
-    * Class representing a value held in a single-byte register.
-    */
-   class RegisterValue: public Value_<RegisterValue> {
-   public:
-      virtual const Register *reg() const override { return *reg_; }
-      
-      virtual void Emit(std::ostream& os) const override;
-      virtual Value *Add(const intmax_t& offset) const override;
+    class Register;
+    /**
+     * Class representing a value held in a single-byte register.
+     */
+    class RegisterValue: public Value_<RegisterValue> {
+    public:
+       virtual const Register *reg() const override { return *reg_; }
+    
+       virtual void Emit(std::ostream& os) const override;
+       virtual Value *Add(const intmax_t& offset) const override;
 
-      virtual void Gen(std::list<const Value *>& vals) const override { vals.push_back(this); }
-      virtual void Use(std::list<const Value *>& vals) const override { vals.push_back(this); }
+       virtual void Gen(std::list<const Value *>& vals) const override { vals.push_back(this); }
+       virtual void Use(std::list<const Value *>& vals) const override { vals.push_back(this); }
 
-      RegisterValue(const ByteRegister *reg): Value_(byte_size), reg_(reg) {}
-      RegisterValue(const MultibyteRegister *reg): Value_(long_size), reg_(reg) {}
-      RegisterValue(const Register *reg): Value_(reg->size()), reg_(reg) {}            
-      RegisterValue(const Register *reg, int size): Value_(size), reg_(reg) {}
-      RegisterValue(const Register **reg_ptr, portal<int> size): Value_(size), reg_(reg_ptr) {}
-      
-   protected:
-      portal<const Register *> reg_;
-      
-      virtual bool Eq_aux(const RegisterValue *other) const override {
-         return reg()->Eq(other->reg());
-      }
-      virtual bool Match_aux(const RegisterValue *to) const override;
-   };
-   
-   /**
-    * Class representing an indexed register value.
-    */
-   class IndexedRegisterValue: public Value_<IndexedRegisterValue> {
-   public:
-      const RegisterValue *val() const { return *val_; }
-      int8_t index() const { return *index_; }
-      virtual const Register *reg() const override { return val()->reg(); }
-      
-      virtual void Emit(std::ostream& os) const override;
-      virtual Value *Add(const intmax_t& offset) const override;
+       RegisterValue(const ByteRegister *reg): Value_(byte_size), reg_(reg) {}
+       RegisterValue(const MultibyteRegister *reg): Value_(long_size), reg_(reg) {}
+       RegisterValue(const Register *reg): Value_(reg->size()), reg_(reg) {}            
+       RegisterValue(const Register *reg, int size): Value_(size), reg_(reg) {}
+       RegisterValue(const Register **reg_ptr, portal<int> size): Value_(size), reg_(reg_ptr) {}
+    
+    protected:
+       portal<const Register *> reg_;
+    
+       virtual bool Eq_aux(const RegisterValue *other) const override {
+          return reg()->Eq(other->reg());
+       }
+       virtual bool Match_aux(const RegisterValue *to) const override;
+    };
+ 
+    /**
+     * Class representing an indexed register value.
+     */
+    class IndexedRegisterValue: public Value_<IndexedRegisterValue> {
+    public:
+       const RegisterValue *val() const { return *val_; }
+       int8_t index() const { return *index_; }
+       virtual const Register *reg() const override { return val()->reg(); }
+    
+       virtual void Emit(std::ostream& os) const override;
+       virtual Value *Add(const intmax_t& offset) const override;
 
-      IndexedRegisterValue(const RegisterValue *val, const portal<int8_t>& index):
-         Value_(long_size), val_(val), index_(index) {}
-      IndexedRegisterValue(const RegisterValue **val, const portal<int8_t>& index,
-                           const portal<int>& size):
-         Value_(size), val_(val), index_(index) {}
+       IndexedRegisterValue(const RegisterValue *val, const portal<int8_t>& index):
+          Value_(long_size), val_(val), index_(index) {}
+       IndexedRegisterValue(const RegisterValue **val, const portal<int8_t>& index,
+                            const portal<int>& size):
+          Value_(size), val_(val), index_(index) {}
 
-      
-   protected:
-      portal<const RegisterValue *> val_;
-      portal<int8_t> index_;
+    
+    protected:
+       portal<const RegisterValue *> val_;
+       portal<int8_t> index_;
 
-      virtual bool Eq_aux(const IndexedRegisterValue *other) const override {
-         return val()->Eq(other->val()) && index() == other->index();
-      }
-      virtual bool Match_aux(const IndexedRegisterValue *to) const override;
-   };
+       virtual bool Eq_aux(const IndexedRegisterValue *other) const override {
+          return val()->Eq(other->val()) && index() == other->index();
+       }
+       virtual bool Match_aux(const IndexedRegisterValue *to) const override;
+    };
 
-   class FrameValue: public Value_<FrameValue> {
-   public:
-      typedef std::list<int8_t> FrameIndices;
+    class FrameValue: public Value_<FrameValue> {
+    public:
+       // using FrameIndices = StackFrame::FrameIndices;
+       typedef std::list<int8_t> FrameIndices;
       
       const RegisterValue *val() const { return &rv_ix; }
       int8_t index() const;
@@ -220,8 +220,8 @@ namespace zc::z80 {
       virtual void Emit(std::ostream& os) const override;
       virtual Value *Add(const intmax_t& offset) const override;
 
-      FrameValue(FrameIndices& indices, FrameIndices::iterator pos, const portal<int>& size):
-         Value_<FrameValue>(size), indices_(indices), pos_(pos) {}
+      FrameValue(FrameIndices& indices, FrameIndices::iterator pos):
+         Value_<FrameValue>(*pos), indices_(indices), pos_(pos) {}
       
    protected:
       FrameIndices::iterator pos_;

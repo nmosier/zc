@@ -276,7 +276,9 @@ Other
 [2 hrs] Debugging; debugging the debugger.
 
 01/26/2020
-
+[? hrs] Added frame-spilling.
+[? hrs] Fix stack-spilling bug when values are used multiple times.
+[? hrs] Transition to use `FrameValue`s.
 
 PEEPHOLE OPTIMIZATIONS
 Done

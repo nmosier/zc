@@ -4,7 +4,7 @@
 #include <vector>
 #include <deque>
 #include <unordered_set>
-
+#include <numeric>
 
 #include "asm.hpp"
 #include "ast.hpp"
@@ -77,27 +77,26 @@ namespace zc {
       const Value *addr_;
    };
 
-
    class StackFrame {
    public:
-      int bytes() const;
-      int locals_bytes() const { return locals_bytes_; }
+      typedef std::list<int8_t> FrameIndices;
 
-      void add_local(const VarDeclaration *type);
-      void add_local(int bs) { locals_bytes_ += bs; }
+      int callee_bytes() { return std::reduce(sizes_.begin(), saved_fp_); }
 
+      const Value *saved_fp();
+      const Value *saved_ra();
+      
       VarSymInfo *next_arg(const VarDeclaration *type);
       VarSymInfo *next_local(const VarDeclaration *type);
+      const Value *next_tmp(const VariableValue *tmp);
 
       StackFrame();
       StackFrame(const VarDeclarations *params);
       
    protected:
-      int base_bytes_;
-      int locals_bytes_;
-      int args_bytes_;
-      const Value *next_local_addr_;
-      const Value *next_arg_addr_;
+      FrameIndices sizes_; /*!< list of sizes */
+      FrameIndices::iterator saved_fp_; /*!< caller's frame pointer */
+      FrameIndices::iterator saved_ra_; /*!< return address */
    };
    
 
@@ -247,13 +246,13 @@ namespace zc {
       void DumpAsm(std::ostream& os) const;
       void ResolveInstrs();
 
-      FunctionImpl(const CgenEnv& env, Block *entry, Block *fin);
+      FunctionImpl(CgenEnv& env, Block *entry, Block *fin);
       
    protected:
       Block *entry_;
       Block *fin_;
       const LabelValue *addr_;
-      int frame_bytes_;
+      StackFrame& stack_frame_;
    };
 
    class FunctionImpls {

@@ -30,12 +30,20 @@ namespace zc {
       env.DumpAsm(os);
    }
 
-   FunctionImpl::FunctionImpl(const CgenEnv& env, Block *entry, Block *fin):
-      entry_(entry), fin_(fin), frame_bytes_(env.ext_env().frame().bytes()) {}
+   FunctionImpl::FunctionImpl(CgenEnv& env, Block *entry, Block *fin):
+      entry_(entry), fin_(fin), stack_frame_(env.ext_env().frame()) {}
       
    BlockTransitions::BlockTransitions(const Transitions& vec): vec_(vec) {
       /* get mask of conditions */
       /* TODO: this doesn't work. */
+   }
+
+   const Value *StackFrame::saved_fp() {
+      return new FrameValue(sizes_, saved_fp_);
+   }
+
+   const Value *StackFrame::saved_ra() {
+      return new FrameValue(sizes_, saved_ra_);
    }
    
    void CgenExtEnv::Enter(Symbol *sym, const VarDeclarations *args) {
@@ -1269,28 +1277,29 @@ namespace zc {
 
    void emit_frameset(CgenEnv& env, Block *block) {
       /* push ix
-       * ld ix,-<locals>
+       * ld ix,0
+       * lea ix,ix-<locals+tmps>
        * add ix,sp
        * ld sp,ix
+       * -------
+       * MAKE SURE TO OPTIMIZE USING PEEPHOLE.
        */
-      int locals_bytes = env.ext_env().frame().locals_bytes();
-      std::vector<Instruction *> frameset
+      Instructions instrs
          {new PushInstruction(&rv_ix),
-          new LoadInstruction(&rv_ix, new ImmediateValue(-locals_bytes, long_size)),
+          new LoadInstruction(&rv_ix, new ImmediateValue(-frame_bytes, long_size)),
           new AddInstruction(&rv_ix, &rv_sp),
-          new LoadInstruction(&rv_sp, &rv_ix),
+          new LoadInstruction(&rv_sp, &rv_ix)
          };
-      block->instrs().insert(block->instrs().begin(), frameset.begin(), frameset.end());
+      block->instrs().insert(block->instrs().begin(), instrs.begin(), instrs.end());
    }
-
+   
    void emit_frameunset(CgenEnv& env, Block *block) {
       /* lea ix,ix+locals_bytes
+       * ld sp,ix
        * pop ix
        * ret
        */
-      block->instrs().push_back(new LeaInstruction
-                                (&rv_ix, new IndexedRegisterValue
-                                 (&rv_ix, env.ext_env().frame().locals_bytes())));
+      block->instrs().push_back(new LeaInstruction(&rv_ix, env.ext_env().frame().saved_fp()));
       block->instrs().push_back(new LoadInstruction(&rv_sp, &rv_ix));
       block->instrs().push_back(new PopInstruction(&rv_ix));
       block->instrs().push_back(new RetInstruction());
@@ -1451,36 +1460,34 @@ namespace zc {
 
    /*** FRAME GEN & STACK FRAME ***/
 
-   StackFrame::StackFrame(): base_bytes_(long_size * 2), locals_bytes_(0), args_bytes_(0) {}
+   StackFrame::StackFrame(): sizes_(),
+                             saved_fp_(sizes_.insert(sizes_.end(), long_size)),
+                             saved_ra_(sizes_.insert(sizes_.end(), long_size)) {}
    
    StackFrame::StackFrame(const VarDeclarations *params):
-      base_bytes_(long_size * 2), locals_bytes_(0), args_bytes_(0), next_local_addr_(nullptr),
-      next_arg_addr_(nullptr) /* saved FP, RA */ {
-      /* add size for each param */
-      args_bytes_ = params->size() * long_size;
+      sizes_(),
+      saved_fp_(sizes_.insert(sizes_.end(), long_size)),
+      saved_ra_(sizes_.insert(sizes_.end(), long_size)) {
+      for (const VarDeclaration *var_decl : *params) {
+         /* TODO? */
+      }
    }
 
-   int StackFrame::bytes() const { return base_bytes_ + locals_bytes_ + args_bytes_; }
-   
-   void StackFrame::add_local(const VarDeclaration *local) { add_local(local->bytes()); }
+   // void StackFrame::add_local(const VarDeclaration *local) { add_local(local->bytes()); }
 
    VarSymInfo *StackFrame::next_arg(const VarDeclaration *arg) {
-      if (next_arg_addr_ == nullptr) {
-         next_arg_addr_ = FP_idxval.Add(locals_bytes_ + base_bytes_);
-      }
-      VarSymInfo *info = new VarSymInfo(next_arg_addr_, arg);
-       next_arg_addr_ = next_arg_addr_->Add(long_size);
-       return info;
-    }
+      auto it = sizes_.insert(sizes_.end(), arg->bytes());
+      return new VarSymInfo(new FrameValue(sizes_, it), arg);
+   }
 
-    VarSymInfo *StackFrame::next_local(const VarDeclaration *decl) {
-       if (next_local_addr_ == nullptr) {
-          next_local_addr_ = &FP_idxval;
-       }
+   VarSymInfo *StackFrame::next_local(const VarDeclaration *decl) {
+      auto it = sizes_.insert(saved_fp_, decl->bytes());
+      return VarSymInfo(new FrameValue(sizes_, it), decl);
+   }
 
-       VarSymInfo *info = new VarSymInfo(next_local_addr_, decl);
-       next_local_addr_ = next_local_addr_->Add(decl->type()->bytes());
-       return info;
+   const Value *StackFrame::next_tmp(const VariableValue *tmp) {
+      auto it = sizes_.insert(sizes_.begin(), tmp->size());
+      return new FrameValue(sizes_, it);
    }
 
 
@@ -1517,7 +1524,8 @@ namespace zc {
    }
 
    void VarDeclaration::FrameGen(StackFrame& frame) const {
-      frame.add_local(this);
+      /* TODO: does this even need to happen anymore? */
+      // frame.add_local(this);
    }
 
    void VarDeclaration::Declare(CgenEnv& env) {
