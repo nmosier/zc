@@ -225,46 +225,23 @@ Since the register allocation is mostly complete, I moved on to building up nece
 [1 hr] Next, I started working on modifying the existing stack-machine code generator to produce unbound variable values as necessary instead of pushing intermediate results onto the stack.
 
 01/23/2020
-
-register allocation algorithm, infrastructure
-remove memory location
-added ComputeRegFree()
-added ComputeVarLifetime()
-changed code generation for expressions: told what value to generate result into (generally means emitting a load at the end)
-
-[3 hrs] finished with BinaryExpr::CodeGen
-
-CODEGEN WITH VARS
-Stats
-[X] ReturnStat
-[X] ExprStat
-[X] IfStat
-[X] LoopStat
-[X] WhileStat
-[X] ForStat
-[X] BreakStat
-[X] ContinueStat
-[X] GotoStat
-[X] LabeledStat
-[X] LabelDefStat
-
-Exprs
-[X] AssignmentExpr
-[X] UnaryExpr
-[ ] 
-
-
-Other
-[X] emit_nonzero_test
-
-- Added emit_predicate(). 
+Today I worked on more register allocation infrastructure.
+[1 hr] I added a basic algorithm to compute register free intervals, on a block-by-block basis. How it works: for each instruction, if the source is a register, then mark that register as ``free''. If the destination is a register, then mark the register as ``used''. This is a very flawed algorithm, which is why I replaced it in a couple days: (1) it wrongly assumes that a value in a register will be used exactly once, and (2) it doesn't account for accumulator-style instructions that use both registers (e.g. `add hl,de`).
+[1 hr] I wrote a basic algorithm to compute variable lifetime intervals, on a block-by-block basic. How it works: for each instruction, if the source is a variable, mark as a `use`. If the destination is a variable, mark as a `gen` (generated). The variable's lifetime is then from the `gen` to the last `use`. This algorithm is less flawed than the one above, but still flawed.
+[4 hrs] The next step was to modify the code generator to produce code that uses intermediate variables. Currently, it was a stack-machine -- it pushed intermediate values onto the stack and popped them off whenever they needed to be used. While simple, this is mutually exclusive with register allocation (stack machines don't use intermediate values).
+   Transitioning the code generator to the new variable scheme involved modifying many functions within the 1600-line `cgen.cpp`, so it took quite a while. I added one paramater to `ASTExpr`s' code generation method: a `VariableValue` that specifies what variable the result should be assigned to. This essentially glues expressions together. One example of the changes I made to the code generator is in the assignment expression: first, the left-hand side is generated into address variable 1; then, the right-hand side is generated into rvalue variable 2. Address variable 1 is then loaded into the multibyte accumulator register `hl`, which can indirectly store variable 2 using the instruction `ld (hl),<variable 2>`.
 
 01/24/2020
-[3 hrs] More register allocation stuff. Rewrote code for computing live intervals; made it much more rigorous.
-<DECSRIBE HOW INTERVALS ARE COMPUTED>.
-
-[2 hrs] Continued writing code for computing live intervals, then moved on to basic register allocation subroutines.
-
+More register allocation stuff. I had an interview with UCSB in the morning, so I only worked in the afternoon.
+I rewrote existing code for computing intervals for register free times and variable lifetimes. This was partially built upon the previous algorithms I wrote yesterday, but is much more rigorous.
+[1 hr]  First, I added a new method to the polymorphic `Value` class: `Gen()` and `Use()`. These methods precisely specify which variables or registers are `gen`'ed or `use`d in the value. For example,
+        there are two values in the expression `ld (hl),v1` -- a memory value whose address is a register value, `(hl)`, and a variable value, `v1`.
+        `(hl)::Gen()` returns nothing, since no new values are being generated into a variable or register (only into memory). `(hl)::Use()` returns `hl`, since `hl` is used as the address of the store.
+        `v1::Gen()` is also empty, but `v1::Use()` is `v1` itself.
+[3 hrs] The new algorithm for copmuting intervals is based on the `Value::Gen()` and `Value::Use()` methods.
+        - Register free intervals: These are computed backwards. A register is _free_ (i) from its last `use` to the end of the block, (ii) from its last `use` before a `gen` within a block, and (iii) from its first `gen` to the beginning of the block.
+        - Variable lifetime intervals: These are computed forwards. A variable's lifetime spans from the first `gen` to the last `use`. There is other informtation that is also captured in a `VariableRallocInfo` struct that will be used later on.
+        
 01/25/2020
 [2 hrs] Continued working on register allocaiton subroutines. Currently checks tries to assign all variables to registers; doesn't do much beyond that.
         Confirmed success with `simple.c` -- optimally assigns registers.
@@ -281,10 +258,15 @@ Other
 [1 hrs] Transition to use `FrameValue`s.
 [2 hrs] Reconfigured FrameValue until it worked.
 
+01/27/2020
+[1 hr] Fixed peephole optimization bug (would skip duplicate matches, e.g. `ld a,a \ ld a,a` and only remove first.
+[2 hrs] Fixed bugs with `chars.c` program -- values were being used across blocks, which caused ralloc assertions to fail.
+        Fixed bug with `ReturnStat`: it didn't cast the return result if it wasn't of equal type. Added explicit casts to fix this, and now `chars.c` runs correctly.
+
 
 OPTIMIZATION IDEAS
 [ ] Defragmenting during register allocation
-[ ] Pushing casts down AST exprs, when possible
+[ ] Pushing casts down AST exprs, when possible (e.g. addition/subtraction/multiplication, but not division)
 
 PEEPHOLE OPTIMIZATIONS
 Done

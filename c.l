@@ -91,7 +91,7 @@ E  [Ee][+-]?{D}+
    }
 
    /* incomplete */
-'[^\\']' {
+\'[^\\']\' {
         yylval.expr = zc::LiteralExpr::Create(extract_char(yytext), g_lineno);
         return CHAR_CONST;
     }
@@ -105,6 +105,7 @@ E  [Ee][+-]?{D}+
 "&&" { return AND; }
 "<=" { return LEQ; }
 "==" { return EQ; }
+">=" { return GEQ; }
 "!=" { return NEQ; }
 "->" { return ARROW; }
 

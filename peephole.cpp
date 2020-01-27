@@ -6,9 +6,7 @@
 namespace zc::z80 {
 
    void PeepholeOptimization::ReplaceAll(Instructions& input) const {
-      for (const_iterator it = input.begin(), end = input.end();
-           it != end;
-           ++it) {
+      for (const_iterator it = input.begin(), end = input.end(); it != end; ) {
          it = ReplaceAt(input, it);
       }
    }
@@ -17,8 +15,12 @@ namespace zc::z80 {
                                                                 const_iterator it) const {
       Instructions new_instrs;
       const_iterator rm_end = replace_(it, input.end(), new_instrs);
+      const_iterator ret_it;
       const_iterator new_end = input.erase(it, rm_end);
       input.splice(new_end, new_instrs);
+      if (it == rm_end) {
+         ++new_end;
+      }
       return new_end;
    }
 

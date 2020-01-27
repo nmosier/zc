@@ -430,10 +430,13 @@
        assert(var);
        const FunctionType *fn_type = dynamic_cast<const FunctionType *>(var->type());
        assert(fn_type);
-       const ASTType *ret_type = fn_type->return_type();
+       ASTType *ret_type = fn_type->return_type();
        if (!ret_type->TypeCoerce(expr_type)) {
           env.error()(g_filename, this) << "value in return statement has incompatible type"
                                         << std::endl;
+       } else if (!ret_type->TypeEq(expr_type)) {
+           /* add explicit cast */
+           expr_ = CastExpr::Create(ret_type, expr(), loc());
        }
     }
 

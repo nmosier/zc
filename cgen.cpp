@@ -524,64 +524,42 @@ namespace zc {
       
       switch (kind()) {
       case Kind::BOP_LOGICAL_AND:
+      case Kind::BOP_LOGICAL_OR:
          /* Short-circuit evaluation dictates that evaluation stops if the first operand 
           * is 0. 
           */
          {
-            /* evaluate lhs */
-            block = lhs()->CodeGen(env, block, lhs_var, ExprKind::EXPR_RVALUE);
-            
-            emit_nonzero_test(env, block, lhs_var);
+             bool and_not_or = (kind() == Kind::BOP_LOGICAL_AND);
+             const char *name = and_not_or ? "BOP_LOGICAL_AND" : "BOP_LOGICAL_OR";
+             
+             /* evaluate lhs */
+             block = lhs()->CodeGen(env, block, lhs_var, ExprKind::EXPR_RVALUE);
+             
+             emit_nonzero_test(env, block, lhs_var);
 
-            /* preemptively set result to 0 */
-            block->instrs().push_back(new LoadInstruction(out, &imm_b<0>));
+            /* preemptively set result to 0/1 */
+             block->instrs().push_back(new LoadInstruction(&rv_a,
+                                                           and_not_or ? &imm_b<0> : &imm_b<1>));
 
             /* create transitions */
-            const Label *end_label = new_label("BOP_LOGICAL_AND");
+             const Label *end_label = new_label(name);
             Block *end_block = new Block(end_label);
-            BlockTransition *end_transition = new JumpTransition(end_block, Cond::Z);
+            BlockTransition *end_transition = new JumpTransition(end_block,
+                                                                 and_not_or ? Cond::Z : Cond::NZ);
             block->transitions().vec().push_back(end_transition);
 
-            const Label *cont_label = new_label("BOP_LOGICAL_AND");
+            const Label *cont_label = new_label(name);
             Block *cont_block = new Block(cont_label);
-            BlockTransition *cont_transition = new JumpTransition(end_block, Cond::NZ);
+            BlockTransition *cont_transition = new JumpTransition(cont_block,
+                                                                  and_not_or ? Cond::NZ : Cond::Z);
             block->transitions().vec().push_back(cont_transition);
 
             /* Evaluate rhs */
             cont_block = rhs()->CodeGen(env, cont_block, rhs_var, ExprKind::EXPR_RVALUE);
-            emit_booleanize(env, block, rhs_var, out); /* OPTIMIZABLE */
+            emit_booleanize(env, cont_block, rhs_var, &rv_a); /* OPTIMIZABLE */
             cont_block->transitions().vec().push_back(end_transition);
 
-            return end_block;
-         }
-         
-      case Kind::BOP_LOGICAL_OR:
-         /* Short-circuit evaluation dictates that evaluation continues until an operand is nonzero.
-          */
-         {
-            /* evaluate lhs */
-            block = lhs()->CodeGen(env, block, lhs_var, ExprKind::EXPR_RVALUE);
-            emit_nonzero_test(env, block, lhs_var);
-            
-            /* preemptively set out to true */            
-            block->instrs().push_back(new LoadInstruction(out, &imm_b<1>)); 
-            
-            /* create transitions */
-            const Label *end_label = new_label("BOP_LOGICAL_OR");
-            Block *end_block = new Block(end_label);
-            BlockTransition *end_transition = new JumpTransition(end_block, Cond::NZ);
-            block->transitions().vec().push_back(end_transition);
-            
-            const Label *cont_label = new_label("BOP_LOGICAL_OR");
-            Block *cont_block = new Block(cont_label);
-            BlockTransition *cont_transition = new JumpTransition(end_block, Cond::Z);
-            block->transitions().vec().push_back(cont_transition);
-
-            /* Evaluate rhs */
-            cont_block = rhs()->CodeGen(env, cont_block, rhs_var, ExprKind::EXPR_RVALUE);
-            emit_booleanize(env, block, rhs_var, out);
-            cont_block->transitions().vec().push_back(end_transition);
-            
+            end_block->instrs().push_back(new LoadInstruction(out, &rv_a));
             return end_block;
          }
 
@@ -710,6 +688,9 @@ namespace zc {
             }
 
             block->instrs().push_back(new AdcInstruction(&rv_a, &rv_a));
+            if (out) {
+                block->instrs().push_back(new LoadInstruction(out, &rv_a));
+            }
          }
          break;
 
@@ -906,6 +887,11 @@ namespace zc {
       for (ASTExpr *param : params()->vec()) {
          /* TODO: this could be optimized. */
          block->instrs().push_back(new PopInstruction(&rv_de)); /* pop off into scrap register */
+      }
+
+      /* load result */
+      if (out) {
+          block->instrs().push_back(new LoadInstruction(out, accumulator(out->size())));
       }
       
       return block;
