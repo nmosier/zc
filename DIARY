@@ -278,7 +278,13 @@ Other
 01/26/2020
 [? hrs] Added frame-spilling.
 [? hrs] Fix stack-spilling bug when values are used multiple times.
-[? hrs] Transition to use `FrameValue`s.
+[1 hrs] Transition to use `FrameValue`s.
+[2 hrs] Reconfigured FrameValue until it worked.
+
+
+OPTIMIZATION IDEAS
+[ ] Defragmenting during register allocation
+[ ] Pushing casts down AST exprs, when possible
 
 PEEPHOLE OPTIMIZATIONS
 Done

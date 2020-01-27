@@ -13,15 +13,6 @@ namespace zc::z80 {
       return end - begin;
    }
 
-   void VariableRallocInfo::RenameVar() {
-      const VariableValue *newval = val->Rename();
-      (*gen)->operands()[0] = (*(*gen)->operands()[0])->ReplaceVar(val, newval); /* dst */
-      for (auto it : uses) {
-         (*it)->operands()[1] = (*(*it)->operands()[1])->ReplaceVar(val, newval); /* src */
-      }
-      val = newval;
-   }
-
    void RegisterAllocator::ComputeIntervals() {
       enum class mode {GEN, USE};
       std::list<const Value *> gens, uses;
@@ -188,12 +179,10 @@ namespace zc::z80 {
       default: abort();
       }
    }
-   
-   ;
+
    bool RegisterAllocator::TryRegAllocVar(const VariableValue *var) {
       /* get candidate registers */
       std::unordered_set<const Register *> candidate_regs;      
-      // GetAssignableRegs(var, std::inserter(candidate_regs, candidate_regs.begin()));
       GetAssignableRegs(var, candidate_regs);
       if (candidate_regs.empty()) { return false; }
 
@@ -236,7 +225,7 @@ namespace zc::z80 {
       }
       
       /* allocate reg to var */
-      var_info.AssignReg(new RegisterValue(reg));
+      var_info.AssignVal(new RegisterValue(reg));
       
       /* remove register free intervals */
       switch (reg->kind()) {
@@ -277,26 +266,28 @@ namespace zc::z80 {
             var_info.StackSpill(block()->instrs());
             return AllocKind::ALLOC_STACK;
          }
-
       }
 
-      return var_info.alloc_kind = AllocKind::ALLOC_NONE; /* TODO */ 
+      /* otherwise, frame-spill */
+      var_info.FrameSpill(stack_frame_);
+
+      return var_info.alloc_kind;
    }
 
    bool VariableRallocInfo::requires_reg() const {
-      if (val->force_reg()) { return true; }
-      if (val->size() == byte_size) { return false; }
+      if (var->force_reg()) { return true; }
+      if (var->size() == byte_size) { return false; }
 
       /* check if generated from immediate */
       intmax_t imm;
-      const ImmediateValue iv(&imm, val->size());
-      const LoadInstruction gen_instr(val, &iv);
+      const ImmediateValue iv(&imm, var->size());
+      const LoadInstruction gen_instr(var, &iv);
       if (gen_instr.Match(*gen)) { return true; }
 
       /* check if stored to memory value */
       const Value *addr;
-      const MemoryValue mv(&addr, val->size());
-      const LoadInstruction use_instr(&mv, val);
+      const MemoryValue mv(&addr, var->size());
+      const LoadInstruction use_instr(&mv, var);
       if (std::any_of(uses.begin(), uses.end(),
                   [&](auto it) -> bool {
                      return use_instr.Match(*it);
@@ -308,20 +299,20 @@ namespace zc::z80 {
    }
 
    bool VariableRallocInfo::is_stack_spillable() const {
-      if (val->size() == byte_size) { return false; } /* must be word/long to be spilled */
+      if (var->size() == byte_size) { return false; } /* must be word/long to be spilled */
 
       /* verify that gen instruction can be translated into `push' */
       const Register *reg_ptr;
-      const RegisterValue reg_val(&reg_ptr, val->size());
-      const LoadInstruction gen_instr(val, &reg_val);
+      const RegisterValue reg_val(&reg_ptr, var->size());
+      const LoadInstruction gen_instr(var, &reg_val);
       if (!gen_instr.Match(*gen)) { return false; }
 
       /* verify that each use can be translated into `pop' into register */
       if (!std::all_of(uses.begin(), uses.end(),
                        [&](auto use) -> bool {
                           const Register *reg_ptr;
-                          const RegisterValue reg_val(&reg_ptr, val->size());
-                          const LoadInstruction use_instr(&reg_val, val);
+                          const RegisterValue reg_val(&reg_ptr, var->size());
+                          const LoadInstruction use_instr(&reg_val, var);
                           return use_instr.Match(*use);
                        })) {
          return false;
@@ -342,13 +333,13 @@ namespace zc::z80 {
          
          --i;
       }
-      
       alloc_kind = AllocKind::ALLOC_STACK;
    }
 
    void VariableRallocInfo::FrameSpill(StackFrame& frame) {
-      // frame.add_local(
-      /* TODO */
+      auto frame_val = frame.next_tmp(var);
+      AssignVal(frame_val);
+      alloc_kind = AllocKind::ALLOC_FRAME;
    }
    
    std::ostream& operator<<(std::ostream& os, AllocKind kind) {
@@ -361,11 +352,18 @@ namespace zc::z80 {
    }
 
    void RegisterAllocator::RunAllocation() {
-      for (auto& var_pair : vars_) {
-         AllocateVar(var_pair.second.val);
-
-         var_pair.second.val->Emit(std::cerr);
-         std::cerr << ":\t" << var_pair.second.alloc_kind << std::endl;
+      /* 0. Allocate regs to all variables that require a register. 
+       * 1. Go thru remaining regs and allocate in decreasing order of USES / LIFETIME ratio.
+       */
+      std::vector<Vars::iterator> prioritized_vars;
+      for (auto it = vars_.begin(); it != vars_.end(); ++it) {
+         prioritized_vars.push_back(it);
+      }
+      std::sort(prioritized_vars.begin(), prioritized_vars.end(),
+                [](auto a, auto b) { return a->second.priority() > b->second.priority(); });
+      
+      for (auto it : prioritized_vars) {
+         AllocateVar(it->second.var);
       }
    }
 
@@ -388,11 +386,13 @@ namespace zc::z80 {
       intervals.erase(it);
    }
 
-   void VariableRallocInfo::AssignReg(const RegisterValue *reg) {
-      (*gen)->ReplaceVar(val, reg);
+   void VariableRallocInfo::AssignVal(const Value *newval) {
+      (*gen)->ReplaceVar(var, newval);
       for (auto use : uses) {
-         (*use)->ReplaceVar(val, reg);
+         (*use)->ReplaceVar(var, newval);
       }
+
+      allocated_val = newval;
    }
 
 
@@ -406,18 +406,18 @@ namespace zc::z80 {
    }
 
    void VariableRallocInfo::Dump(std::ostream& os) const {
-      val->Emit(os);
+      var->Emit(os);
+      os << " " << alloc_kind;
+      if (allocated_val) { os << " "; allocated_val->Emit(os); }
       os << std::endl;
       os << "\tinterval:\t";
       interval.Dump(os);
       os << std::endl;
       os << "\tgen:\t";
       (*gen)->Emit(os); 
-      os << std::endl;
       for (auto it : uses) {
          os << "\tuse:\t";
          (*it)->Emit(os);
-         os << std::endl;
       }
    }
 
@@ -445,9 +445,9 @@ namespace zc::z80 {
 
       ralloc.Dump(std::cerr);
 
-      /* TMP */
       ralloc.RunAllocation();
 
+      ralloc.Dump(std::cerr);
    }
 
    void RegisterAllocator::Ralloc(FunctionImpl& impl, StackFrame& frame) {

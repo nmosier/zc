@@ -545,8 +545,12 @@
           const ASTType *arg_type = (*arg_it)->type();
           if (!(*type_it)->type()->TypeCoerce(arg_type)) {
              env.error()(g_filename, this) << "cannot coerce type of argument " << i << std::endl;
+          } else if (!(*type_it)->type()->TypeEq(arg_type)) {
+             /* add explicit cast */
+             *arg_it = CastExpr::Create((*type_it)->type()->Decay(), *arg_it, loc());
           }
        }
+
     }
 
     void CastExpr::TypeCheck(SemantEnv& env) {

@@ -26,6 +26,7 @@ namespace zc::z80 {
       }
 
       bool in(const RallocInterval& other) const {
+         assert(begin <= end && other.begin <= other.end);
          return begin >= other.begin && end <= other.end;
       }
 
@@ -59,15 +60,14 @@ namespace zc::z80 {
     * Variable info for the register allocator.
     */
    struct VariableRallocInfo {
-      const VariableValue *val;
+      const VariableValue *var;
+      const Value *allocated_val = nullptr;
       Instructions::iterator gen; /*!< where the variable is assigned (i.e. generated) */
       std::list<Instructions::iterator> uses; /*!< the instructions in which the variable is used */
       RallocInterval interval;
-      AllocKind alloc_kind;
+      AllocKind alloc_kind = AllocKind::ALLOC_NONE;
 
-      void RenameVar(); /* TODO: delete this? */
-
-      void AssignReg(const RegisterValue *reg);
+      void AssignVal(const Value *val);
       bool requires_reg() const;
 
       bool is_stack_spillable() const;
@@ -77,12 +77,22 @@ namespace zc::z80 {
 
       void Dump(std::ostream& os) const;
 
-      VariableRallocInfo(const VariableValue *val, Instructions::iterator gen, int begin):
-         val(val), gen(gen), interval(begin, gen, begin, gen) {}
+      VariableRallocInfo(const VariableValue *var, Instructions::iterator gen, int begin):
+         var(var), gen(gen), interval(begin, gen, begin, gen) {}
 
-      VariableRallocInfo(const VariableValue *val, Instructions::iterator gen,
+      VariableRallocInfo(const VariableValue *var, Instructions::iterator gen,
                          const RallocInterval& interval):
-         val(val), gen(gen), interval(interval) {}
+         var(var), gen(gen), interval(interval) {}
+
+      /**
+       * Priority number when scheduling allocations. Higher number means higher priority.
+       * Positive values for those that require registers; negative values for those that don't.xs
+       */
+      double priority() const {
+         double base = (uses.size() + 1) / (interval.length() + 1);
+         if (requires_reg()) { return base; }
+         else { return -1/base; }
+      }
    };
 
    /**
@@ -120,8 +130,10 @@ namespace zc::z80 {
    protected:
       Block *block_; /*!< block containing instructions. */
       StackFrame& stack_frame_; /*!< stack frame for spilling locals. */
-      std::unordered_map<int, VariableRallocInfo> vars_;
-      std::unordered_map<const ByteRegister *, RegisterFreeIntervals> regs_;
+      typedef std::unordered_map<int, VariableRallocInfo> Vars;
+      Vars vars_;
+      typedef std::unordered_map<const ByteRegister *, RegisterFreeIntervals> Regs;
+      Regs regs_;
       NestedRallocIntervals stack_spills_; /*!< intervals on which vars are stack-spilled */
 
       AllocKind AllocateVar(const VariableValue *var);
@@ -139,8 +151,6 @@ namespace zc::z80 {
        * @param var variable
        * @param out output list of registers
        */
-      //template <typename OutputIt>
-      //void GetAssignableRegs(const VariableValue *var, OutputIt out) const {
       void GetAssignableRegs(const VariableValue *var,
                              std::unordered_set<const Register *>& out) const;
       

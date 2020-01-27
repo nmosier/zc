@@ -92,7 +92,7 @@
        VariableValue *Rename() const { return new VariableValue(size()); }
 
        virtual const Value *ReplaceVar(const VariableValue *var, const Value *with) const override
-       { return with; }
+       { if (Eq(var)) { return with; } else { return this; } }
 
        VariableValue(int size, bool force_reg = false):
           Value_(size), id_(id_counter_++), force_reg_(force_reg) {}

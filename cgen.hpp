@@ -84,8 +84,8 @@ namespace zc {
       const FrameValue *callee_bytes();
       const FrameValue *neg_callee_bytes();
 
-      const Value *saved_fp();
-      const Value *saved_ra();
+      const FrameValue *saved_fp();
+      const FrameValue *saved_ra();
       
       VarSymInfo *next_arg(const VarDeclaration *type);
       VarSymInfo *next_local(const VarDeclaration *type);

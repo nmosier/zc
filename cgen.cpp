@@ -20,7 +20,7 @@ namespace zc {
       root->CodeGen(env);
 
 #if PREDUMP
-      env.DumpAsm(os);
+      env.DumpAsm(std::cerr);
 #endif
       OptimizeIR(env);
 
@@ -38,11 +38,11 @@ namespace zc {
       /* TODO: this doesn't work. */
    }
 
-   const Value *StackFrame::saved_fp() {
+   const FrameValue *StackFrame::saved_fp() {
       return new FrameValue(sizes_, saved_fp_);
    }
 
-   const Value *StackFrame::saved_ra() {
+   const FrameValue *StackFrame::saved_ra() {
       return new FrameValue(sizes_, saved_ra_);
    }
    
@@ -412,12 +412,20 @@ namespace zc {
          break;
          
       case Kind::UOP_DEREFERENCE:
-         /* get address as rvalue */
-         var = new VariableValue(bytes);
-         block = expr()->CodeGen(env, block, var, ExprKind::EXPR_RVALUE);
-
-         /* dereference address into _out_ */
-         block->instrs().push_back(new LoadInstruction(out, new MemoryValue(var, type()->bytes())));
+         switch (mode) {
+         case ExprKind::EXPR_NONE: abort();
+         case ExprKind::EXPR_LVALUE:
+            block = expr()->CodeGen(env, block, out, ExprKind::EXPR_RVALUE);
+            break;
+         case ExprKind::EXPR_RVALUE:
+            /* dereference address into _out_ */
+            var = new VariableValue(bytes);
+            block = expr()->CodeGen(env, block, var, ExprKind::EXPR_RVALUE);
+            block->instrs().push_back(new LoadInstruction(&rv_hl, var));
+            block->instrs().push_back
+               (new LoadInstruction(out, new MemoryValue(&rv_hl, type()->bytes())));
+            break;
+         }
          break;
          
       case Kind::UOP_POSITIVE:
@@ -645,8 +653,6 @@ namespace zc {
                block->instrs().push_back(new LoadInstruction(&rv_a, lt_not_gt ? lhs_var : rhs_var));
                block->instrs().push_back(new CompInstruction(&rv_a, lt_not_gt ? rhs_var : lhs_var));
                block->instrs().push_back(new LoadInstruction(&rv_a, &imm_b<0>));
-               block->instrs().push_back(new AdcInstruction(&rv_a, &rv_a));
-               block->instrs().push_back(new LoadInstruction(out, &rv_a));
                break;
                                   
             case word_size: abort();
@@ -658,7 +664,6 @@ namespace zc {
                block->instrs().push_back(new LoadInstruction(&rv_hl, lt_not_gt ? lhs_var : rhs_var));
                block->instrs().push_back(new XorInstruction(&rv_a, &rv_a));
                block->instrs().push_back(new SbcInstruction(&rv_hl, lt_not_gt ? rhs_var : lhs_var));
-               block->instrs().push_back(new AdcInstruction(&rv_a, &rv_a));
                break;
             
             default: abort();
@@ -870,15 +875,26 @@ namespace zc {
    }
 
    Block *CallExpr::CodeGen(CgenEnv& env, Block *block, const Value *out, ExprKind mode) {
-      /* push arguments onto stack (1st arg is highest on stack) */
-
       /* codegen params */
       for (auto it = params()->vec().rbegin(), end = params()->vec().rend(); it != end; ++it) {
          auto param = *it;
          int param_bytes = param->type()->Decay()->bytes();
          const VariableValue *param_var = new VariableValue(param_bytes);
          block = param->CodeGen(env, block, param_var, ExprKind::EXPR_RVALUE);
-         block->instrs().push_back(new PushInstruction(param_var));
+
+         const Value *push_src;
+         switch (param_bytes) {
+         case byte_size:
+            block->instrs().push_back(new LoadInstruction(&rv_a, param_var));
+            push_src = &rv_af;
+            break;
+         case word_size: abort();
+         case long_size:
+            push_src = param_var;
+            break;
+         }
+         
+         block->instrs().push_back(new PushInstruction(push_src));
       }
 
       /* codegen callee */
@@ -898,11 +914,22 @@ namespace zc {
    Block *CastExpr::CodeGen(CgenEnv& env, Block *block, const Value *out, ExprKind mode) {
       assert(mode == ExprKind::EXPR_RVALUE);
 
-      const VariableValue *var = new VariableValue(expr()->type()->bytes());
+      int expr_bytes = expr()->type()->Decay()->bytes();
+      int out_bytes = out->size();
+
+      if (expr_bytes == out_bytes ||
+          (expr_bytes == word_size && out_bytes == long_size) ||
+          (expr_bytes == long_size && out_bytes == word_size)) {
+         return expr()->CodeGen(env, block, out, mode);
+      }
+
+      const VariableValue *var = new VariableValue(expr_bytes);
       block = expr()->CodeGen(env, block, var, mode);
+
+      
       block->instrs().push_back(new LoadInstruction(accumulator(var), var));
-      accumulator(type()->bytes())->reg()->Cast(block, &r_hl);
-      block->instrs().push_back(new LoadInstruction(out, accumulator(var)));
+      accumulator(out)->reg()->Cast(block, accumulator(var)->reg());
+      block->instrs().push_back(new LoadInstruction(out, accumulator(out)));
 
       return block;
    }
@@ -1258,8 +1285,6 @@ namespace zc {
    
    Block *emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr, const Value *out_lhs,
                      const Value *out_rhs) {
-      Instructions& instrs = block->instrs();
-
       /* evaluate lhs */
       block = expr->lhs()->CodeGen(env, block, out_lhs, ASTBinaryExpr::ExprKind::EXPR_RVALUE);
       
@@ -1297,7 +1322,10 @@ namespace zc {
        * pop ix
        * ret
        */
-      block->instrs().push_back(new LeaInstruction(&rv_ix, env.ext_env().frame().saved_fp()));
+      block->instrs().push_back(new LeaInstruction
+                                (&rv_ix, new IndexedRegisterValue
+                                 (&rv_ix,
+                                  IndexedRegisterValue::Index(env.ext_env().frame().saved_fp()))));
       block->instrs().push_back(new LoadInstruction(&rv_sp, &rv_ix));
       block->instrs().push_back(new PopInstruction(&rv_ix));
       block->instrs().push_back(new RetInstruction());
@@ -1475,7 +1503,21 @@ namespace zc {
    // void StackFrame::add_local(const VarDeclaration *local) { add_local(local->bytes()); }
 
    VarSymInfo *StackFrame::next_arg(const VarDeclaration *arg) {
-      auto it = sizes_->insert(sizes_->end(), arg->bytes());
+      int bytes = arg->bytes();
+      FrameIndices::iterator it;
+      switch (bytes) {
+      case byte_size:
+         sizes_->insert(sizes_->end(), byte_size);
+         it = sizes_->insert(sizes_->end(), byte_size);
+         sizes_->insert(sizes_->end(), byte_size);         
+         break;
+      case word_size: abort();
+      case long_size:
+         it = sizes_->insert(sizes_->end(), long_size);
+         break;
+      default: abort();
+      }
+
       auto offset = new FrameValue(sizes_, it);
       auto val = new IndexedRegisterValue(&rv_ix, IndexedRegisterValue::Index(offset));
       return new VarSymInfo(val, arg);
