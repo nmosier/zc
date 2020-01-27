@@ -191,6 +191,84 @@ namespace zc {
    }
 
    LiteralExpr::LiteralExpr(const intmax_t& val, const SourceLoc& loc): ASTExpr(loc), val_(val) {
-      type_ = IntegralType::Create(IntegralType::IntKind::SPEC_LONG_LONG, loc);
+      type_ = IntegralType::Create(val, loc);
+      // type_ = IntegralType::Create(IntegralType::IntKind::SPEC_LONG_LONG, loc);
    }
+
+   /*** CAST ***/
+   ASTExpr *ASTExpr::Cast(ASTType *type) {
+      return CastExpr::Create(type, this, loc());
+   }
+   
+   ASTExpr *UnaryExpr::Cast(ASTType *type) {
+      switch (kind()) {
+      case Kind::UOP_ADDR:
+      case Kind::UOP_DEREFERENCE:
+      case Kind::UOP_INC_PRE:
+      case Kind::UOP_INC_POST:
+      case Kind::UOP_DEC_PRE:
+      case Kind::UOP_DEC_POST:
+      case Kind::UOP_LOGICAL_NOT:         
+         return ASTExpr::Cast(type);
+
+      case Kind::UOP_POSITIVE:
+      case Kind::UOP_NEGATIVE:
+      case Kind::UOP_BITWISE_NOT:
+         expr_ = expr()->Cast(type);
+         type_ = type;
+         return this;
+      }
+   }
+
+   ASTExpr *BinaryExpr::Cast(ASTType *type) {
+      switch (kind()) {
+      case Kind::BOP_LOGICAL_AND:
+      case Kind::BOP_LOGICAL_OR:
+      case Kind::BOP_EQ:
+      case Kind::BOP_NEQ:
+      case Kind::BOP_LT:
+      case Kind::BOP_LEQ:
+      case Kind::BOP_GT:
+      case Kind::BOP_GEQ:
+      case Kind::BOP_DIVIDE:
+      case Kind::BOP_MOD:
+         return ASTExpr::Cast(type);
+
+      case Kind::BOP_BITWISE_AND:
+      case Kind::BOP_BITWISE_OR:
+      case Kind::BOP_BITWISE_XOR:
+      case Kind::BOP_PLUS:
+      case Kind::BOP_MINUS:
+      case Kind::BOP_TIMES:
+         lhs_ = lhs()->Cast(type);
+         rhs_ = rhs()->Cast(type);
+         type_ = type;
+         return this;
+         
+      case Kind::BOP_COMMA:
+         rhs_ = rhs()->Cast(type);
+         type_ = type;
+         return this;
+      }
+   }
+
+   ASTExpr *LiteralExpr::Cast(ASTType *type) {
+      type_ = type;
+      return this;
+   }
+
+   ASTExpr *CastExpr::Cast(ASTType *type) {
+      return expr()->Cast(type);
+   }
+
+   ASTExpr *SizeofExpr::Cast(ASTType *type) {
+      type_ = type;
+      return this;
+   }
+
+   ASTExpr *IndexExpr::Cast(ASTType *type) {
+      index_ = index()->Cast(type);
+      return this;
+   }
+   
 }

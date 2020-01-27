@@ -557,7 +557,7 @@ namespace zc {
             /* Evaluate rhs */
             cont_block = rhs()->CodeGen(env, cont_block, rhs_var, ExprKind::EXPR_RVALUE);
             emit_booleanize(env, cont_block, rhs_var, &rv_a); /* OPTIMIZABLE */
-            cont_block->transitions().vec().push_back(end_transition);
+            cont_block->transitions().vec().push_back(new JumpTransition(end_block, Cond::ANY));
 
             end_block->instrs().push_back(new LoadInstruction(out, &rv_a));
             return end_block;
@@ -666,8 +666,8 @@ namespace zc {
                 * ld a,0
                 */
                block->instrs().push_back(new ScfInstruction());
-               block->instrs().push_back(new LoadInstruction(&rv_a, lhs_var));
-               block->instrs().push_back(new SbcInstruction(&rv_a, rhs_var));
+               block->instrs().push_back(new LoadInstruction(&rv_a, leq_not_geq ? lhs_var : rhs_var));
+               block->instrs().push_back(new SbcInstruction(&rv_a, leq_not_geq ? rhs_var : lhs_var));
                block->instrs().push_back(new LoadInstruction(&rv_a, &imm_b<0>));
                break;
 
@@ -1608,6 +1608,7 @@ namespace zc {
    int IntegralType::bytes() const {
       using Kind = IntegralType::IntKind;
       switch (int_kind()) {
+      case Kind::SPEC_BOOL: return 0;
       case Kind::SPEC_CHAR: return byte_size;
       case Kind::SPEC_SHORT: return word_size;
       case Kind::SPEC_INT:

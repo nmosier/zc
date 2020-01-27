@@ -265,6 +265,10 @@ I rewrote existing code for computing intervals for register free times and vari
 
 Ideas: add `bool` type? bool would be stored as flag.
 
+[ ] IfStat -- cast cond to bool
+[ ] WhileStat -- cast cond to bool
+[ ] ForStat
+
 OPTIMIZATION IDEAS
 [ ] Defragmenting during register allocation
 [ ] Pushing casts down AST exprs, when possible (e.g. addition/subtraction/multiplication, but not division)

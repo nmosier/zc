@@ -183,7 +183,7 @@ namespace zc {
 
    class IntegralType: public ASTType {
    public:
-      enum class IntKind {SPEC_CHAR, SPEC_SHORT, SPEC_INT, SPEC_LONG, SPEC_LONG_LONG};
+      enum class IntKind {SPEC_BOOL, SPEC_CHAR, SPEC_SHORT, SPEC_INT, SPEC_LONG, SPEC_LONG_LONG};
       virtual Kind kind() const override { return Kind::TYPE_INTEGRAL; }
       IntKind int_kind() const { return int_kind_; }
 
@@ -203,16 +203,24 @@ namespace zc {
          throw std::logic_error("attempted to dereference integral type");
       }
 
-      virtual int bytes() const override;      
-      
+      virtual int bytes() const override;
+
       template <typename... Args>
       static IntegralType *Create(Args... args) { return new IntegralType(args...); }
 
+      /**
+       * Find smallest type that can fit this value.
+       */
+      static IntKind min_type(intmax_t val);
+
    protected:
       IntKind int_kind_;
-
+      
       template <typename... Args>
       IntegralType(IntKind int_kind, Args... args): ASTType(args...), int_kind_(int_kind) {}
+
+      template <typename... Args>
+      IntegralType(intmax_t val, Args... args): ASTType(args...), int_kind_(min_type(val)) {}
    };
 
    /**

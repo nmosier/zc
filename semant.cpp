@@ -398,7 +398,8 @@
                                         << std::endl;
        } else if (!ret_type->TypeEq(expr_type)) {
            /* add explicit cast */
-           expr_ = CastExpr::Create(ret_type, expr(), loc());
+          expr_ = expr()->Cast(ret_type);
+          // expr_ = CastExpr::Create(ret_type, expr(), loc());
        }
     }
 
@@ -475,7 +476,7 @@
 
       /* add cast expression to coerce rhs value */
       if (!lhs_->type()->TypeEq(rhs_->type())) {
-         rhs_ = CastExpr::Create(lhs_->type(), rhs_, rhs_->loc());
+         rhs_ = rhs()->Cast(lhs_->type());
       }
    }
 
@@ -512,7 +513,7 @@
              env.error()(g_filename, this) << "cannot coerce type of argument " << i << std::endl;
           } else if (!(*type_it)->type()->TypeEq(arg_type)) {
              /* add explicit cast */
-             *arg_it = CastExpr::Create((*type_it)->type()->Decay(), *arg_it, loc());
+             *arg_it = (*arg_it)->Cast((*type_it)->type());
           }
        }
 
@@ -565,8 +566,8 @@
        } else {
           const IntegralType *int_type = dynamic_cast<const IntegralType *>(index()->type());
           if (int_type->bytes() != z80::long_size) {
-             index_ = CastExpr::Create(IntegralType::Create(IntKind::SPEC_LONG, loc()), index(),
-                                       loc());
+             index_ = CastExpr::Create
+                (IntegralType::Create(IntKind::SPEC_LONG, loc()), index(), loc());
           }
        }
        type_ = base()->type()->get_containee();
@@ -657,9 +658,9 @@
 
                /* make implicit casts explicit */
                if (!lhs_->type()->TypeEq(type_)) {
-                  lhs_ = CastExpr::Create(type_, lhs_, lhs_->loc());
+                  lhs_ = lhs()->Cast(type_);
                } else if (!rhs_->type()->TypeEq(type_)) {
-                  rhs_ = CastExpr::Create(type_, rhs_, rhs_->loc());
+                  rhs_ = rhs()->Cast(type_);
                }
             } else {
                if (!lhs_int) {
@@ -685,8 +686,17 @@
       }
    }
 
+    IntegralType::IntKind IntegralType::min_type(intmax_t val) {
+       if (val >= std::numeric_limits<char>::min() &&
+           val <= std::numeric_limits<unsigned char>::max()) {
+          return IntKind::SPEC_CHAR;
+       } else {
+          return IntKind::SPEC_LONG_LONG;
+       }
+    }
+    
    void LiteralExpr::TypeCheck(SemantEnv& env) {
-      type_ = IntegralType::Create(IntegralType::IntKind::SPEC_LONG_LONG, loc());
+      type_ = IntegralType::Create(IntegralType::min_type(val()), loc());
    }
 
    void StringExpr::TypeCheck(SemantEnv& env) {

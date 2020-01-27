@@ -45,6 +45,11 @@ namespace zc {
        */
       ASTExpr *ReduceConst();
 
+      /**
+       * Push cast down expr.
+       */
+      virtual ASTExpr *Cast(ASTType *type);
+
       void DumpType(std::ostream& os) const;
 
       /**
@@ -61,7 +66,7 @@ namespace zc {
       /**
        * Type of expression; populated by @see TypeCheck()
        */
-      ASTType *type_;
+      ASTType *type_ = nullptr;
 
       virtual void ReduceConst_rec() {} /*!< aux. function that reduces subexpressions */
 
@@ -153,6 +158,8 @@ namespace zc {
 
       virtual Block *CodeGen(CgenEnv& env, Block *block, const Value *val, ExprKind mode) override;
 
+      virtual ASTExpr *Cast(ASTType *type) override;
+
    protected:
       Kind kind_;
       UnaryExpr(Kind kind, ASTExpr *expr, const SourceLoc& loc): ASTUnaryExpr(expr, loc), kind_(kind) {}
@@ -193,6 +200,8 @@ namespace zc {
       virtual void TypeCheck(SemantEnv& env) override;
 
       virtual Block *CodeGen(CgenEnv& env, Block *block, const Value *val, ExprKind mode) override;
+
+      virtual ASTExpr *Cast(ASTType *type) override;
       
    protected:
       Kind kind_;
@@ -224,6 +233,8 @@ namespace zc {
       virtual void TypeCheck(SemantEnv& env) override;
 
       virtual Block *CodeGen(CgenEnv& env, Block *block, const Value *val, ExprKind mode) override;
+
+      virtual ASTExpr *Cast(ASTType *type) override;
       
    protected:
       intmax_t val_;
@@ -303,6 +314,8 @@ namespace zc {
       virtual Block *CodeGen(CgenEnv& env, Block *block, const Value *val, ExprKind mode) override
       { return block; }
 
+      virtual ASTExpr *Cast(ASTType *type) override { abort(); }      
+
    protected:
       NoExpr(const SourceLoc& loc): ASTExpr(loc) {}
    };
@@ -351,6 +364,8 @@ namespace zc {
       virtual void TypeCheck(SemantEnv& env) override;
 
       virtual Block *CodeGen(CgenEnv& env, Block *block, const Value *val, ExprKind mode) override;
+
+      virtual ASTExpr *Cast(ASTType *type) override;
       
    protected:
       template <typename... Args>
@@ -403,6 +418,8 @@ namespace zc {
       virtual void TypeCheck(SemantEnv& env) override;
 
       virtual Block *CodeGen(CgenEnv& env, Block *block, const Value *val, ExprKind mode) override;
+
+      virtual ASTExpr *Cast(ASTType *type) override;      
       
    protected:
       Variant variant_;
@@ -420,7 +437,6 @@ namespace zc {
                                                                 * expr is string constant.
                                                                 * Need to create CONST enum
                                                                 * first. */
-      // virtual intmax_t int_const() const override;
 
       template <typename... Args>
       static IndexExpr *Create(Args... args) { return new IndexExpr(args...); }
@@ -429,6 +445,7 @@ namespace zc {
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
       virtual void TypeCheck(SemantEnv& env) override;
       virtual Block *CodeGen(CgenEnv& env, Block *block, const Value *val, ExprKind mode) override;
+      virtual ASTExpr *Cast(ASTType *type) override;
       
    protected:
       ASTExpr *base_;
