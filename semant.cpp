@@ -239,28 +239,10 @@
     void EnumType::Declare(SemantEnv& env) {
        TaggedType::Declare(env);
 
-#if 0
-       if (membs()) {
-          for (auto memb : *membs()) {
-             memb->Declare(env);
-          }
-       }
-#endif
     }
 
     void Enumerator::Declare(SemantEnv& env) {
-#if 1
        TypeCheck(env, enum_type());
-#else
-       if (env.symtab().Probe(sym())) {
-          env.error()(g_filename, this) << "enumeration constant '" << *sym()
-                                        << "' previously defined as different kind of symbol"
-                                        << " in this scope"
-                                        << std::endl;
-       } else {
-          env.symtab().AddToScope(sym(), VarDeclaration::Create(sym(), true, enum_type(), loc()));
-       }
-#endif
     }
 
     void EnumType::DeclareMembs(SemantEnv& env) {
@@ -380,31 +362,11 @@
     }
 
     void FunctionDef::TypeCheck(SemantEnv& env) {
-       // decl()->Declare(env);
        Enscope(env);
        comp_stat()->TypeCheck(env, false); /* function body doesn't get new scope */
        Descope(env);
     }
 
-#if 0
-    void FunctionDeclarator::TypeCheck(SemantEnv& env) {
-       declarator()->TypeCheck(env);
-       for (auto param : *params()) {
-          param->TypeCheck(env);
-       }
-    }
-#endif
-
-#if 0
-    void ArrayDeclarator::TypeCheck(SemantEnv& env) {
-       declarator()->TypeCheck(env);
-       count_expr()->TypeCheck(env);
-       if (!count_expr()->is_const()) {
-          env.error()(g_filename, this) << "array size expression is not constant" << std::endl;
-       }
-    }
-#endif
-    
    void CompoundStat::TypeCheck(SemantEnv& env, bool scoped) {
       if (scoped) {
          env.EnterScope();
@@ -1114,23 +1076,6 @@
        env.ExitScope();
      }
 
-#if 0
-     void ASTType::Enscope(SemantEnv& env) { 
-        /* check for previous declarations in scope */
-        if (sym() == nullptr) {
-           return;
-        }
-     
-        if (env.symtab().Probe(sym()) != nullptr) {
-           /* ERROR: symbol already defined in this scope. */
-           env.error()(g_filename, this) << "redefinition of '" << *sym() << "'" << std::endl;
-           return;
-        }
-     
-        /* add symbol to scope */
-        env.symtab().AddToScope(sym(), this);
-     }
-#endif
 
      void ExternalDecl::Enscope(SemantEnv& env) const {
         decl()->Declare(env);

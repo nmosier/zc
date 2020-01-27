@@ -1,2 +1,2 @@
 b773988efb6f4999ddec8b4484ce551eb0e2f10e # some peephole, no register alloc
-2d024751c1ac10e03d18d15ff6c928c8a92b1f87 # same peephole, basic register alloc
+115cd1f8e9f3d39a04fcdb38f023a6e191caf1df # same peephole, basic register alloc

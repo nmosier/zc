@@ -263,6 +263,7 @@ I rewrote existing code for computing intervals for register free times and vari
 [2 hrs] Fixed bugs with `chars.c` program -- values were being used across blocks, which caused ralloc assertions to fail.
         Fixed bug with `ReturnStat`: it didn't cast the return result if it wasn't of equal type. Added explicit casts to fix this, and now `chars.c` runs correctly.
 
+Ideas: add `bool` type? bool would be stored as flag.
 
 OPTIMIZATION IDEAS
 [ ] Defragmenting during register allocation
