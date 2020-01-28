@@ -12,6 +12,10 @@
  #include "asm-reg.hpp"
  #include "util.hpp"
 
+namespace zc {
+   enum class Cond;
+}
+
  namespace zc::z80 {
 
     /**********
@@ -19,7 +23,6 @@
      **********/
 
     class VariableValue;
- 
     /**
      * Base class for values during code generation.
      */
@@ -81,6 +84,7 @@
     class VariableValue: public Value_<VariableValue> {
     public:
        bool force_reg() const { return force_reg_; }
+       virtual bool requires_alloc() const { return true; }
        int id() const { return id_; }
 
        virtual void Gen(std::list<const Value *>& vals) const override { vals.push_back(this); }
@@ -109,6 +113,38 @@
 
        virtual bool Eq_aux(const VariableValue *other) const override { return id() == other->id(); }
        virtual bool Match_aux(const VariableValue *to) const override { return Eq_aux(to); }
+    };
+
+    /* NOTE: pseudo-value. */
+    class FlagValue: public Value_<FlagValue> {
+    public:
+       Cond cond() const { return *cond_; }
+       
+       virtual void Gen(std::list<const Value *>& vals) const override {}
+       virtual void Use(std::list<const Value *>& vals) const override {}
+
+       virtual void Emit(std::ostream& os) const override;
+       virtual Value *Add(const intmax_t& offset) const override {
+          throw std::logic_error("attempted to add to flag value");
+       }
+
+       template <typename... Args>
+       FlagValue(portal<Cond> cond, Args... args): Value_(args...), cond_(cond) {}
+       
+    protected:
+       portal<Cond> cond_;
+
+       virtual bool Eq_aux(const FlagValue *other) const override {
+          return cond() == other->cond();
+       }
+       virtual bool Match_aux(const FlagValue *to) const override {
+          if (cond_) {
+             return cond() == to->cond();
+          } else {
+             cond_.send(to->cond());
+             return true;
+          }
+       }
     };
 
     /**

@@ -183,7 +183,7 @@ namespace zc {
    }
    Block *ReturnStat::CodeGen(CgenEnv& env, Block *block) {
       /* generate returned expression */
-      const VariableValue *var;
+      const Value *var;
       block = expr()->CodeGen(env, block, &var, ASTExpr::ExprKind::EXPR_RVALUE);
       block->instrs().push_back(new LoadInstruction(return_rv(expr()->type()->bytes()), var));
       
@@ -204,7 +204,7 @@ namespace zc {
    Block *IfStat::CodeGen(CgenEnv& env, Block *block) {
 
 #if 0
-      const VariableValue *cond_var = new VariableValue(cond()->type()->size());
+      const Value *cond_var = new VariableValue(cond()->type()->size());
       
       /* Evaluate predicate */
       block = cond()->CodeGen(env, block, cond_var, ASTExpr::ExprKind::EXPR_RVALUE);
@@ -377,17 +377,17 @@ namespace zc {
       return LabeledStat::CodeGen(env, block);
    }
 
-   Block *AssignmentExpr::CodeGen(CgenEnv& env, Block *block, const VariableValue **out,
+   Block *AssignmentExpr::CodeGen(CgenEnv& env, Block *block, const Value **out,
                                   ExprKind mode) {
       assert(mode == ExprKind::EXPR_RVALUE);
       
       /* compute right-hand rvalue */
-      const VariableValue *lhs_lval, *rhs_rval;
-      // const VariableValue *rhs_var = new VariableValue(rhs()->type()->bytes());
+      const Value *lhs_lval, *rhs_rval;
+      // const Value *rhs_var = new VariableValue(rhs()->type()->bytes());
       block = rhs()->CodeGen(env, block, &rhs_rval, ExprKind::EXPR_RVALUE);
 
       /* compute left-hand lvalue */
-      // const VariableValue *lhs_var = new VariableValue(long_size);
+      // const Value *lhs_var = new VariableValue(long_size);
       block = lhs()->CodeGen(env, block, &lhs_lval, ExprKind::EXPR_LVALUE);
       
       /* assign */
@@ -404,9 +404,9 @@ namespace zc {
       return block;
    }
 
-   Block *UnaryExpr::CodeGen(CgenEnv& env, Block *block, const VariableValue **out, ExprKind mode) {
+   Block *UnaryExpr::CodeGen(CgenEnv& env, Block *block, const Value **out, ExprKind mode) {
       int bytes = expr()->type()->bytes();
-      const VariableValue *var;
+      const Value *var;
       switch (kind()) {
       case Kind::UOP_ADDR:
          assert(mode == ExprKind::EXPR_RVALUE);
@@ -524,11 +524,11 @@ namespace zc {
       return block;
    }
 
-   Block *BinaryExpr::CodeGen(CgenEnv& env, Block *block, const VariableValue **out,
+   Block *BinaryExpr::CodeGen(CgenEnv& env, Block *block, const Value **out,
                               ExprKind mode) {
-      // const VariableValue *lhs_var = new VariableValue(lhs()->type()->bytes());
-      // const VariableValue *rhs_var = new VariableValue(rhs()->type()->bytes());
-      const VariableValue *lhs_var, *rhs_var;
+      // const Value *lhs_var = new VariableValue(lhs()->type()->bytes());
+      // const Value *rhs_var = new VariableValue(rhs()->type()->bytes());
+      const Value *lhs_var, *rhs_var;
       
       switch (kind()) {
       case Kind::BOP_LOGICAL_AND:
@@ -887,7 +887,7 @@ namespace zc {
       return block;
    }
    
-   Block *LiteralExpr::CodeGen(CgenEnv& env, Block *block, const VariableValue **out,
+   Block *LiteralExpr::CodeGen(CgenEnv& env, Block *block, const Value **out,
                                ExprKind mode) {
       const ImmediateValue *imm = new ImmediateValue(val(), type()->bytes());
       if (out) {
@@ -897,7 +897,7 @@ namespace zc {
       return block;
    }
    
-   Block *StringExpr::CodeGen(CgenEnv& env, Block *block, const VariableValue **out,
+   Block *StringExpr::CodeGen(CgenEnv& env, Block *block, const Value **out,
                               ExprKind mode) {
       assert(mode == ExprKind::EXPR_RVALUE); /* string constants aren't assignable */
       if (out) {
@@ -907,7 +907,7 @@ namespace zc {
       return block;
    }
    
-   Block *IdentifierExpr::CodeGen(CgenEnv& env, Block *block, const VariableValue **out,
+   Block *IdentifierExpr::CodeGen(CgenEnv& env, Block *block, const Value **out,
                                   ExprKind mode) {
       const SymInfo *id_info = env.symtab().Lookup(id()->id());
 
@@ -928,13 +928,13 @@ namespace zc {
       return block;
    }
 
-   Block *CallExpr::CodeGen(CgenEnv& env, Block *block, const VariableValue **out, ExprKind mode) {
+   Block *CallExpr::CodeGen(CgenEnv& env, Block *block, const Value **out, ExprKind mode) {
       /* codegen params */
       for (auto it = params()->vec().rbegin(), end = params()->vec().rend(); it != end; ++it) {
          auto param = *it;
          int param_bytes = param->type()->Decay()->bytes();
-         // const VariableValue *param_var = new VariableValue(param_bytes);
-         const VariableValue *param_var;
+         // const Value *param_var = new VariableValue(param_bytes);
+         const Value *param_var;
          block = param->CodeGen(env, block, &param_var, ExprKind::EXPR_RVALUE);
 
          const Value *push_src;
@@ -953,7 +953,7 @@ namespace zc {
       }
 
       /* codegen callee */
-      const VariableValue *fn_var;
+      const Value *fn_var;
       block = fn()->CodeGen(env, block, &fn_var, ExprKind::EXPR_RVALUE);
       block->instrs().push_back(new LoadInstruction(&rv_iy, fn_var));
 
@@ -975,7 +975,7 @@ namespace zc {
       return block;
    }
 
-   Block *CastExpr::CodeGen(CgenEnv& env, Block *block, const VariableValue **out, ExprKind mode) {
+   Block *CastExpr::CodeGen(CgenEnv& env, Block *block, const Value **out, ExprKind mode) {
       assert(mode == ExprKind::EXPR_RVALUE);
 
       int expr_bytes = expr()->type()->Decay()->bytes();
@@ -990,8 +990,8 @@ namespace zc {
       if (out == nullptr) { return block; }
       *out = new VariableValue(out_bytes);
 
-      // const VariableValue *var = new VariableValue(expr_bytes);
-      const VariableValue *var;
+      // const Value *var = new VariableValue(expr_bytes);
+      const Value *var;
       block = expr()->CodeGen(env, block, &var, mode);
       
       switch (out_bytes) {
@@ -1019,9 +1019,9 @@ namespace zc {
       return block;
    }
 
-   Block *MembExpr::CodeGen(CgenEnv& env, Block *block, const VariableValue **out, ExprKind mode) {
+   Block *MembExpr::CodeGen(CgenEnv& env, Block *block, const Value **out, ExprKind mode) {
       /* code generate struct as lvalue */
-      const VariableValue *struct_var;
+      const Value *struct_var;
       block = expr()->CodeGen(env, block, &struct_var, ExprKind::EXPR_LVALUE);
 
       if (out == nullptr) { return block; }
@@ -1031,7 +1031,7 @@ namespace zc {
       int offset = dynamic_cast<CompoundType *>(expr()->type())->offset(memb());
       ImmediateValue *imm = new ImmediateValue(offset, long_size);
 
-      const VariableValue *offset_var = new VariableValue(long_size);
+      const Value *offset_var = new VariableValue(long_size);
       /* ld <off>,#off
        * ld hl,<struct_var>
        * add hl,<off>
@@ -1057,7 +1057,7 @@ namespace zc {
       return block;
    }
 
-   Block *SizeofExpr::CodeGen(CgenEnv& env, Block *block, const VariableValue **out,
+   Block *SizeofExpr::CodeGen(CgenEnv& env, Block *block, const Value **out,
                               ExprKind mode) {
       if (out == nullptr) { return block; }
       *out = new VariableValue(type()->bytes());
@@ -1073,14 +1073,14 @@ namespace zc {
       return block;
    }
 
-   Block *IndexExpr::CodeGen(CgenEnv& env, Block *block, const VariableValue **out, ExprKind mode) {
+   Block *IndexExpr::CodeGen(CgenEnv& env, Block *block, const Value **out, ExprKind mode) {
       /* generate index */
-      const VariableValue *index_var;
+      const Value *index_var;
       block = index()->CodeGen(env, block, &index_var, ExprKind::EXPR_RVALUE);
       block->instrs().push_back(new LoadInstruction(&rv_hl, index_var));
 
       /* generate base */
-      const VariableValue *base_var;
+      const Value *base_var;
       block = base()->CodeGen(env, block, &base_var, ExprKind::EXPR_LVALUE);
 
       if (out == nullptr) { return block; }
@@ -1206,7 +1206,7 @@ namespace zc {
    /* NOTE: Doesn't return block because it's sealed by transitions.
     */
    void emit_predicate(CgenEnv& env, Block *block, ASTExpr *expr, Block *take, Block *leave) {
-      const VariableValue *var = new VariableValue(expr->type()->bytes());
+      const Value *var = new VariableValue(expr->type()->bytes());
       block = expr->CodeGen(env, block, &var, ASTExpr::ExprKind::EXPR_RVALUE);
       emit_nonzero_test(env, block, var);
 
@@ -1215,7 +1215,7 @@ namespace zc {
       block->transitions().vec().push_back(new JumpTransition(leave, Cond::Z));
    }
 
-   void emit_logical_not(CgenEnv& env, Block *block, const Value *in, const VariableValue **out) {
+   void emit_logical_not(CgenEnv& env, Block *block, const Value *in, const Value **out) {
       Instructions& is = block->instrs();
       
       *out = new VariableValue(byte_size);
@@ -1294,8 +1294,8 @@ namespace zc {
    }
 
    Block *emit_incdec(CgenEnv& env, Block *block, bool inc_not_dec, bool pre_not_post,
-                      ASTExpr *subexpr, const VariableValue **out) {
-      const VariableValue *lval = new VariableValue(long_size);
+                      ASTExpr *subexpr, const Value **out) {
+      const Value *lval = new VariableValue(long_size);
       block = subexpr->CodeGen(env, block, &lval, ASTExpr::ExprKind::EXPR_LVALUE);
       Instructions& is = block->instrs();
       int bytes = subexpr->type()->bytes();
@@ -1334,7 +1334,7 @@ namespace zc {
              * ld <out>,<rval>
              */
             {
-               const VariableValue *rval = new VariableValue(long_size);
+               const Value *rval = new VariableValue(long_size);
                const MemoryValue *memval = new MemoryValue(&rv_hl, long_size);
                is.push_back(new LoadInstruction(&rv_hl, lval));
                is.push_back(new LoadInstruction(rval, memval));
@@ -1372,7 +1372,7 @@ namespace zc {
              * ld (hl),<rval>
              */
             {
-               const VariableValue *rval = new VariableValue(long_size);
+               const Value *rval = new VariableValue(long_size);
                const MemoryValue *memval = new MemoryValue(&rv_hl, long_size);
                is.push_back(new LoadInstruction(&rv_hl, lval));
                is.push_back(new LoadInstruction(rval, memval));
@@ -1390,8 +1390,8 @@ namespace zc {
 
    
    
-   Block *emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr, const VariableValue **out_lhs,
-                     const VariableValue **out_rhs) {
+   Block *emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr, const Value **out_lhs,
+                     const Value **out_rhs) {
       /* evaluate lhs */
       block = expr->lhs()->CodeGen(env, block, out_lhs, ASTBinaryExpr::ExprKind::EXPR_RVALUE);
       
@@ -1522,49 +1522,28 @@ namespace zc {
       fin()->for_each_block(visited, fn, os, this);      
    }
 
-   void JumpTransition::DumpAsm(std::ostream& os, const FunctionImpl *impl) const {
-      os << "\tjp\t";
-      switch (cond()) {
-      case Cond::Z:
-         os << "z,";
-         break;
-      case Cond::NZ:
-         os << "nz,";
-         break;
-      case Cond::C:
-         os << "c,";
-         break;
-      case Cond::NC:
-         os << "nc,";
-         break;
-      case Cond::ANY:
-         break;
+   std::ostream& operator<<(std::ostream& os, Cond cond) {
+      switch (cond) {
+      case Cond::Z: return os << "z";
+      case Cond::NZ: return os << "nz";
+      case Cond::C: return os << "c";
+      case Cond::NC: return os << "nc";
+      case Cond::ANY: return os;
       }
+   }
 
+   void JumpTransition::DumpAsm(std::ostream& os, const FunctionImpl *impl) const {
+      os << "\tjp\t" << cond();
+      if (cond() != Cond::ANY) { os << ","; }
       dst()->label()->EmitRef(os);
-
       os << std::endl;
    }
 
    void ReturnTransition::DumpAsm(std::ostream& os, const FunctionImpl *impl) const
    {
       os << "\tjp\t";
-      switch (cond()) {
-      case Cond::Z:
-         os << "z,";
-         break;
-      case Cond::NZ:
-         os << "nz,";
-         break;
-      case Cond::C:
-         os << "c,";
-         break;
-      case Cond::NC:
-         os << "nc,";
-         break;
-      case Cond::ANY:
-         break;
-      }
+      os << cond();
+      if (cond() != Cond::ANY) { os << ","; }
 
       impl->fin()->label()->EmitRef(os);
 
@@ -1639,7 +1618,7 @@ namespace zc {
       return new VarSymInfo(val, decl);
    }
 
-   const Value *StackFrame::next_tmp(const VariableValue *tmp) {
+   const Value *StackFrame::next_tmp(const Value *tmp) {
       auto it = sizes_->insert(sizes_->begin(), tmp->size());
       auto offset = new FrameValue(sizes_, it);
       return new IndexedRegisterValue(&rv_ix, IndexedRegisterValue::Index(offset));

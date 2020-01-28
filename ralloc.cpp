@@ -181,6 +181,8 @@ namespace zc::z80 {
    }
 
    bool RegisterAllocator::TryRegAllocVar(const VariableValue *var) {
+      assert(var->requires_alloc());
+
       /* get candidate registers */
       std::unordered_set<const Register *> candidate_regs;      
       GetAssignableRegs(var, candidate_regs);
@@ -249,6 +251,8 @@ namespace zc::z80 {
    }
    
    AllocKind RegisterAllocator::AllocateVar(const VariableValue *var) {
+      assert(var->requires_alloc());
+      
       VariableRallocInfo& var_info = vars_.at(var->id());      
       bool has_reg = TryRegAllocVar(var);
       if (has_reg) {
@@ -350,14 +354,16 @@ namespace zc::z80 {
       case AllocKind::ALLOC_FRAME: os << "ALLOC_FRAME"; return os;
       }
    }
-
+   
    void RegisterAllocator::RunAllocation() {
       /* 0. Allocate regs to all variables that require a register. 
        * 1. Go thru remaining regs and allocate in decreasing order of USES / LIFETIME ratio.
        */
       std::vector<Vars::iterator> prioritized_vars;
       for (auto it = vars_.begin(); it != vars_.end(); ++it) {
-         prioritized_vars.push_back(it);
+         if (it->second.var->requires_alloc()) {
+            prioritized_vars.push_back(it);
+         }
       }
       std::sort(prioritized_vars.begin(), prioritized_vars.end(),
                 [](auto a, auto b) { return a->second.priority() > b->second.priority(); });

@@ -1,6 +1,7 @@
 #include <stdexcept>
 
 #include "asm.hpp"
+#include "cgen.hpp"
 
 namespace zc::z80 {
 
@@ -196,5 +197,7 @@ namespace zc::z80 {
       os << kind() << "("; all()->Emit(os); os << ")";
    }
    
-
+   void FlagValue::Emit(std::ostream& os) const {
+      os << cond();
+   }
 }

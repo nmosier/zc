@@ -89,7 +89,7 @@ namespace zc {
       
       VarSymInfo *next_arg(const VarDeclaration *type);
       VarSymInfo *next_local(const VarDeclaration *type);
-      const Value *next_tmp(const VariableValue *tmp);
+      const Value *next_tmp(const Value *tmp);
 
       StackFrame();
       StackFrame(const VarDeclarations *params);
@@ -118,6 +118,7 @@ namespace zc {
    };
 
    enum class Cond {Z, NZ, C, NC, ANY};
+   std::ostream& operator<<(std::ostream& os, Cond cond);   
    
    class BlockTransition;
    class BlockTransitions {
@@ -352,7 +353,7 @@ namespace zc {
    /**
     * Emit logical not on expression.
     */
-   void emit_logical_not(CgenEnv& env, Block *block, const Value *in, const VariableValue **out);
+   void emit_logical_not(CgenEnv& env, Block *block, const Value *in, const Value **out);
 
    /**
     * Emit code that converts integral value into boolean (0 or 1).
@@ -376,13 +377,13 @@ namespace zc {
     * @return continuation block
     */
    Block *emit_incdec(CgenEnv& env, Block *block, bool inc_not_dec, bool pre_not_post,
-                      ASTExpr *subexpr, const VariableValue **out);
+                      ASTExpr *subexpr, const Value **out);
    
    /**
     * Generic emission routine for performing binary operation on two integers.
     */
    Block *emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr,
-                     const VariableValue **out_lhs, const VariableValue **out_rhs);
+                     const Value **out_lhs, const Value **out_rhs);
 
    /**
     * Emit CRT frameset.
