@@ -118,7 +118,9 @@ namespace zc {
     /* NOTE: pseudo-value. */
     class FlagValue: public Value_<FlagValue> {
     public:
-       Cond cond() const { return *cond_; }
+       Cond cond_0() const { return *cond_0_; }
+       Cond cond_1() const { return *cond_1_; }      
+       
        
        virtual void Gen(std::list<const Value *>& vals) const override {}
        virtual void Use(std::list<const Value *>& vals) const override {}
@@ -128,23 +130,20 @@ namespace zc {
           throw std::logic_error("attempted to add to flag value");
        }
 
+       FlagValue *invert() const { return new FlagValue(cond_1_, cond_0_); }
+
        template <typename... Args>
-       FlagValue(portal<Cond> cond, Args... args): Value_(args...), cond_(cond) {}
+       FlagValue(portal<Cond> cond_0, portal<Cond> cond_1, Args... args):
+          Value_(args..., flag_size), cond_0_(cond_0), cond_1_(cond_1) {}
        
     protected:
-       portal<Cond> cond_;
+       portal<Cond> cond_0_;
+       portal<Cond> cond_1_;
 
        virtual bool Eq_aux(const FlagValue *other) const override {
-          return cond() == other->cond();
+          return cond_0() == other->cond_0() && cond_1() == other->cond_1();
        }
-       virtual bool Match_aux(const FlagValue *to) const override {
-          if (cond_) {
-             return cond() == to->cond();
-          } else {
-             cond_.send(to->cond());
-             return true;
-          }
-       }
+       virtual bool Match_aux(const FlagValue *to) const override;       
     };
 
     /**

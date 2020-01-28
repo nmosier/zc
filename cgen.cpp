@@ -433,11 +433,14 @@ namespace zc {
          break;
          
       case Kind::UOP_POSITIVE:
-         block = expr()->CodeGen(env, block, out, ExprKind::EXPR_RVALUE);         
-         break;
+         return expr()->CodeGen(env, block, out, ExprKind::EXPR_RVALUE);         
          
       case Kind::UOP_NEGATIVE:
          {
+            if (bytes == flag_size) {
+               return expr()->CodeGen(env, block, out, ExprKind::EXPR_RVALUE);
+            }
+            
             /* select register to load into */
             const RegisterValue *reg;
             switch (bytes) {
@@ -505,7 +508,6 @@ namespace zc {
          break;
          
       case Kind::UOP_LOGICAL_NOT:
-         // var = new VariableValue(bytes);
          block = expr()->CodeGen(env, block, &var, ExprKind::EXPR_RVALUE);
          emit_logical_not(env, block, var, out);
          break;
@@ -542,8 +544,9 @@ namespace zc {
             
             /* evaluate lhs */
             block = lhs()->CodeGen(env, block, &lhs_var, ExprKind::EXPR_RVALUE);
-             
-            emit_nonzero_test(env, block, lhs_var);
+
+            const FlagValue *flag;
+            emit_nonzero_test(env, block, lhs_var, &flag);
             
             /* preemptively set result to 0/1 */
             block->instrs().push_back(new LoadInstruction(&rv_a,
@@ -552,14 +555,17 @@ namespace zc {
             /* create transitions */
              const Label *end_label = new_label(name);
             Block *end_block = new Block(end_label);
-            BlockTransition *end_transition = new JumpTransition(end_block,
-                                                                 and_not_or ? Cond::Z : Cond::NZ);
+            //BlockTransition *end_transition = new JumpTransition(end_block,
+            //and_not_or ? Cond::Z : Cond::NZ);
+            BlockTransition *end_transition =
+               new JumpTransition(end_block, and_not_or ? flag->cond_0() : flag->cond_1());
             block->transitions().vec().push_back(end_transition);
 
             const Label *cont_label = new_label(name);
             Block *cont_block = new Block(cont_label);
-            BlockTransition *cont_transition = new JumpTransition(cont_block,
-                                                                  and_not_or ? Cond::NZ : Cond::Z);
+            BlockTransition *cont_transition = new JumpTransition
+               (cont_block, and_not_or ? flag->cond_1() : flag->cond_0());
+            // and_not_or ? Cond::NZ : Cond::Z);
             block->transitions().vec().push_back(cont_transition);
 
             /* Evaluate rhs */
@@ -988,15 +994,22 @@ namespace zc {
       }
 
       if (out == nullptr) { return block; }
-      *out = new VariableValue(out_bytes);
 
       // const Value *var = new VariableValue(expr_bytes);
       const Value *var;
       block = expr()->CodeGen(env, block, &var, mode);
       
       switch (out_bytes) {
+      case flag_size:
+         {
+            // *out = new FlagValue(Cond::Z, Cond::NZ);
+            emit_nonzero_test(env, block, var, (const FlagValue **) out);
+         }
+         break;
+         
       case byte_size:
          {
+            *out = new VariableValue(out_bytes);            
             auto low_byte = new ByteValue(var, ByteValue::Kind::BYTE_LOW);
             block->instrs().push_back(new LoadInstruction(*out, low_byte));
          }
@@ -1005,6 +1018,7 @@ namespace zc {
       case word_size: abort();
       case long_size:
          {
+            *out = new VariableValue(out_bytes);                         
             auto low_byte = new ByteValue(*out, ByteValue::Kind::BYTE_LOW);
             block->instrs().push_back(new LoadInstruction(*out, &imm_l<0>));
             block->instrs().push_back(new LoadInstruction(low_byte, var));
@@ -1012,10 +1026,6 @@ namespace zc {
          break;
       }
       
-      //block->instrs().push_back(new LoadInstruction(accumulator(var), var));
-      //accumulator(out)->reg()->Cast(block, accumulator(var)->reg());
-      //block->instrs().push_back(new LoadInstruction(out, accumulator(out)));
-
       return block;
    }
 
@@ -1180,9 +1190,13 @@ namespace zc {
       return new Label(s);
    }
 
-   void emit_nonzero_test(CgenEnv& env, Block *block, const Value *in) {
+   void emit_nonzero_test(CgenEnv& env, Block *block, const Value *in, const FlagValue **out) {
       int bytes = in->size();
       switch (bytes) {
+      case flag_size:
+         *out = dynamic_cast<const FlagValue *>(in);
+         return;
+         
       case byte_size:
          /* ld a,<out>
           * or a,a
@@ -1190,7 +1204,8 @@ namespace zc {
          block->instrs().push_back(new LoadInstruction(new RegisterValue(&r_a), in));
          block->instrs().push_back
             (new OrInstruction(new RegisterValue(&r_a), new RegisterValue(&r_a)));
-         break;
+         *out = new FlagValue(Cond::Z, Cond::NZ);
+         return;
          
       case word_size: abort();
       case long_size:
@@ -1199,20 +1214,23 @@ namespace zc {
           */
          block->instrs().push_back(new LoadInstruction(&rv_hl, in));
          emit_crt("__icmpzero", block);
-         break;
+         *out = new FlagValue(Cond::Z, Cond::NZ);         
+         return;
       }
    }
 
    /* NOTE: Doesn't return block because it's sealed by transitions.
     */
    void emit_predicate(CgenEnv& env, Block *block, ASTExpr *expr, Block *take, Block *leave) {
-      const Value *var = new VariableValue(expr->type()->bytes());
+      // const Value *var = new VariableValue(expr->type()->bytes());
+      const Value *var;
       block = expr->CodeGen(env, block, &var, ASTExpr::ExprKind::EXPR_RVALUE);
-      emit_nonzero_test(env, block, var);
-
+      const FlagValue *flag;
+      emit_nonzero_test(env, block, var, &flag);
+      
       /* transitions */
-      block->transitions().vec().push_back(new JumpTransition(take, Cond::NZ));
-      block->transitions().vec().push_back(new JumpTransition(leave, Cond::Z));
+      block->transitions().vec().push_back(new JumpTransition(take, flag->cond_1()));
+      block->transitions().vec().push_back(new JumpTransition(leave, flag->cond_0()));
    }
 
    void emit_logical_not(CgenEnv& env, Block *block, const Value *in, const Value **out) {
@@ -1222,6 +1240,14 @@ namespace zc {
       
       int bytes = in->size();
       switch (bytes) {
+      case flag_size:
+         {
+            const FlagValue *in_flag = dynamic_cast<const FlagValue *>(in);
+            assert(in_flag);
+            *out = in_flag->invert();
+            return;            
+         }
+         
       case byte_size:
          /* ld a,<in>
           * cp a,1
@@ -1234,7 +1260,7 @@ namespace zc {
          is.push_back(new LoadInstruction(&rv_a, &imm_b<0>));
          is.push_back(new AdcInstruction(&rv_a, &rv_a));
          is.push_back(new LoadInstruction(*out, &rv_a));
-         break;
+         return;
 
       case word_size: abort();
          
@@ -1262,6 +1288,10 @@ namespace zc {
 
       int bytes = in->size();
       switch (bytes) {
+      case flag_size:
+         emit_booleanize_flag(env, block, dynamic_cast<const FlagValue *>(in));
+         return;
+         
       case byte_size:
          /* xor a,a
           * cp a,<in>
@@ -1271,7 +1301,7 @@ namespace zc {
          is.push_back(new XorInstruction(&rv_a, &rv_a));
          is.push_back(new CompInstruction(&rv_a, in));
          is.push_back(new AdcInstruction(&rv_a, &rv_a));
-         break;
+         return;
          
       case word_size: abort();
          
@@ -1286,10 +1316,43 @@ namespace zc {
          is.push_back(new OrInstruction(&rv_a, &rv_a));
          is.push_back(new SbcInstruction(&rv_hl, in));
          is.push_back(new AdcInstruction(&rv_a, &rv_a));
-         break;
+         return;
 
       default:
          abort();
+      }
+   }
+
+   void emit_booleanize_flag(CgenEnv& env, Block *block, const FlagValue *in) {
+      switch (in->cond_0()) {
+      case Cond::ANY: abort();
+      case Cond::Z:
+      case Cond::NZ:
+         /* ld a,0
+          * jr z/nz,_
+          * inc a
+          * _
+          */
+         block->instrs().push_back(new LoadInstruction(&rv_a, &imm_b<0>));
+         block->instrs().push_back(new JrInstruction(new ImmediateValue(3), in->cond_0()));
+         block->instrs().push_back(new IncInstruction(&rv_a));
+         break;
+         
+      case Cond::NC:
+         /* sbc a,a
+          * neg
+          */
+         block->instrs().push_back(new SbcInstruction(&rv_a, &rv_a));
+         block->instrs().push_back(new NegInstruction());
+         break;
+         
+      case Cond::C:
+         /* sbc a,a
+          * inc a
+          */
+         block->instrs().push_back(new SbcInstruction(&rv_a, &rv_a));
+         block->instrs().push_back(new IncInstruction(&rv_a));
+         break;
       }
    }
 

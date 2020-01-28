@@ -346,9 +346,10 @@ namespace zc {
 
    /**
     * Check whether expression is nonzero (i.e. evaluates to true as a predicate).
-    * Zero flag (ZF) is set accordingly.
+    * @param in value to test
+    * @param output flags value
     */
-   void emit_nonzero_test(CgenEnv& env, Block *block, const Value *in);
+   void emit_nonzero_test(CgenEnv& env, Block *block, const Value *in, const FlagValue **out);
 
    /**
     * Emit logical not on expression.
@@ -361,6 +362,8 @@ namespace zc {
     */
    void emit_booleanize(CgenEnv& env, Block *block, const Value *in);
 
+   void emit_booleanize_flag(CgenEnv& env, Block *block, const FlagValue *in);
+   
    /**
     * Emit code for predicate.
     */ 

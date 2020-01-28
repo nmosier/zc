@@ -213,10 +213,19 @@ namespace zc {
 
       case Kind::UOP_POSITIVE:
       case Kind::UOP_NEGATIVE:
-      case Kind::UOP_BITWISE_NOT:
          expr_ = expr()->Cast(type);
          type_ = type;
          return this;
+
+      case Kind::UOP_BITWISE_NOT:
+         if (type->kind() == ASTType::Kind::TYPE_INTEGRAL &&
+             dynamic_cast<IntegralType *>(type)->int_kind() == IntegralType::IntKind::SPEC_BOOL) {
+            return ASTExpr::Cast(type);
+         } else {
+            expr_ = expr()->Cast(type);
+            type_ = type;
+            return this;
+         }
       }
    }
 
@@ -234,16 +243,26 @@ namespace zc {
       case Kind::BOP_MOD:
          return ASTExpr::Cast(type);
 
-      case Kind::BOP_BITWISE_AND:
       case Kind::BOP_BITWISE_OR:
-      case Kind::BOP_BITWISE_XOR:
-      case Kind::BOP_PLUS:
-      case Kind::BOP_MINUS:
-      case Kind::BOP_TIMES:
          lhs_ = lhs()->Cast(type);
          rhs_ = rhs()->Cast(type);
          type_ = type;
          return this;
+         
+      case Kind::BOP_BITWISE_AND:
+      case Kind::BOP_BITWISE_XOR:
+      case Kind::BOP_PLUS:
+      case Kind::BOP_MINUS:
+      case Kind::BOP_TIMES:
+         if (type->kind() == ASTType::Kind::TYPE_INTEGRAL &&
+             dynamic_cast<IntegralType *>(type)->int_kind() == IntegralType::IntKind::SPEC_BOOL) {
+            return ASTExpr::Cast(type);
+         } else {
+            lhs_ = lhs()->Cast(type);
+            rhs_ = rhs()->Cast(type);
+            type_ = type;
+            return this;
+         }
          
       case Kind::BOP_COMMA:
          rhs_ = rhs()->Cast(type);
@@ -272,8 +291,7 @@ namespace zc {
    }
 
    ASTExpr *IndexExpr::Cast(ASTType *type) {
-      index_ = index()->Cast(type);
-      return this;
+      return ASTExpr::Cast(type);
    }
    
 }

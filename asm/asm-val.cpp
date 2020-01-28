@@ -164,6 +164,25 @@ namespace zc::z80 {
       }
    }
 
+   bool FlagValue::Match_aux(const FlagValue *to) const {
+      if (cond_0_) {
+         if (cond_0() != to->cond_0()) {
+            return false;
+         }
+      } else {
+         cond_0_.send(to->cond_0());
+      }
+      if (cond_1_) {
+         if (cond_1() != to->cond_1()) {
+            return false;
+         }
+      } else {
+         cond_1_.send(to->cond_1());
+      }
+      return true;
+   }
+   
+
    /*** OTHER ***/
    int8_t FrameValue::index() const {
       int8_t i = std::reduce(indices_->begin(), pos_, 0);
@@ -198,6 +217,6 @@ namespace zc::z80 {
    }
    
    void FlagValue::Emit(std::ostream& os) const {
-      os << cond();
+      os << "[" << cond_0() << "|" << cond_1() << "]";
    }
 }

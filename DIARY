@@ -290,3 +290,6 @@ Todo
 [ ] ld rr,LL \ push rr \ pop iy \ call _indcall -> call LL
 
 
+
+
+BooleanizeExpr? 

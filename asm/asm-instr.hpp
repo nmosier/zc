@@ -14,6 +14,8 @@
 #include "asm/asm-cond.hpp"
 #include "util.hpp"
 
+namespace zc { enum class Cond; }
+
 namespace zc::z80 {
 
    class Value;
@@ -53,15 +55,16 @@ namespace zc::z80 {
    protected:
       std::string name_;
       Values operands_;
-      std::optional<FlagState> cond_;
+      //std::optional<FlagState> cond_;
+      std::optional<Cond> cond_;
 
       virtual void Resolve_(Instructions& out) { out.push_back(this); }
       
       Instruction(const std::string& name): name_(name), operands_(), cond_(std::nullopt) {}
-      Instruction(FlagState cond, const std::string& name): name_(name), operands_(), cond_(cond) {}
+      Instruction(Cond cond, const std::string& name): name_(name), operands_(), cond_(cond) {}
       Instruction(const Values& operands, const std::string& name):
          name_(name), operands_(operands), cond_(std::nullopt) {}
-      Instruction(const Values& operands, FlagState cond, const std::string& name):
+      Instruction(const Values& operands, Cond cond, const std::string& name):
          name_(name), operands_(operands), cond_(cond) {}
    };
 
@@ -229,6 +232,19 @@ namespace zc::z80 {
    protected:
    };
 
+#if 0
+   template <class Base>
+   class CondInstruction: public Base {
+   public:
+      const FlagState *cond() const { return cond_; }
+
+      template <typename... Args>
+      CondInstruction(const FlagState *cond, Args... args): Base(args...), cond_(cond) {}
+
+   protected:
+      const FlagState *cond_;
+   };
+
    /**
     * "JP cc,Mmm" instruction class
     */
@@ -242,6 +258,16 @@ namespace zc::z80 {
       
    protected:
       const FlagState *cond_;
+   };
+#endif
+   
+   /**
+    * "JR" instruction class
+    */
+   class JrInstruction: public UnaryInstruction {
+   public:
+      template <typename... Args>
+      JrInstruction(Args... args): UnaryInstruction(args..., "jr") {}
    };
 
    /**

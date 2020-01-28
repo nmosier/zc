@@ -1,6 +1,7 @@
 #include <ostream>
 
 #include "asm.hpp"
+#include "cgen.hpp"
 
 namespace zc::z80 {
 
@@ -10,7 +11,7 @@ namespace zc::z80 {
          os << "\t";
       }
       if (cond_) {
-         cond_->Emit(os);
+         os << *cond_;
       }
       for (auto it = operands_.begin(), end = operands_.end(); it != end; ++it) {
          if (it != operands_.begin() || cond_) {
