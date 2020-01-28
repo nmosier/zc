@@ -1627,7 +1627,7 @@ namespace zc {
    int IntegralType::bytes() const {
       using Kind = IntegralType::IntKind;
       switch (int_kind()) {
-      case Kind::SPEC_BOOL: return 0;
+      case Kind::SPEC_BOOL: return flag_size;
       case Kind::SPEC_CHAR: return byte_size;
       case Kind::SPEC_SHORT: return word_size;
       case Kind::SPEC_INT:

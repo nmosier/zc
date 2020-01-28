@@ -17,6 +17,7 @@ namespace zc::z80 {
 #endif
       ;
 
+   constexpr int flag_size = 0;
    constexpr int byte_size = 1;
    constexpr int word_size = 2;
    constexpr int long_size =
