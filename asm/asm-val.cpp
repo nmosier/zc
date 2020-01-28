@@ -176,4 +176,25 @@ namespace zc::z80 {
       };
       return std::visit(IndexVisitor(), *index_);
    }
+
+   const Value *ByteValue::Resolve() const {
+      switch (kind()) {
+      case Kind::BYTE_HIGH: return all()->high();
+      case Kind::BYTE_LOW:  return all()->low();
+      }
+   }
+
+   std::ostream& operator<<(std::ostream& os, ByteValue::Kind kind) {
+      using Kind = ByteValue::Kind;
+      switch (kind) {
+      case Kind::BYTE_HIGH: return os << "high";
+      case Kind::BYTE_LOW: return os << "low"; 
+      }
+   }
+
+   void ByteValue::Emit(std::ostream& os) const {
+      os << kind() << "("; all()->Emit(os); os << ")";
+   }
+   
+
 }

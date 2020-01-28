@@ -36,6 +36,8 @@ namespace zc::z80 {
       virtual Kind kind() const = 0;
       const char *name() const { return name_; }
       virtual int size() const = 0;
+      virtual const Register *high() const = 0;
+      virtual const Register *low() const = 0;
       
       void Emit(std::ostream& os) const { os << name(); }
       virtual void Cast(Block *block, const Register *from) const = 0;
@@ -71,6 +73,10 @@ namespace zc::z80 {
    public:
       virtual Kind kind() const override { return Kind::REG_BYTE; }
       virtual int size() const override { return byte_size; }
+      virtual const Register *high() const override {
+         throw std::logic_error("attempted to take high byte of single-byte register");
+      }
+      virtual const Register *low() const override { return this; }
 
       virtual void Cast(Block *block, const Register *from) const override;
       
@@ -88,6 +94,8 @@ namespace zc::z80 {
       virtual Kind kind() const override { return Kind::REG_MULTIBYTE; }
       const ByteRegs& regs() const { return regs_; }
       bool contains(const Register *reg) const;
+      virtual const Register *high() const override { return regs()[0]; }
+      virtual const Register *low() const override { return regs()[1]; }
       
       virtual void Cast(Block *block, const Register *from) const override;
 

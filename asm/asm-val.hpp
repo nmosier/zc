@@ -28,6 +28,8 @@
        int size() const { return size_.get(); }
        virtual const Register *reg() const { return nullptr; }
        // virtual const VariableValue *var() const { return nullptr; }
+       virtual const Value *high() const { return nullptr; }
+       virtual const Value *low() const { return nullptr; }
     
        virtual void Emit(std::ostream& os) const = 0;
        virtual Value *Add(const intmax_t& offset) const = 0;
@@ -38,6 +40,8 @@
 
        virtual void Gen(std::list<const Value *>& vals) const {}
        virtual void Use(std::list<const Value *>& vals) const {}
+
+       virtual const Value *Resolve() const { return this; }
 
        virtual const Value *ReplaceVar(const VariableValue *var, const Value *with) const
        { return this; }
@@ -113,7 +117,13 @@
     class ImmediateValue: public Value_<ImmediateValue> {
     public:
        const intmax_t& imm() const { return *imm_; }
-    
+       virtual const Value *high() const override {
+          return new ImmediateValue((imm() & 0x00ff00) >> 8, byte_size);
+       }
+       virtual const Value *low() const override {
+          return new ImmediateValue((imm() & 0x0000ff), byte_size);
+       }
+       
        virtual void Emit(std::ostream& os) const override;
        virtual Value *Add(const intmax_t& offset) const override;
     
@@ -158,6 +168,8 @@
     class RegisterValue: public Value_<RegisterValue> {
     public:
        virtual const Register *reg() const override { return *reg_; }
+       virtual const Value *high() const override { return new RegisterValue(reg()->high()); }
+       virtual const Value *low() const override { return new RegisterValue(reg()->low()); }
     
        virtual void Emit(std::ostream& os) const override;
        virtual Value *Add(const intmax_t& offset) const override;
@@ -218,6 +230,7 @@
     public:
        // using FrameIndices = StackFrame::FrameIndices;
        typedef std::list<int8_t> FrameIndices;
+       virtual const Value *low() const override { return this; }
       
       int8_t index() const;
 
@@ -269,7 +282,13 @@
    public:
       const Value *addr() const { return *addr_; }
       virtual const Register *reg() const override {return addr()->reg(); }
-      // virtual const VariableValue *var() const override { return addr()->var(); }
+      virtual const Value *high() const override {
+         assert(size() == long_size);
+         return new MemoryValue(addr()->Add(1), byte_size);
+      }
+      virtual const Value *low() const override {
+         return new MemoryValue(addr(), byte_size);
+      }
       
       virtual void Emit(std::ostream& os) const override;
       virtual Value *Add(const intmax_t& offset) const override;
@@ -293,6 +312,53 @@
       }
       virtual bool Match_aux(const MemoryValue *to) const override;
    };
+
+    class ByteValue: public Value_<ByteValue> {
+    public:
+       enum class Kind {BYTE_HIGH, BYTE_LOW};
+       Kind kind() const { return *kind_; }
+       const Value *all() const { return *all_; }
+       virtual const Register *reg() const override { return all()->reg(); } /* TODO: this break */
+       virtual const Value *low() const override { return this; }
+
+       virtual void Emit(std::ostream& os) const override;
+
+       virtual Value *Add(const intmax_t& offset) const override {
+          return new ByteValue(all()->Add(offset), kind());
+       }
+
+       virtual void Gen(std::list<const Value *>& vals) const override { all()->Gen(vals); }       
+       virtual void Use(std::list<const Value *>& vals) const override { all()->Use(vals); }
+
+       virtual const Value *Resolve() const override;
+       virtual const Value *ReplaceVar(const VariableValue *var, const Value *with) const override {
+          return new ByteValue(all()->ReplaceVar(var, with), kind());
+       }
+
+       ByteValue(const Value *all, Kind kind): Value_(byte_size), all_(all), kind_(kind) {}
+
+    protected:
+       portal<const Value *> all_;
+       portal<Kind> kind_;
+
+       virtual bool Eq_aux(const ByteValue *other) const override {
+          return all() == other->all() && kind() == other->kind();
+       }
+       virtual bool Match_aux(const ByteValue *to) const override {
+          if (kind_) {
+             if (kind() != to->kind()) { return false; }
+          } else {
+             kind_.send(to->kind());
+          }
+          if (all_) {
+             if (all() != to->all()) { return false; }
+             else { all_.send(to->all()); }
+          }
+          return true;
+       }
+       
+    };
+    std::ostream& operator<<(std::ostream& os, ByteValue::Kind kind);
    
    /*** EXTERNAL CONSTANTS ***/
    template <intmax_t N>

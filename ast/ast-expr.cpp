@@ -257,8 +257,13 @@ namespace zc {
       return this;
    }
 
-   ASTExpr *CastExpr::Cast(ASTType *type) {
-      return expr()->Cast(type);
+   ASTExpr *CastExpr::Cast(ASTType *to) {
+      /* Propogate cast IFF is to lower type. */
+      if (to->bytes() < type()->bytes()) {
+         return expr()->Cast(type());
+      } else {
+         return CastExpr::Create(to, this, loc());
+      }
    }
 
    ASTExpr *SizeofExpr::Cast(ASTType *type) {

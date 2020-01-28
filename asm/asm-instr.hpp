@@ -43,7 +43,7 @@ namespace zc::z80 {
        * Convert complex pseudo-instructions (e.g. ld hl,bc) to basic instructions 
        * (e.g. push bc \ pop bc)
        */
-      virtual void Resolve(Instructions& out) { out.push_back(this); }
+      void Resolve(Instructions& out);
                            
       void Emit(std::ostream& os ) const;
 
@@ -55,6 +55,8 @@ namespace zc::z80 {
       Values operands_;
       std::optional<FlagState> cond_;
 
+      virtual void Resolve_(Instructions& out) { out.push_back(this); }
+      
       Instruction(const std::string& name): name_(name), operands_(), cond_(std::nullopt) {}
       Instruction(FlagState cond, const std::string& name): name_(name), operands_(), cond_(cond) {}
       Instruction(const Values& operands, const std::string& name):
@@ -249,11 +251,12 @@ namespace zc::z80 {
    public:
       virtual void Gen(std::list<const Value *>& vals) const override;
       virtual void Use(std::list<const Value *>& vals) const override;
-
-      virtual void Resolve(Instructions& out) override;
       
       template <typename... Args>
       LoadInstruction(Args... args): BinaryInstruction(args..., "ld") {}
+
+   protected:
+      virtual void Resolve_(Instructions& out) override;      
    };
 
    /**
@@ -453,7 +456,10 @@ namespace zc::z80 {
       XorInstruction(Args... args): BitwiseInstruction(args..., "xor") {}
    };
 
+   /*** PSEUDO-INSTRUCTIONS ***/
    
+   
+
 }
 
 

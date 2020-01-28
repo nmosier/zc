@@ -262,6 +262,12 @@ I rewrote existing code for computing intervals for register free times and vari
 [1 hr] Fixed peephole optimization bug (would skip duplicate matches, e.g. `ld a,a \ ld a,a` and only remove first.
 [2 hrs] Fixed bugs with `chars.c` program -- values were being used across blocks, which caused ralloc assertions to fail.
         Fixed bug with `ReturnStat`: it didn't cast the return result if it wasn't of equal type. Added explicit casts to fix this, and now `chars.c` runs correctly.
+[1 hr] Add ByteValue type.
+[? hrs] CASTING.
+
+01/28/2020 
+[1 hr] Fixed casting bug. Finished adding ByteValue type.
+
 
 Ideas: add `bool` type? bool would be stored as flag.
 

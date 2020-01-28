@@ -903,19 +903,36 @@ namespace zc {
       int expr_bytes = expr()->type()->Decay()->bytes();
       int out_bytes = out->size();
 
-      if (expr_bytes == out_bytes ||
-          (expr_bytes == word_size && out_bytes == long_size) ||
-          (expr_bytes == long_size && out_bytes == word_size)) {
+      assert(expr_bytes != word_size && out_bytes != word_size);
+
+      if (expr_bytes == out_bytes) {
          return expr()->CodeGen(env, block, out, mode);
       }
 
       const VariableValue *var = new VariableValue(expr_bytes);
       block = expr()->CodeGen(env, block, var, mode);
-
       
-      block->instrs().push_back(new LoadInstruction(accumulator(var), var));
-      accumulator(out)->reg()->Cast(block, accumulator(var)->reg());
-      block->instrs().push_back(new LoadInstruction(out, accumulator(out)));
+      switch (out_bytes) {
+      case byte_size:
+         {
+            auto low_byte = new ByteValue(var, ByteValue::Kind::BYTE_LOW);
+            block->instrs().push_back(new LoadInstruction(out, low_byte));
+         }
+         break;
+
+      case word_size: abort();
+      case long_size:
+         {
+            auto low_byte = new ByteValue(out, ByteValue::Kind::BYTE_LOW);
+            block->instrs().push_back(new LoadInstruction(out, &imm_l<0>));
+            block->instrs().push_back(new LoadInstruction(low_byte, var));
+         }
+         break;
+      }
+      
+      //block->instrs().push_back(new LoadInstruction(accumulator(var), var));
+      //accumulator(out)->reg()->Cast(block, accumulator(var)->reg());
+      //block->instrs().push_back(new LoadInstruction(out, accumulator(out)));
 
       return block;
    }
@@ -1316,6 +1333,8 @@ namespace zc {
       block->instrs().push_back(new PopInstruction(&rv_ix));
       block->instrs().push_back(new RetInstruction());
    }
+
+   // void emit_cast(CgenEnv& env, Block *block, const Varialbe
 
    /*** Other ***/
    void ByteRegister::Cast(Block *block, const Register *from) const {

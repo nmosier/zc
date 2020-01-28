@@ -73,7 +73,7 @@ namespace zc::z80 {
       auto mv = dynamic_cast<const MemoryValue *>(dst());
       if (mv) { mv->Use(vals); } /* ugh, this is hideous */
    }
-   
+
    void BitwiseInstruction::Gen(std::list<const Value *>& vals) const {
       if (!dst()->Eq(src())) { dst()->Gen(vals); }
    }
@@ -99,6 +99,7 @@ namespace zc::z80 {
    void DjnzInstruction::Gen(std::list<const Value *>& vals) const { rv_b.Gen(vals); }
    void DjnzInstruction::Use(std::list<const Value *>& vals) const { rv_b.Use(vals); }
 
+
    /*** VARS ***/
    void Instruction::ReplaceVar(const VariableValue *var, const Value *with) {
       for (Values::iterator operand_it = operands_.begin(), operand_end = operands_.end();
@@ -109,7 +110,19 @@ namespace zc::z80 {
    }
 
    /*** RESOLUTION ***/
-   void LoadInstruction::Resolve(Instructions& out) {
+
+   void Instruction::Resolve(Instructions& out) {
+      /* resolve all operands first */
+      for (auto it = operands().begin(), end = operands().end(); it != end; ++it) {
+         *it = (**it)->Resolve();
+      }
+
+      /* call auxiliary function */
+      Resolve_(out);
+   }
+
+   
+   void LoadInstruction::Resolve_(Instructions& out) {
       const Register *r1, *r2;
       int sz1, sz2;
       const RegisterValue rv1(&r1, &sz1);
@@ -126,5 +139,6 @@ namespace zc::z80 {
 
       out.push_back(this);
    }
+
    
 }
