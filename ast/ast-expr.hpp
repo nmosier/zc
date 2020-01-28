@@ -14,8 +14,11 @@ namespace zc {
 
    namespace z80 {
       class Value;
+      class VariableValue;
    }
    using Value = z80::Value;
+   using VariableValue = z80::VariableValue;
+   
    
    class ASTExpr;
    typedef ASTNodeVec<ASTExpr> ASTExprs;
@@ -59,7 +62,7 @@ namespace zc {
        * @param out value to generate result into
        * @param mode how to evaluate expression (as lvalue or rvalue)
        */
-      virtual Block *CodeGen(CgenEnv& env, Block *block, const Value *out,
+      virtual Block *CodeGen(CgenEnv& env, Block *block, const VariableValue **out,
                              ExprKind mode) = 0;
 
    protected:
@@ -122,7 +125,7 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override { os << "AssignmentExpr"; }
 
       virtual void TypeCheck(SemantEnv& env) override;
-      virtual Block *CodeGen(CgenEnv& env, Block *block, const Value *val, ExprKind mode) override;
+      virtual Block *CodeGen(CgenEnv& env, Block *block, const VariableValue **out, ExprKind mode) override;
 
    protected:
       AssignmentExpr(ASTExpr *lhs, ASTExpr *rhs, const SourceLoc& loc):
@@ -156,7 +159,7 @@ namespace zc {
 
       virtual void TypeCheck(SemantEnv& env) override;
 
-      virtual Block *CodeGen(CgenEnv& env, Block *block, const Value *val, ExprKind mode) override;
+      virtual Block *CodeGen(CgenEnv& env, Block *block, const VariableValue **out, ExprKind mode) override;
 
       virtual ASTExpr *Cast(ASTType *type) override;
 
@@ -199,7 +202,7 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override;
       virtual void TypeCheck(SemantEnv& env) override;
 
-      virtual Block *CodeGen(CgenEnv& env, Block *block, const Value *val, ExprKind mode) override;
+      virtual Block *CodeGen(CgenEnv& env, Block *block, const VariableValue **out, ExprKind mode) override;
 
       virtual ASTExpr *Cast(ASTType *type) override;
       
@@ -232,7 +235,7 @@ namespace zc {
 
       virtual void TypeCheck(SemantEnv& env) override;
 
-      virtual Block *CodeGen(CgenEnv& env, Block *block, const Value *val, ExprKind mode) override;
+      virtual Block *CodeGen(CgenEnv& env, Block *block, const VariableValue **out, ExprKind mode) override;
 
       virtual ASTExpr *Cast(ASTType *type) override;
       
@@ -258,7 +261,7 @@ namespace zc {
 
       virtual void TypeCheck(SemantEnv& env) override;
 
-      virtual Block *CodeGen(CgenEnv& env, Block *block, const Value *val, ExprKind mode) override;
+      virtual Block *CodeGen(CgenEnv& env, Block *block, const VariableValue **out, ExprKind mode) override;
       
    protected:
       const std::string *str_;
@@ -287,7 +290,7 @@ namespace zc {
 
       virtual void TypeCheck(SemantEnv& env) override;
 
-      virtual Block *CodeGen(CgenEnv& env, Block *block, const Value *val, ExprKind mode) override;
+      virtual Block *CodeGen(CgenEnv& env, Block *block, const VariableValue **out, ExprKind mode) override;
       
    protected:
       Identifier *id_;
@@ -311,7 +314,7 @@ namespace zc {
 
       virtual void TypeCheck(SemantEnv& env) override;
 
-      virtual Block *CodeGen(CgenEnv& env, Block *block, const Value *val, ExprKind mode) override
+      virtual Block *CodeGen(CgenEnv& env, Block *block, const VariableValue **out, ExprKind mode) override
       { return block; }
 
       virtual ASTExpr *Cast(ASTType *type) override { abort(); }      
@@ -337,7 +340,7 @@ namespace zc {
 
       virtual void TypeCheck(SemantEnv& env) override;
 
-      virtual Block *CodeGen(CgenEnv& env, Block *block, const Value *val, ExprKind mode) override;
+      virtual Block *CodeGen(CgenEnv& env, Block *block, const VariableValue **out, ExprKind mode) override;
 
    protected:
       ASTExpr *fn_;
@@ -363,7 +366,7 @@ namespace zc {
 
       virtual void TypeCheck(SemantEnv& env) override;
 
-      virtual Block *CodeGen(CgenEnv& env, Block *block, const Value *val, ExprKind mode) override;
+      virtual Block *CodeGen(CgenEnv& env, Block *block, const VariableValue **out, ExprKind mode) override;
 
       virtual ASTExpr *Cast(ASTType *type) override;
       
@@ -391,7 +394,7 @@ namespace zc {
 
       virtual void TypeCheck(SemantEnv& env) override;
 
-      virtual Block *CodeGen(CgenEnv& env, Block *block, const Value *val, ExprKind mode) override;
+      virtual Block *CodeGen(CgenEnv& env, Block *block, const VariableValue **out, ExprKind mode) override;
       
    protected:
       ASTExpr *expr_;
@@ -417,7 +420,7 @@ namespace zc {
 
       virtual void TypeCheck(SemantEnv& env) override;
 
-      virtual Block *CodeGen(CgenEnv& env, Block *block, const Value *val, ExprKind mode) override;
+      virtual Block *CodeGen(CgenEnv& env, Block *block, const VariableValue **out, ExprKind mode) override;
 
       virtual ASTExpr *Cast(ASTType *type) override;      
       
@@ -444,7 +447,8 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override { os << "IndexExpr"; }
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
       virtual void TypeCheck(SemantEnv& env) override;
-      virtual Block *CodeGen(CgenEnv& env, Block *block, const Value *val, ExprKind mode) override;
+      virtual Block *CodeGen(CgenEnv& env, Block *block, const VariableValue **out, ExprKind mode)
+         override;
       virtual ASTExpr *Cast(ASTType *type) override;
       
    protected:

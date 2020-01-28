@@ -352,12 +352,13 @@ namespace zc {
    /**
     * Emit logical not on expression.
     */
-   void emit_logical_not(CgenEnv& env, Block *block, const Value *in, const Value *out);
+   void emit_logical_not(CgenEnv& env, Block *block, const Value *in, const VariableValue **out);
 
    /**
     * Emit code that converts integral value into boolean (0 or 1).
+    * NOTE: Places result in byte register %a.
     */
-   void emit_booleanize(CgenEnv& env, Block *block, const Value *in, const Value *out);
+   void emit_booleanize(CgenEnv& env, Block *block, const Value *in);
 
    /**
     * Emit code for predicate.
@@ -375,13 +376,13 @@ namespace zc {
     * @return continuation block
     */
    Block *emit_incdec(CgenEnv& env, Block *block, bool inc_not_dec, bool pre_not_post,
-                      ASTExpr *subexpr, const Value *out);
+                      ASTExpr *subexpr, const VariableValue **out);
    
    /**
     * Generic emission routine for performing binary operation on two integers.
     */
    Block *emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr,
-                     const Value *out_lhs, const Value *out_rhs);
+                     const VariableValue **out_lhs, const VariableValue **out_rhs);
 
    /**
     * Emit CRT frameset.
