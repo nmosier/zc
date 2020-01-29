@@ -1511,18 +1511,12 @@ namespace zc {
       }
    }
 
-   void BlockTransitions::Serialize(Instructions& out) {
-      for (auto trans : vec()) {
-         trans->Serialize(out);
-      }
-   }
-
    void FunctionImpl::Serialize() {
       instrs_ = Instructions();
       Blocks visited;
-      void (*fn)(Block *, Instructions&) = Block::Serialize;
-      entry()->for_each_block(visited, fn, *instrs_);
-      fin()->for_each_block(visited, fn, *instrs_);
+      void (*fn)(Block *, Instructions&, Blocks& visited) = Block::Serialize;
+      entry()->for_each_block(visited, fn, *instrs_, visited);
+      fin()->for_each_block(visited, fn, *instrs_, visited);
    }
 
    void Block::Resolve(Block *block, const FunctionImpl *impl) {
@@ -1541,9 +1535,15 @@ namespace zc {
       block->transitions().Prune();
    }
 
-   void Block::Serialize(Block *block, Instructions& out) {
+   void Block::Serialize(Block *block, Instructions& out, Blocks& visited) {
+      /* label */
+      out.push_back(new LabelInstruction(block->label()));
+
+      /* instructions */
       std::copy(block->instrs().begin(), block->instrs().end(), std::inserter(out, out.end()));
-      block->transitions().Serialize(out);
+
+      /* emit transitions */
+      block->transitions().Serialize(out, visited);
    }
 
    void JumpTransition::Serialize(Instructions& out) {
@@ -1620,6 +1620,30 @@ namespace zc {
       /* erase unreachable transitions */
       vec_.erase(it, end);
    }
+
+   void BlockTransitions::Serialize(Instructions& instrs, Blocks& visited) {
+      /* NOTE: It has no transitions if it is __frameunset. */
+      if (vec().empty()) {
+         return;
+      }
+
+      auto it = vec().begin();
+      auto last = --vec().end();
+      for (; it != last; ++it) {
+         (*it)->Serialize(instrs);
+      }
+
+      /* omit last transition but output block, if it hasn't been emitted already */
+      auto dst = (*last)->dst();
+      assert(dst);
+      if (visited.find(dst) == visited.end()) {
+         void (*fn)(Block *, Instructions& instrs, Blocks&) = Block::Serialize;
+         dst->for_each_block(visited, fn, instrs, visited);
+      } else {
+         (*last)->Serialize(instrs);
+      }
+   }
+   
    
    void BlockTransitions::DumpAsm(std::ostream& os, Blocks& visited)
       const {

@@ -131,7 +131,7 @@ namespace zc {
       bool live() const;
       void DumpAsm(std::ostream& os, Blocks& visited) const;
       void Prune();
-      void Serialize(Instructions& out);
+      void Serialize(Instructions& out, Blocks& visited);
       
       BlockTransitions(const Transitions& vec);
       BlockTransitions(): vec_() {}
@@ -215,7 +215,7 @@ namespace zc {
       /**
        * Serialize instructions.
        */
-      static void Serialize(Block *block, Instructions& out);
+      static void Serialize(Block *block, Instructions& out, Blocks& visited);
       
       /**
        * Apply function to each block.
