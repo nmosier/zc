@@ -268,6 +268,9 @@ I rewrote existing code for computing intervals for register free times and vari
 01/28/2020 
 [1 hr] Fixed casting bug. Finished adding ByteValue type.
 
+01/29/2020
+[2 hr] Debugged segfault in CastExpr with `chars.c` test program.
+[1 hr] Added optimization flags.
 
 Ideas: add `bool` type? bool would be stored as flag.
 
@@ -277,7 +280,8 @@ Ideas: add `bool` type? bool would be stored as flag.
 
 OPTIMIZATION IDEAS
 [ ] Defragmenting during register allocation
-[ ] Pushing casts down AST exprs, when possible (e.g. addition/subtraction/multiplication, but not division)
+[ ] Pushing casts down AST exprs, when possible (e.g. addition/subtraction/multiplication,
+                                                 but not division)
 
 PEEPHOLE OPTIMIZATIONS
 Done
@@ -289,7 +293,7 @@ Todo
 [ ] lea rr,ix+* \ push rr -> pea ix+*
 [ ] ld rr,LL \ push rr \ pop iy \ call _indcall -> call LL
 
-
-
-
-BooleanizeExpr? 
+FUNCTION-LEVEL RALLOC
+- Serialize blocks into single instruction stream.
+- Perform ralloc on that.
+- All variable splitting should occur BEFORE serializing block diagram to instruction stream.

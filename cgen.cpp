@@ -850,7 +850,6 @@ namespace zc {
          block->instrs().push_back(new LeaInstruction(*out, id_addr));
       } else {
          const Value *id_rval = id_info->val();
-         const RegisterValue *rv;
          *out = new VariableValue(id_rval->size());         
          block->instrs().push_back(new LoadInstruction(*out, id_rval));
       }

@@ -35,6 +35,9 @@ namespace zc::z80 {
             (end >= other.begin && end <= other.end);
       }
 
+      void Merge(const RallocInterval& with) { Merge(with, *this); }
+      void Merge(const RallocInterval& with, RallocInterval& out) const;
+
       void Dump(std::ostream& os) const { os << "[" << begin << "," << end << "]"; }
 
       RallocInterval(int begin, Instructions::iterator begin_it,
@@ -75,6 +78,12 @@ namespace zc::z80 {
 
       void FrameSpill(StackFrame& frame); 
 
+      /**
+       * Check if variable is joinable with next variable.
+       * @return variable to join; nullptr if no join was possible.
+       */
+      const VariableValue *joinable();
+      
       void Dump(std::ostream& os) const;
 
       VariableRallocInfo(const VariableValue *var, Instructions::iterator gen, int begin):
@@ -160,7 +169,15 @@ namespace zc::z80 {
        * @return whether a register was assigned
        */
       bool TryAssignReg(VariableRallocInfo& varinfo);
-      
+
+      /**
+       * Join variables.
+       * @param first first variable to appear. The second variable will be joined into this one.
+       * @param second second variable to appear. After joining, this one disappears.
+       */
+      void JoinVar(const VariableValue *first, const VariableValue *second);
+      void JoinVars();
+
       static void RallocBlock(Block *block, StackFrame& stack_frame);
    };
    

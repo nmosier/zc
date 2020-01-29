@@ -55,7 +55,6 @@ namespace zc::z80 {
    protected:
       std::string name_;
       Values operands_;
-      //std::optional<FlagState> cond_;
       std::optional<Cond> cond_;
 
       virtual void Resolve_(Instructions& out) { out.push_back(this); }
@@ -75,7 +74,7 @@ namespace zc::z80 {
       
    protected:
       template <typename... Args>
-      BinaryInstruction(const Value *dst, const Value *src, Args... args):
+      BinaryInstruction(portal<const Value *> dst, portal<const Value *> src, Args... args):
          Instruction(Values {dst, src}, args...) {}
    };
 

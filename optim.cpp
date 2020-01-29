@@ -1,3 +1,5 @@
+#include <cstring>
+
 #include "optim.hpp"
 #include "ast.hpp"
 #include "cgen.hpp"
@@ -25,8 +27,71 @@ namespace zc {
       }
 #endif
    }
-   
 
+   /*** OPTIMIZATION SETTINGS ***/
+
+   CgenOptimInfo::NameTable CgenOptimInfo::nametab {
+      {"join-vars", &CgenOptimInfo::join_vars},
+         {"reduce-const", &CgenOptimInfo::reduce_const},
+   };
+
+#if 0
+   int CgenOptimInfo::set_flag(const char *flag, void (*err)(const char *flag),
+                               void (*help)(const char *flag)) {
+      /* check for special flags: `all', `none' */
+      if (strcmp(flag, "all") == 0) {
+         set_all();
+         return 0;
+      }
+      if (strcmp(flag, "none") == 0) {
+         clear_all();
+         return 0;
+      }
+      if (strcmp(flag, "help") == 0) {
+         for (auto pair : nametab) {
+            help(pair.first.c_str());
+         }
+         return -1;
+      }
+      
+      const char *no = "no-";
+      auto it = nametab.find(flag);
+      if (it != nametab.end()) {
+         this->*(it->second) = true;
+         return 0;
+      }
+
+      /* search for `no-' */
+      if (strncmp(flag, no, strlen(no)) == 0) {
+         const char *no_flag = flag + strlen(no);
+         auto it = nametab.find(no_flag);
+         if (it != nametab.end()) {
+            this->*(it->second) = false;
+            return 0;
+         }
+      }
+
+      err(flag);
+      return -1;
+   }
+
+   int CgenOptimInfo::set_flags(const char *flags, void (*err)(const char *flag),
+                                void (*help)(const char *flag)) {
+      char *buf = strdup(flags);
+      assert(buf);
+
+      int retv = 0;
+      const char *flag;
+      while ((flag = strsep(&buf, ",")) != NULL) {
+         if (set_flag(flag, err, help) < 0) {
+            retv = -1;
+         }
+      }
+
+      return retv;
+   }
+#endif
+   
    /*** CONSTANTS ***/
 
    void TranslationUnit::ReduceConst() {

@@ -182,7 +182,25 @@ namespace zc::z80 {
       return true;
    }
    
-
+   bool VariableValue::Match_aux(const VariableValue *to) const {
+      if (id_) {
+         if (id() != to->id()) {
+            return false;
+         }
+      } else {
+         id_.send(to->id());
+      }
+      
+      if (force_reg_) {
+         if (force_reg() != to->force_reg()) {
+            return false;
+         }
+      } else {
+         force_reg_.send(to->force_reg());
+      }
+      return true;
+   }
+   
    /*** OTHER ***/
    int8_t FrameValue::index() const {
       int8_t i = std::reduce(indices_->begin(), pos_, 0);

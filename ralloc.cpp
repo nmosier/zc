@@ -5,6 +5,7 @@
 
 #include "ralloc.hpp"
 #include "cgen.hpp"
+#include "optim.hpp"
 
 namespace zc::z80 {
 
@@ -449,6 +450,10 @@ namespace zc::z80 {
       RegisterAllocator ralloc(block, stack_frame);
       ralloc.ComputeIntervals();
 
+      if (g_optim.join_vars) {
+         ralloc.JoinVars();
+      }
+      
       ralloc.Dump(std::cerr);
 
       ralloc.RunAllocation();
@@ -482,4 +487,85 @@ namespace zc::z80 {
       intervals_.insert(interval);
       return true;
    }
+
+   const VariableValue *VariableRallocInfo::joinable() {
+      /* Requirements for joining:
+       *  - Variable must have exactly one use. 
+       *  - Use instruction must be a `ld`.
+       *  - Variables must have compatible traits (e.g. both must require registers or not).
+       */
+
+      if (uses.size() != 1) { return nullptr; }
+      Instructions::iterator use = uses.front();
+
+      const Value *other_val;
+      const LoadInstruction ld_instr(&other_val, var);
+      if (!ld_instr.Match(*use)) { return nullptr; }
+      const VariableValue *other_var = dynamic_cast<const VariableValue *>(other_val);
+      if (other_var == nullptr) { return nullptr; }
+
+      if (!var->Compat(other_var)) { return nullptr; }
+
+      return other_var;
+   }
+
+   void RegisterAllocator::JoinVars() {
+      for (auto pair : vars_) {
+         auto var_info = pair.second;
+         auto second_var = var_info.joinable();
+         if (second_var) {
+            JoinVar(var_info.var, second_var);
+         }
+      }
+   }
+
+   void RegisterAllocator::JoinVar(const VariableValue *first, const VariableValue *second) {
+      /* find associated infos */
+      auto first_info = vars_.at(first->id());
+      auto second_info = vars_.at(second->id());
+
+      /* Join variables:
+       *  - Merge lifetime intervals into one
+       *  - Copy other variable's uses into this variable's uses.
+       *  - Replace all references to other variable.
+       *  - Delete other variable's `gen` instruction.
+       *  - Unmap second variable from `vars_`.
+       */
+
+      /* merge lifetime intervals */
+      first_info.interval.Merge(second_info.interval);
+
+      /* copy _second_'s uses into this var's uses */
+      assert(first_info.uses.size() == 1);
+      first_info.uses = second_info.uses;
+
+      /* replace all references to other variable */
+      (*second_info.gen)->ReplaceVar(second, first);
+      for (auto instr_it : second_info.uses) {
+         (*instr_it)->ReplaceVar(second, first);
+      }
+
+      /* delete _second_ variable's `gen` instruction */
+      block_->instrs().erase(second_info.gen);
+
+      /* unmap variable from `vars_` */
+      vars_.erase(second->id());
+   }
+         
+   void RallocInterval::Merge(const RallocInterval& with, RallocInterval& out) const {
+      if (end == with.begin) {
+         out.begin = begin;
+         out.begin_it = begin_it;
+         out.end = with.end;
+         out.end_it = with.end_it;
+      } else if (begin == with.end) {
+         out.begin = with.begin;
+         out.begin_it = with.begin_it;
+         out.end = end;
+         out.end_it = end_it;
+      } else {
+         throw std::logic_error("attempt to merge non-incident intervals");
+      }
+   }
+   
 }

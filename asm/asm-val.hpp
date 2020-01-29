@@ -85,7 +85,7 @@ namespace zc {
     public:
        bool force_reg() const { return force_reg_; }
        virtual bool requires_alloc() const { return true; }
-       int id() const { return id_; }
+       int id() const { return *id_; }
 
        virtual void Gen(std::list<const Value *>& vals) const override { vals.push_back(this); }
        virtual void Use(std::list<const Value *>& vals) const override { vals.push_back(this); }
@@ -99,20 +99,24 @@ namespace zc {
         */
        VariableValue *Rename() const { return new VariableValue(size()); }
 
+       bool Compat(const VariableValue *other) const { return force_reg() == other->force_reg(); }
+
        virtual const Value *ReplaceVar(const VariableValue *var, const Value *with) const override
        { if (Eq(var)) { return with; } else { return this; } }
 
        VariableValue(int size, bool force_reg = false):
           Value_(size), id_(id_counter_++), force_reg_(force_reg) {}
-
+       VariableValue(portal<int> id, portal<int> size, portal<bool> force_reg = false):
+          Value_(size), id_(id), force_reg_(force_reg) {}
+       
     protected:
-       int id_;
-       bool force_reg_;
+       portal<int> id_;
+       portal<bool> force_reg_;
     
        static int id_counter_;
 
        virtual bool Eq_aux(const VariableValue *other) const override { return id() == other->id(); }
-       virtual bool Match_aux(const VariableValue *to) const override { return Eq_aux(to); }
+       virtual bool Match_aux(const VariableValue *to) const override;
     };
 
     /* NOTE: pseudo-value. */

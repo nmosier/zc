@@ -52,6 +52,8 @@ extern int ast_yydebug;                  // Control Bison debugging (set to 1 to
 extern int yyparse(void);            // Entry point to the AST parser
 extern zc::TranslationUnit *g_AST_root;  // AST produced by parser
 
+zc::CgenOptimInfo zc::g_optim;
+
 namespace {
 
 void usage(const char *program) {
@@ -65,49 +67,31 @@ int main(int argc, char *argv[]) {
 
   int c;
   opterr = 0;  // getopt shouldn't print any messages
-  while ((c = getopt(argc, argv, "lpscrgtTOo:h")) != -1) {
+  while ((c = getopt(argc, argv, "lpscrgtTO:o:h")) != -1) {
     switch (c) {
-#ifdef DEBUG
-      case 'l':
-        yy_flex_debug = 1;
-        break;
-      case 'p':
-        ast_yydebug = 1;
-        break;
-      case 'c':
-        cool::gCgenDebug = true;
-        break;
-#endif
-        #if 0
-    case 'r':
-       disable_reg_alloc = 1;
+    case 'o':  // set the name of the output file
+       out_filename = optarg;
        break;
-      case 'g':  // enable garbage collection
-        cgen_Memmgr = GC_GENGC;
-        break;
-      case 't':  // run garbage collection very frequently (on every allocation)
-        cgen_Memmgr_Test = GC_TEST;
-        break;
-      case 'T':  // do even more pedantic tests in garbage collection
-        cgen_Memmgr_Debug = GC_DEBUG;
-        break;
-#endif
-      case 'o':  // set the name of the output file
-        out_filename = optarg;
-        break;
-#if 0
-      case 'O':  // enable optimization
-        cgen_optimize = true;
-        break;
-#endif
-      case 'h':
-        usage(argv[0]);
-        return 0;
-      case '?':
-        usage(argv[0]);
-        return 85;
-      default:
-        break;
+    case 'O':  // enable optimization
+       if (zc::g_optim.set_flags(optarg,
+                   [=](const char *flag) {
+                      std::cerr << argv[0] << ": -O: unknown flag " << flag << std::endl;
+                   },
+                   [](const char *flag) {
+                      std::cerr << "\t" << flag << "\n";
+                   })
+           < 0) {
+          return 85;
+       }
+       break;
+    case 'h':
+       usage(argv[0]);
+       return 0;
+    case '?':
+       usage(argv[0]);
+       return 85;
+    default:
+       break;
     }
   }
 

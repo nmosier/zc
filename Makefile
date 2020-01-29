@@ -1,4 +1,4 @@
-CXXFLAGS += -std=c++2a -I . -Wno-register -g -DEZ80
+CXXFLAGS += -std=c++2a -I . -Wno-register -g -DEZ80 -pedantic
 LDFLAGS += -L/usr/local/opt/flex/lib
 
 AST_HDRS = ast.hpp $(wildcard ast/*.hpp)
