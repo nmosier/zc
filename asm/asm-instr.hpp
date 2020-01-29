@@ -47,10 +47,10 @@ namespace zc::z80 {
        */
       void Resolve(Instructions& out);
                            
-      void Emit(std::ostream& os ) const;
+      virtual void Emit(std::ostream& os ) const;
 
-      bool Eq(const Instruction *other) const;
-      bool Match(const Instruction *to) const;
+      virtual bool Eq(const Instruction *other) const;
+      virtual bool Match(const Instruction *to) const;
       
    protected:
       std::string name_;
@@ -486,7 +486,21 @@ namespace zc::z80 {
 
    /*** PSEUDO-INSTRUCTIONS ***/
    
-   
+   class LabelInstruction: public Instruction {
+   public:
+      template <typename... Args>
+      LabelInstruction(const Label *label): Instruction("%label"), label_(label) {}
+
+      virtual void Emit(std::ostream& os) const override { label_->EmitDef(os); }
+      virtual bool Eq(const Instruction *other) const override {
+         auto other_ = dynamic_cast<const LabelInstruction *>(other);
+         return other_ && label_->Eq(other_->label_);
+      }
+      virtual bool Match(const Instruction *to) const override { return Eq(to); }
+      
+   private:
+      const Label *label_;
+   };
 
 }
 

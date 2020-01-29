@@ -131,6 +131,7 @@ namespace zc {
       bool live() const;
       void DumpAsm(std::ostream& os, Blocks& visited) const;
       void Prune();
+      void Serialize(Instructions& out);
       
       BlockTransitions(const Transitions& vec);
       BlockTransitions(): vec_() {}
@@ -146,6 +147,7 @@ namespace zc {
       virtual Block *dst() const = 0;
       
       virtual BlockTransition *Resolve(const FunctionImpl *impl) = 0;
+      virtual void Serialize(Instructions& out) = 0;
       virtual void DumpAsm(std::ostream& os) const = 0;
       
    protected:
@@ -159,6 +161,7 @@ namespace zc {
       virtual Block *dst() const override { return dst_; }
 
       virtual BlockTransition *Resolve(const FunctionImpl *impl) override { return this; }
+      virtual void Serialize(Instructions& out) override;
       virtual void DumpAsm(std::ostream& os) const override;
 
       template <typename... Args>
@@ -172,7 +175,10 @@ namespace zc {
    public:
       virtual Block *dst() const override { return nullptr; }
 
-      virtual BlockTransition *Resolve(const FunctionImpl *impl) override;      
+      virtual BlockTransition *Resolve(const FunctionImpl *impl) override;
+      virtual void Serialize(Instructions& out) override {
+         throw std::logic_error("attempt to serialize return transition ");
+      }
       virtual void DumpAsm(std::ostream& os) const override {
          throw std::logic_error("return transition should have been resolved");
       }
@@ -193,7 +199,6 @@ namespace zc {
 
       bool live() const { return transitions().live(); }
 
-      static void Resolve(Block *block, const FunctionImpl *impl);
       
       /**
        * Emit as assembly.
@@ -203,9 +208,14 @@ namespace zc {
       static void DumpAsm(Block *block, std::ostream& os, Blocks& visited);
 
       /**
-       * Resolve block's instructions.
+       * Resolve block's instructions and transitions.
        */
-      static void ResolveInstrs(Block *block);
+      static void Resolve(Block *block, const FunctionImpl *impl);
+
+      /**
+       * Serialize instructions.
+       */
+      static void Serialize(Block *block, Instructions& out);
       
       /**
        * Apply function to each block.
@@ -257,6 +267,7 @@ namespace zc {
       
       void DumpAsm(std::ostream& os) const;
       void Resolve();
+      void Serialize();
 
       FunctionImpl(CgenEnv& env, Block *entry, Block *fin);
       
@@ -265,6 +276,7 @@ namespace zc {
       Block *fin_;
       const LabelValue *addr_;
       StackFrame& stack_frame_;
+      std::optional<Instructions> instrs_ = std::nullopt; /*!< only set after serialization */
    };
 
    class FunctionImpls {
@@ -310,6 +322,7 @@ namespace zc {
 
       void DumpAsm(std::ostream& os) const;
       void Resolve();
+      void Serialize();
       
    protected:
       /**

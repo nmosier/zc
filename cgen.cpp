@@ -20,6 +20,8 @@ namespace zc {
       root->CodeGen(env);
 
       env.Resolve();
+      env.Serialize();
+                         
       
 #if PREDUMP
       env.DumpAsm(std::cerr);
@@ -1503,6 +1505,26 @@ namespace zc {
       }
    }
 
+   void CgenEnv::Serialize() {
+      for (auto impl : impls().impls()) {
+         impl.Serialize();
+      }
+   }
+
+   void BlockTransitions::Serialize(Instructions& out) {
+      for (auto trans : vec()) {
+         trans->Serialize(out);
+      }
+   }
+
+   void FunctionImpl::Serialize() {
+      instrs_ = Instructions();
+      Blocks visited;
+      void (*fn)(Block *, Instructions&) = Block::Serialize;
+      entry()->for_each_block(visited, fn, *instrs_);
+      fin()->for_each_block(visited, fn, *instrs_);
+   }
+
    void Block::Resolve(Block *block, const FunctionImpl *impl) {
       /* resolve instructions */
       Instructions resolved_instrs;
@@ -1518,6 +1540,16 @@ namespace zc {
       }
       block->transitions().Prune();
    }
+
+   void Block::Serialize(Block *block, Instructions& out) {
+      std::copy(block->instrs().begin(), block->instrs().end(), std::inserter(out, out.end()));
+      block->transitions().Serialize(out);
+   }
+
+   void JumpTransition::Serialize(Instructions& out) {
+      out.push_back(new JumpInstruction(new LabelValue(dst()->label()), cond()));
+   }
+   
 
    void Block::DumpAsm(Block *block, std::ostream& os, Blocks& visited) {
       /* emit label */
