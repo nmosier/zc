@@ -405,6 +405,7 @@
 
     void IfStat::TypeCheck(SemantEnv& env) {
        cond()->TypeCheck(env);
+       cond_ = cond()->Cast(IntegralType::Create(IntegralType::IntKind::SPEC_BOOL, loc()));
        if_body()->TypeCheck(env);
        if (else_body() != nullptr) {
           else_body()->TypeCheck(env);
@@ -414,6 +415,7 @@
     void WhileStat::TypeCheck(SemantEnv& env) {
        env.stat_stack().Push(this);
        pred()->TypeCheck(env);
+       pred_ = pred()->Cast(int_type<IntegralType::IntKind::SPEC_BOOL>);
        body()->TypeCheck(env);
        env.stat_stack().Pop();
     }
@@ -422,6 +424,7 @@
        env.stat_stack().Push(this);
        init()->TypeCheck(env);
        pred()->TypeCheck(env);
+       pred_ = pred()->Cast(int_type<IntegralType::IntKind::SPEC_BOOL>);
        after()->TypeCheck(env);
        body()->TypeCheck(env);
        env.stat_stack().Pop();
@@ -595,13 +598,29 @@
       case Kind::UOP_POSITIVE:
       case Kind::UOP_NEGATIVE:
       case Kind::UOP_BITWISE_NOT:
-      case Kind::UOP_LOGICAL_NOT:
          /* requires integral type */         
-         if (!(expr_->type()->kind() == ASTType::Kind::TYPE_INTEGRAL)) {
-            env.error()(g_filename, this) << "positive/negative sign verboten for non-integral type"
+         if (expr_->type()->kind() != ASTType::Kind::TYPE_INTEGRAL) {
+            env.error()(g_filename, this) << "unary operator verboten for non-integral type"
                                           << std::endl;
          }
          type_ = expr_->type();
+         break;
+
+      case Kind::UOP_LOGICAL_NOT:
+         {
+            IntegralType *bool_type = IntegralType::Create
+               (IntegralType::IntKind::SPEC_BOOL, loc());         
+            if (expr()->type()->kind() != ASTType::Kind::TYPE_INTEGRAL &&
+             expr()->type()->kind() != ASTType::Kind::TYPE_POINTER) {
+               env.error()(g_filename, this) << "logical not requires integral or pointer type"
+                                             << std::endl;
+            } else {
+               /* cast expr to bool */
+               
+               expr_ = expr()->Cast(bool_type);
+            }
+            type_ = bool_type;
+         }
          break;
 
       case Kind::UOP_INC_PRE:
@@ -633,16 +652,34 @@
       
       switch (kind()) {
       case Kind::BOP_LOGICAL_AND:
-      case Kind::BOP_BITWISE_AND:
       case Kind::BOP_LOGICAL_OR:
-      case Kind::BOP_BITWISE_OR:
-      case Kind::BOP_BITWISE_XOR:
+         {
+            auto expr_ok = [&](const ASTExpr *expr){
+                              if (!expr->type()->has_type(std::array{ASTType::Kind::TYPE_INTEGRAL,
+                                                                        ASTType::Kind::TYPE_POINTER})) {
+                                 env.error()(g_filename, expr) << "binary logical operators "
+                                                                  << "require integral or pointer "
+                                                                  << "operands" << std::endl;
+                                 }
+                           };
+            expr_ok(lhs());
+            expr_ok(rhs());
+            auto bool_type = IntegralType::Create(IntegralType::IntKind::SPEC_BOOL, loc());
+            lhs_ = lhs()->Cast(bool_type);
+            rhs_ = rhs()->Cast(bool_type);
+            type_ = bool_type;
+         }
+         break;
+
       case Kind::BOP_EQ:
       case Kind::BOP_NEQ:
       case Kind::BOP_LT:
       case Kind::BOP_LEQ:
       case Kind::BOP_GT:
       case Kind::BOP_GEQ:
+      case Kind::BOP_BITWISE_AND:
+      case Kind::BOP_BITWISE_OR:
+      case Kind::BOP_BITWISE_XOR:
       case Kind::BOP_PLUS:
       case Kind::BOP_MINUS:
       case Kind::BOP_TIMES:
@@ -675,7 +712,7 @@
             }
 
             if (is_logical()) {
-               type_ = IntegralType::Create(IntegralType::IntKind::SPEC_CHAR, loc());
+               type_ = IntegralType::Create(IntegralType::IntKind::SPEC_BOOL, loc());
             }
          }
          break;
@@ -1125,5 +1162,6 @@
        ExternalDecl::Descope(env);
        env.ExitScope();
     }
+
 
 }

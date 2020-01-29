@@ -202,17 +202,6 @@ namespace zc {
    }
 
    Block *IfStat::CodeGen(CgenEnv& env, Block *block) {
-
-#if 0
-      const Value *cond_var = new VariableValue(cond()->type()->size());
-      
-      /* Evaluate predicate */
-      block = cond()->CodeGen(env, block, cond_var, ASTExpr::ExprKind::EXPR_RVALUE);
-      
-      /* Test predicate */
-      emit_nonzero_test(env, block, cond_var);
-#endif
-      
       /* Create joining label and block. */
       Label *join_label = new_label("if_join");
       Block *join_block = new Block(join_label);
@@ -225,16 +214,6 @@ namespace zc {
       Block *else_block = new Block(else_label);
 
       emit_predicate(env, block, cond(), if_block, else_block);
-
-#if 0
-      /* Create block transitions to if, else blocks */
-      BlockTransition *if_transition = new JumpTransition(if_block, Cond::NZ);
-      BlockTransition *else_transition = new JumpTransition(else_block, Cond::ANY);
-
-      block->transitions().vec().push_back(if_transition);
-      block->transitions().vec().push_back(else_transition);
-#endif
-
       
       /* Code generate if, else blocks */
       Block *if_end = if_body()->CodeGen(env, if_block);
@@ -287,14 +266,7 @@ namespace zc {
       StatInfo *stat_info = new StatInfo(this, body_block, join_block);
       env.stat_stack().Push(stat_info);
 
-#if 0
-      pred_block = pred()->CodeGen(env, pred_block, pred_var ASTExpr::ExprKind::EXPR_RVALUE);
-      emit_nonzero_test(env, pred_block, pred_var);
-      pred_block->transitions().vec().push_back(new JumpTransition(body_block, Cond::NZ));
-      pred_block->transitions().vec().push_back(new JumpTransition(join_block, Cond::ANY));
-#else
       emit_predicate(env, block, pred(), body_block, join_block);
-#endif
 
       body_block = body()->CodeGen(env, body_block);
       body_block->transitions().vec().push_back(new JumpTransition(pred_block, Cond::ANY));
@@ -545,36 +517,44 @@ namespace zc {
             /* evaluate lhs */
             block = lhs()->CodeGen(env, block, &lhs_var, ExprKind::EXPR_RVALUE);
 
-            const FlagValue *flag;
-            emit_nonzero_test(env, block, lhs_var, &flag);
-            
+            const FlagValue *flag1;
+            emit_nonzero_test(env, block, lhs_var, &flag1);
+
+#if 0
             /* preemptively set result to 0/1 */
             block->instrs().push_back(new LoadInstruction(&rv_a,
                                                           and_not_or ? &imm_b<0> : &imm_b<1>));
+#endif
 
             /* create transitions */
              const Label *end_label = new_label(name);
             Block *end_block = new Block(end_label);
-            //BlockTransition *end_transition = new JumpTransition(end_block,
-            //and_not_or ? Cond::Z : Cond::NZ);
             BlockTransition *end_transition =
-               new JumpTransition(end_block, and_not_or ? flag->cond_0() : flag->cond_1());
+               new JumpTransition(end_block, and_not_or ? flag1->cond_0() : flag1->cond_1());
             block->transitions().vec().push_back(end_transition);
 
             const Label *cont_label = new_label(name);
             Block *cont_block = new Block(cont_label);
             BlockTransition *cont_transition = new JumpTransition
-               (cont_block, and_not_or ? flag->cond_1() : flag->cond_0());
+               (cont_block, and_not_or ? flag1->cond_1() : flag1->cond_0());
             // and_not_or ? Cond::NZ : Cond::Z);
             block->transitions().vec().push_back(cont_transition);
 
             /* Evaluate rhs */
             cont_block = rhs()->CodeGen(env, cont_block, &rhs_var, ExprKind::EXPR_RVALUE);
-            emit_booleanize(env, cont_block, rhs_var);
+            const FlagValue *flag2;
+            emit_nonzero_test(env, cont_block, rhs_var, &flag2);
+            assert(flag1->Eq(flag2));
+            
+            // emit_booleanize(env, cont_block, rhs_var);
             cont_block->transitions().vec().push_back(new JumpTransition(end_block, Cond::ANY));
 
+#if 0
             *out = new VariableValue(byte_size);
             end_block->instrs().push_back(new LoadInstruction(*out, &rv_a));
+#else
+            *out = flag1;
+#endif
             return end_block;
          }
 
@@ -639,18 +619,21 @@ namespace zc {
 
       case Kind::BOP_LT:
       case Kind::BOP_GT:
+      case Kind::BOP_LEQ:
+      case Kind::BOP_GEQ:
          {
-            bool lt_not_gt = (kind() == Kind::BOP_LT);
+            bool lt_not_gt = (kind() == Kind::BOP_LT || kind() == Kind::BOP_LEQ);
+            bool lg_not_eq = (kind() == Kind::BOP_LT || kind() == Kind::BOP_GT);
+            bool rev_vars = (lt_not_gt == lg_not_eq);
             block = emit_binop(env, block, this, &lhs_var, &rhs_var);
             switch (lhs()->type()->bytes()) {
             case byte_size:
                /* ld a,<lhs>/<rhs>
                 * cp a,<rhs>/<lhs>
-                * ld a,0
                 */
-               block->instrs().push_back(new LoadInstruction(&rv_a, lt_not_gt ? lhs_var : rhs_var));
-               block->instrs().push_back(new CompInstruction(&rv_a, lt_not_gt ? rhs_var : lhs_var));
-               block->instrs().push_back(new LoadInstruction(&rv_a, &imm_b<0>));
+               block->instrs().push_back(new LoadInstruction(&rv_a, rev_vars ? lhs_var : rhs_var));
+               block->instrs().push_back(new CompInstruction(&rv_a, rev_vars ? rhs_var : lhs_var));
+               // block->instrs().push_back(new LoadInstruction(&rv_a, &imm_b<0>));
                break;
                                   
             case word_size: abort();
@@ -659,25 +642,30 @@ namespace zc {
                 * xor a,a
                 * sbc hl,<rhs>
                 */
-               block->instrs().push_back(new LoadInstruction(&rv_hl, lt_not_gt ? lhs_var : rhs_var));
+               block->instrs().push_back(new LoadInstruction(&rv_hl, rev_vars ? lhs_var : rhs_var));
                block->instrs().push_back(new XorInstruction(&rv_a, &rv_a));
-               block->instrs().push_back(new SbcInstruction(&rv_hl, lt_not_gt ? rhs_var : lhs_var));
+               block->instrs().push_back(new SbcInstruction(&rv_hl, rev_vars ? rhs_var : lhs_var));
                break;
             
             default: abort();
             }
 
-            block->instrs().push_back(new AdcInstruction(&rv_a, &rv_a));
+            // block->instrs().push_back(new AdcInstruction(&rv_a, &rv_a));
 
             if (out) {
-               *out = new VariableValue(byte_size);
-               block->instrs().push_back(new LoadInstruction(*out, &rv_a));
+               // *out = new VariableValue(byte_size);
+               if (lg_not_eq) {
+                  *out = new FlagValue(Cond::NC, Cond::C);
+               } else {
+                  *out = new FlagValue(Cond::C, Cond::NC);
+               }
+               // block->instrs().push_back(new LoadInstruction(*out, &rv_a));
             }
             return block;
          }
          break;
 
-         
+#if 0         
       case Kind::BOP_LEQ:
       case Kind::BOP_GEQ:
          {
@@ -712,13 +700,14 @@ namespace zc {
             default: abort();
             }
 
-            block->instrs().push_back(new AdcInstruction(&rv_a, &rv_a));
+            // block->instrs().push_back(new AdcInstruction(&rv_a, &rv_a));
             if (out) {
-               *out = new VariableValue(byte_size);
-                block->instrs().push_back(new LoadInstruction(*out, &rv_a));
+               // *out = new VariableValue(byte_size);
+               // block->instrs().push_back(new LoadInstruction(*out, &rv_a));
             }
          }
          break;
+#endif
 
       case Kind::BOP_PLUS:
          block = emit_binop(env, block, this, &lhs_var, &rhs_var);

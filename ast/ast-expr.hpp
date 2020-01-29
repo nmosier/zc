@@ -242,7 +242,8 @@ namespace zc {
    protected:
       intmax_t val_;
 
-      LiteralExpr(const intmax_t& val, const SourceLoc& loc);
+      LiteralExpr(intmax_t val, SourceLoc loc);
+      LiteralExpr(intmax_t val, ASTType *type, SourceLoc loc): ASTExpr(type, loc), val_(val) {}
    };
 
    class StringExpr: public ASTExpr {

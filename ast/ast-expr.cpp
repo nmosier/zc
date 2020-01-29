@@ -190,7 +190,7 @@ namespace zc {
       index()->Dump(os, level, with_types);      
    }
 
-   LiteralExpr::LiteralExpr(const intmax_t& val, const SourceLoc& loc): ASTExpr(loc), val_(val) {
+   LiteralExpr::LiteralExpr(intmax_t val, SourceLoc loc): ASTExpr(loc), val_(val) {
       type_ = IntegralType::Create(val, loc);
       // type_ = IntegralType::Create(IntegralType::IntKind::SPEC_LONG_LONG, loc);
    }

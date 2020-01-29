@@ -34,6 +34,13 @@ namespace zc {
       bool is_callable() const { return get_callable() != nullptr; }
       virtual const FunctionType *get_callable() const { return nullptr; }
 
+      template <typename InputIt>
+      bool has_type(InputIt begin, InputIt end) const
+      { return std::find(begin, end, kind()) != end; }
+      template <typename T>
+      bool has_type(T list) const
+      { return std::find(list.begin(), list.end(), kind()) != list.end(); }
+
       /**
        * Add all declarable types to list.
        */
@@ -611,6 +618,10 @@ namespace zc {
    std::ostream& operator<<(std::ostream& os, IntegralType::IntKind kind);
    std::ostream& operator<<(std::ostream& os, CompoundType::TagKind kind);
 
+   /*** PROTOTYPES ***/
+   template <IntegralType::IntKind int_kind> IntegralType *int_type =
+                           IntegralType::Create(int_kind, 0);
+   
 }
    
 #endif

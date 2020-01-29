@@ -37,7 +37,7 @@ namespace zc {
 
    ASTExpr *ASTExpr::ReduceConst() {
       if (is_const()) {
-         auto expr = LiteralExpr::Create(int_const(), loc());
+         auto expr = LiteralExpr::Create(int_const(), type(), loc());
          return expr;
       } else {
          ReduceConst_rec();
@@ -81,7 +81,9 @@ namespace zc {
 
    ASTStat *IfStat::ReduceConst() {
       if_body_ = if_body()->ReduceConst();
-      else_body_ = else_body()->ReduceConst();
+      if (else_body_) {
+         else_body_ = else_body()->ReduceConst();
+      }
       
       if (cond()->is_const()) {
          intmax_t val = cond()->int_const();
