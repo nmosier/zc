@@ -118,7 +118,8 @@ namespace zc {
    };
 
    enum class Cond {Z, NZ, C, NC, ANY};
-   std::ostream& operator<<(std::ostream& os, Cond cond);   
+   std::ostream& operator<<(std::ostream& os, Cond cond);
+   Cond invert(Cond cond);
    
    class BlockTransition;
    class BlockTransitions {
@@ -128,7 +129,8 @@ namespace zc {
       Transitions& vec() { return vec_; }
 
       bool live() const;
-      void DumpAsm(std::ostream& os, Blocks& emitted_blocks, const FunctionImpl *impl) const;
+      void DumpAsm(std::ostream& os, Blocks& visited) const;
+      void Prune();
       
       BlockTransitions(const Transitions& vec);
       BlockTransitions(): vec_() {}
@@ -142,8 +144,9 @@ namespace zc {
    public:
       Cond cond() const { return cond_; }
       virtual Block *dst() const = 0;
-
-      virtual void DumpAsm(std::ostream& os, const FunctionImpl *impl) const = 0;
+      
+      virtual BlockTransition *Resolve(const FunctionImpl *impl) = 0;
+      virtual void DumpAsm(std::ostream& os) const = 0;
       
    protected:
       const Cond cond_;
@@ -155,7 +158,8 @@ namespace zc {
    public:
       virtual Block *dst() const override { return dst_; }
 
-      virtual void DumpAsm(std::ostream& os, const FunctionImpl *impl) const override;
+      virtual BlockTransition *Resolve(const FunctionImpl *impl) override { return this; }
+      virtual void DumpAsm(std::ostream& os) const override;
 
       template <typename... Args>
       JumpTransition(Block *dst, Args... args): BlockTransition(args...), dst_(dst) {}
@@ -167,7 +171,11 @@ namespace zc {
    class ReturnTransition: public BlockTransition {
    public:
       virtual Block *dst() const override { return nullptr; }
-      virtual void DumpAsm(std::ostream& os, const FunctionImpl *impl) const override;
+
+      virtual BlockTransition *Resolve(const FunctionImpl *impl) override;      
+      virtual void DumpAsm(std::ostream& os) const override {
+         throw std::logic_error("return transition should have been resolved");
+      }
       
       template <typename... Args>
       ReturnTransition(Args... args): BlockTransition(args...) {}
@@ -185,12 +193,14 @@ namespace zc {
 
       bool live() const { return transitions().live(); }
 
+      static void Resolve(Block *block, const FunctionImpl *impl);
+      
       /**
        * Emit as assembly.
        * @param os output stream
        * @param emitted_blocks set of blocks that have already been emitted (to avoid duplication).
        */
-      static void DumpAsm(const Block *block, std::ostream& os, const FunctionImpl *impl);
+      static void DumpAsm(Block *block, std::ostream& os, Blocks& visited);
 
       /**
        * Resolve block's instructions.
@@ -246,7 +256,7 @@ namespace zc {
       const LabelValue *addr() const { return addr_; }
       
       void DumpAsm(std::ostream& os) const;
-      void ResolveInstrs();
+      void Resolve();
 
       FunctionImpl(CgenEnv& env, Block *entry, Block *fin);
       
@@ -299,7 +309,7 @@ namespace zc {
       CgenEnv(): Env<SymInfo, TaggedType, StatInfo, CgenExtEnv>(), strconsts_(), impls_() {}
 
       void DumpAsm(std::ostream& os) const;
-      void ResolveInstrs();
+      void Resolve();
       
    protected:
       /**

@@ -19,13 +19,15 @@ namespace zc {
       CgenEnv env;
       root->CodeGen(env);
 
+      env.Resolve();
+      
 #if PREDUMP
       env.DumpAsm(std::cerr);
 #endif
       OptimizeIR(env);
 
       /* resolve */
-      env.ResolveInstrs();
+      env.Resolve();      
       
       env.DumpAsm(os);
    }
@@ -520,12 +522,6 @@ namespace zc {
             const FlagValue *flag1;
             emit_nonzero_test(env, block, lhs_var, &flag1);
 
-#if 0
-            /* preemptively set result to 0/1 */
-            block->instrs().push_back(new LoadInstruction(&rv_a,
-                                                          and_not_or ? &imm_b<0> : &imm_b<1>));
-#endif
-
             /* create transitions */
              const Label *end_label = new_label(name);
             Block *end_block = new Block(end_label);
@@ -549,12 +545,7 @@ namespace zc {
             // emit_booleanize(env, cont_block, rhs_var);
             cont_block->transitions().vec().push_back(new JumpTransition(end_block, Cond::ANY));
 
-#if 0
-            *out = new VariableValue(byte_size);
-            end_block->instrs().push_back(new LoadInstruction(*out, &rv_a));
-#else
             *out = flag1;
-#endif
             return end_block;
          }
 
@@ -665,50 +656,6 @@ namespace zc {
          }
          break;
 
-#if 0         
-      case Kind::BOP_LEQ:
-      case Kind::BOP_GEQ:
-         {
-            bool leq_not_geq = (kind() == Kind::BOP_LEQ);
-            block = emit_binop(env, block, this, &lhs_var, &rhs_var);
-            switch (lhs()->type()->bytes()) {
-            case byte_size:
-               /* scf
-                * ld a,<lhs>/<rhs>
-                * sbc a,<rhs>/<lhs>
-                * ld a,0
-                */
-               block->instrs().push_back(new ScfInstruction());
-               block->instrs().push_back(new LoadInstruction(&rv_a, leq_not_geq ? lhs_var : rhs_var));
-               block->instrs().push_back(new SbcInstruction(&rv_a, leq_not_geq ? rhs_var : lhs_var));
-               block->instrs().push_back(new LoadInstruction(&rv_a, &imm_b<0>));
-               break;
-
-            case word_size: abort();
-            case long_size:
-               /* xor a,a
-                * scf
-                * ld hl,<lhs>/<rhs>
-                * sbc hl,<rhs>/<lhs>
-                */
-               block->instrs().push_back(new XorInstruction(&rv_a, &rv_a));
-               block->instrs().push_back(new ScfInstruction());
-               block->instrs().push_back(new LoadInstruction(&rv_hl, leq_not_geq ? lhs_var : rhs_var));
-               block->instrs().push_back(new SbcInstruction(&rv_hl, leq_not_geq ? rhs_var : lhs_var));
-               break;
-
-            default: abort();
-            }
-
-            // block->instrs().push_back(new AdcInstruction(&rv_a, &rv_a));
-            if (out) {
-               // *out = new VariableValue(byte_size);
-               // block->instrs().push_back(new LoadInstruction(*out, &rv_a));
-            }
-         }
-         break;
-#endif
-
       case Kind::BOP_PLUS:
          block = emit_binop(env, block, this, &lhs_var, &rhs_var);
          block->instrs().push_back(new LoadInstruction(accumulator(lhs_var), lhs_var));
@@ -755,17 +702,6 @@ namespace zc {
          block = emit_binop(env, block, this, &lhs_var, &rhs_var);
          switch (lhs_var->size()) {
          case byte_size:
-#if 0
-            /* ld b,<lhs>
-             * ld c,<rhs>
-             * mlt bc
-             * ld <out>,c
-             */
-            block->instrs().push_back(new LoadInstruction(&rv_b, lhs_var));
-            block->instrs().push_back(new LoadInstruction(&rv_c, rhs_var));
-            block->instrs().push_back(new MultInstruction(&rv_bc));
-            block->instrs().push_back(new LoadInstruction(out, &rv_c));            
-#else
             /* ld high(<vl>),<lhs>
              * ld low(<vl>),<rhs>
              * mlt <vl>
@@ -784,7 +720,6 @@ namespace zc {
                                             (*out, new ByteValue(vl, ByteValue::Kind::BYTE_LOW)));
                }
             }
-#endif
             break;
             
          case word_size: abort();
@@ -1292,49 +1227,6 @@ namespace zc {
       }
    }
 
-   #if 0
-   /* result placed in accumulator (a or hl) */
-   void emit_booleanize(CgenEnv& env, Block *block, const Value *in) {
-      Instructions& is = block->instrs();
-
-      int bytes = in->size();
-      switch (bytes) {
-      case flag_size:
-         emit_booleanize_flag(env, block, dynamic_cast<const FlagValue *>(in));
-         return;
-         
-      case byte_size:
-         /* xor a,a
-          * cp a,<in>
-          * adc a,a
-          * ld <out>,a
-          */
-         is.push_back(new XorInstruction(&rv_a, &rv_a));
-         is.push_back(new CompInstruction(&rv_a, in));
-         is.push_back(new AdcInstruction(&rv_a, &rv_a));
-         return;
-         
-      case word_size: abort();
-         
-      case long_size:
-         /* ld hl,0
-          * or a,a
-          * sbc hl,<in>
-          * adc a,a
-          * ld <out>,a
-          */
-         is.push_back(new LoadInstruction(&rv_hl, &imm_l<0>));
-         is.push_back(new OrInstruction(&rv_a, &rv_a));
-         is.push_back(new SbcInstruction(&rv_hl, in));
-         is.push_back(new AdcInstruction(&rv_a, &rv_a));
-         return;
-
-      default:
-         abort();
-      }
-   }
-#endif
-
    void emit_booleanize_flag_byte(CgenEnv& env, Block *block, const FlagValue *in,
                                   const Value **out) {
       *out = &rv_a;
@@ -1612,7 +1504,23 @@ namespace zc {
       }
    }
 
-   void Block::DumpAsm(const Block *block, std::ostream& os, const FunctionImpl *impl) {
+   void Block::Resolve(Block *block, const FunctionImpl *impl) {
+      /* resolve instructions */
+      Instructions resolved_instrs;
+      for (auto instr : block->instrs()) {
+         instr->Resolve(resolved_instrs);
+      }
+      block->instrs_ = resolved_instrs;
+
+      /* resolve transitions */
+      for (auto it = block->transitions().vec().begin(), end = block->transitions().vec().end();
+           it != end; ++it) {
+         *it = (*it)->Resolve(impl);
+      }
+      block->transitions().Prune();
+   }
+
+   void Block::DumpAsm(Block *block, std::ostream& os, Blocks& visited) {
       /* emit label */
       block->label()->EmitDef(os);
       
@@ -1621,19 +1529,23 @@ namespace zc {
          instr->Emit(os);
       }
 
-      /* emit transitions */
-      for (const BlockTransition *trans : block->transitions().vec()) {
-         trans->DumpAsm(os, impl);
-      }
+      block->transitions().DumpAsm(os, visited);
+   }
+
+   void FunctionImpl::Resolve() {
+      Blocks visited;
+      void (*fn)(Block *, const FunctionImpl *) = Block::Resolve;
+      entry()->for_each_block(visited, fn, this);
+      fin()->for_each_block(visited, fn, this);
    }
    
    void FunctionImpl::DumpAsm(std::ostream& os) const {
       Blocks visited;
 
-      void (*fn)(const Block *, std::ostream& os, const FunctionImpl *) = Block::DumpAsm;
+      void (*fn)(Block *, std::ostream&, Blocks&) = Block::DumpAsm;
       
-      entry()->for_each_block(visited, fn, os, this);
-      fin()->for_each_block(visited, fn, os, this);      
+      entry()->for_each_block(visited, fn, os, visited);
+      fin()->for_each_block(visited, fn, os, visited);      
    }
 
    std::ostream& operator<<(std::ostream& os, Cond cond) {
@@ -1646,43 +1558,89 @@ namespace zc {
       }
    }
 
-   void JumpTransition::DumpAsm(std::ostream& os, const FunctionImpl *impl) const {
+   Cond invert(Cond cond) {
+      switch (cond) {
+      case Cond::Z: return Cond::NZ;
+      case Cond::NZ: return Cond::Z;
+      case Cond::C: return Cond::NC;
+      case Cond::NC: return Cond::C;
+      case Cond::ANY: return Cond::ANY;
+      }
+   }
+
+   void BlockTransitions::Prune() {
+      std::set<Cond> conds;
+      auto it = vec().begin();
+      auto end = vec().end();
+
+      for (; it != end; ++it) {
+         Cond cond = (*it)->cond();
+         if (conds.find(cond) != conds.end()) {
+            /* reduntant jump */
+            it = vec_.erase(it);
+         } else if (cond == Cond::ANY || conds.find(invert(cond)) != conds.end()) {
+            ++it;
+            break;
+         } else {
+            conds.insert(cond);
+         }
+      }
+
+      /* erase unreachable transitions */
+      vec_.erase(it, end);
+   }
+   
+   void BlockTransitions::DumpAsm(std::ostream& os, Blocks& visited)
+      const {
+      /* NOTE: It has no transitions if it is __frameunset. */
+      if (vec().empty()) {
+         return;
+      }
+
+      auto it = vec().begin();
+      auto last = --vec().end();
+      for (; it != last; ++it) {
+         (*it)->DumpAsm(os);
+      }
+
+      /* omit last transition but output block, if it hasn't been emitted already */
+      auto dst = (*last)->dst();
+      assert(dst);
+      if (visited.find(dst) == visited.end()) {
+         void (*fn)(Block *, std::ostream& os, Blocks&) = Block::DumpAsm;      
+         dst->for_each_block(visited, fn, os, visited);
+      } else {
+         (*last)->DumpAsm(os);
+      }
+   }
+
+   void JumpTransition::DumpAsm(std::ostream& os) const {
       os << "\tjp\t" << cond();
       if (cond() != Cond::ANY) { os << ","; }
       dst()->label()->EmitRef(os);
       os << std::endl;
    }
 
+   BlockTransition *ReturnTransition::Resolve(const FunctionImpl *impl) {
+      return new JumpTransition(impl->fin(), cond());
+   }
+
+#if 0
    void ReturnTransition::DumpAsm(std::ostream& os, const FunctionImpl *impl) const
    {
       os << "\tjp\t";
       os << cond();
       if (cond() != Cond::ANY) { os << ","; }
-
+      
       impl->fin()->label()->EmitRef(os);
 
       os << std::endl;
    }
+#endif
 
-   /*** INSTRUCTION RESOLUTION ***/
-   void Block::ResolveInstrs(Block *block) {
-      Instructions resolved_instrs;
-      for (auto instr : block->instrs()) {
-         instr->Resolve(resolved_instrs);
-      }
-      block->instrs_ = resolved_instrs;
-   }
-
-   void FunctionImpl::ResolveInstrs() {
-      Blocks visited;
-      void (*fn)(Block *block) = Block::ResolveInstrs;
-      entry()->for_each_block(visited, fn);
-      fin()->for_each_block(visited, fn);
-   }
-
-   void CgenEnv::ResolveInstrs() {
+   void CgenEnv::Resolve() {
       for (auto impl : impls().impls()) {
-         impl.ResolveInstrs();
+         impl.Resolve();
       }
    }
 
