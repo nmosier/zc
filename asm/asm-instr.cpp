@@ -100,6 +100,15 @@ namespace zc::z80 {
    void DjnzInstruction::Gen(std::list<const Value *>& vals) const { rv_b.Gen(vals); }
    void DjnzInstruction::Use(std::list<const Value *>& vals) const { rv_b.Use(vals); }
 
+   void SbcInstruction::Gen(std::list<const Value *>& vals) const { dst()->Gen(vals); }
+   void SbcInstruction::Use(std::list<const Value *>& vals) const {
+      if (!dst()->Eq(src())) {
+         dst()->Gen(vals);
+         src()->Gen(vals);
+      }
+   }
+   
+   
 
    /*** VARS ***/
    void Instruction::ReplaceVar(const VariableValue *var, const Value *with) {

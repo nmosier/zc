@@ -360,9 +360,15 @@ namespace zc {
     * Emit code that converts integral value into boolean (0 or 1).
     * NOTE: Places result in byte register %a.
     */
-   void emit_booleanize(CgenEnv& env, Block *block, const Value *in);
+   // void emit_booleanize(CgenEnv& env, Block *block, const Value *in);
 
-   void emit_booleanize_flag(CgenEnv& env, Block *block, const FlagValue *in);
+   // void emit_booleanize_flag(CgenEnv& env, Block *block, const FlagValue *in);
+
+   void emit_booleanize_flag_byte(CgenEnv& env, Block *block, const FlagValue *in,
+                                  const Value **out);
+   void emit_booleanize_flag_long(CgenEnv& env, Block *block, const FlagValue *in,
+                                  const Value **out);
+   
    
    /**
     * Emit code for predicate.

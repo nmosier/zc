@@ -998,19 +998,39 @@ namespace zc {
          
       case byte_size:
          {
-            *out = new VariableValue(out_bytes);            
-            auto low_byte = new ByteValue(var, ByteValue::Kind::BYTE_LOW);
-            block->instrs().push_back(new LoadInstruction(*out, low_byte));
+            switch (expr_bytes) {
+            case flag_size:
+               emit_booleanize_flag_byte(env, block, dynamic_cast<const FlagValue *>(var), out);
+               break;
+               
+            case word_size: abort();
+            case long_size:
+               {
+                  *out = new VariableValue(out_bytes);            
+                  auto low_byte = new ByteValue(var, ByteValue::Kind::BYTE_LOW);
+                  block->instrs().push_back(new LoadInstruction(*out, low_byte));
+               }
+               break;
+            }
          }
          break;
 
       case word_size: abort();
       case long_size:
-         {
-            *out = new VariableValue(out_bytes);                         
-            auto low_byte = new ByteValue(*out, ByteValue::Kind::BYTE_LOW);
-            block->instrs().push_back(new LoadInstruction(*out, &imm_l<0>));
-            block->instrs().push_back(new LoadInstruction(low_byte, var));
+         switch (expr_bytes) {
+         case flag_size:
+            emit_booleanize_flag_long(env, block, dynamic_cast<const FlagValue *>(var), out);
+            break;
+         case byte_size:
+            {
+               *out = new VariableValue(out_bytes);                         
+               auto low_byte = new ByteValue(*out, ByteValue::Kind::BYTE_LOW);
+               block->instrs().push_back(new LoadInstruction(*out, &imm_l<0>));
+               block->instrs().push_back(new LoadInstruction(low_byte, var));
+            }
+            break;
+         case word_size: abort();            
+         default: abort();
          }
          break;
       }
@@ -1205,6 +1225,7 @@ namespace zc {
          emit_crt("__icmpzero", block);
          *out = new FlagValue(Cond::Z, Cond::NZ);         
          return;
+      default: abort();
       }
    }
 
@@ -1271,7 +1292,8 @@ namespace zc {
       }
    }
 
-   /* NOTE: Places result in %a. */
+   #if 0
+   /* result placed in accumulator (a or hl) */
    void emit_booleanize(CgenEnv& env, Block *block, const Value *in) {
       Instructions& is = block->instrs();
 
@@ -1311,8 +1333,11 @@ namespace zc {
          abort();
       }
    }
+#endif
 
-   void emit_booleanize_flag(CgenEnv& env, Block *block, const FlagValue *in) {
+   void emit_booleanize_flag_byte(CgenEnv& env, Block *block, const FlagValue *in,
+                                  const Value **out) {
+      *out = &rv_a;
       switch (in->cond_0()) {
       case Cond::ANY: abort();
       case Cond::Z:
@@ -1341,6 +1366,43 @@ namespace zc {
           */
          block->instrs().push_back(new SbcInstruction(&rv_a, &rv_a));
          block->instrs().push_back(new IncInstruction(&rv_a));
+         break;
+      }
+   }
+
+   void emit_booleanize_flag_long(CgenEnv& env, Block *block, const FlagValue *in,
+                                  const Value **out) {
+      switch (in->cond_0()) {
+      case Cond::ANY: abort();
+      case Cond::Z:
+      case Cond::NZ:
+         /* ld <out>,0 
+          * jr z/nz,_ 
+          * inc <out>
+          * _
+          */
+         *out = new VariableValue(long_size);         
+         block->instrs().push_back(new LoadInstruction(*out, &imm_l<0>));
+         block->instrs().push_back(new JrInstruction(new ImmediateValue(3), in->cond_0()));
+         block->instrs().push_back(new IncInstruction(*out));
+         break;
+         
+      case Cond::NC:
+         /* sbc hl,hl
+          * call __ineg
+          */
+         *out = &rv_hl;
+         block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_hl));
+         emit_crt("__ineg", block);
+         break;
+         
+      case Cond::C:
+         /* sbc hl,hl
+          * inc hl
+          */
+         *out = &rv_hl;
+         block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_hl));
+         block->instrs().push_back(new IncInstruction(&rv_hl));
          break;
       }
    }

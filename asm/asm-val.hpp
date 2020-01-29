@@ -31,8 +31,8 @@ namespace zc {
        int size() const { return size_.get(); }
        virtual const Register *reg() const { return nullptr; }
        // virtual const VariableValue *var() const { return nullptr; }
-       virtual const Value *high() const { return nullptr; }
-       virtual const Value *low() const { return nullptr; }
+       virtual const Value *high() const { throw std::logic_error("attempted to take high byte"); }
+       virtual const Value *low() const { throw std::logic_error("attempted to take low byte"); }
     
        virtual void Emit(std::ostream& os) const = 0;
        virtual Value *Add(const intmax_t& offset) const = 0;
@@ -130,6 +130,9 @@ namespace zc {
           throw std::logic_error("attempted to add to flag value");
        }
 
+       virtual const Value *Resolve() const override
+       { throw std::logic_error("can't resolve flag"); }
+       
        FlagValue *invert() const { return new FlagValue(cond_1_, cond_0_); }
 
        template <typename... Args>

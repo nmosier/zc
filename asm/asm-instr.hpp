@@ -424,6 +424,9 @@ namespace zc::z80 {
     */
    class SbcInstruction: public BinaryInstruction {
    public:
+      virtual void Gen(std::list<const Value *>& vals) const override;
+      virtual void Use(std::list<const Value *>& vals) const override;
+      
       template <typename... Args>
       SbcInstruction(Args... args): BinaryInstruction(args..., "sbc") {}
    };
