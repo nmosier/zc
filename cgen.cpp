@@ -20,7 +20,7 @@ namespace zc {
       root->CodeGen(env);
 
       env.Resolve();
-      env.Serialize();
+      // env.Serialize();
                          
       
 #if PREDUMP

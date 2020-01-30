@@ -85,3 +85,7 @@ LANGUAGE FEATURES
 OPTIMIZATION
 [ ] Constant propogation
 [ ] Dead code elimination
+
+
+RALLOC
+[ ] Only use instruction iterators for intervals.

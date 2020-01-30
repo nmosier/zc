@@ -216,9 +216,13 @@ namespace zc::z80 {
    }
 
    const Value *ByteValue::Resolve() const {
-      switch (kind()) {
-      case Kind::BYTE_HIGH: return all()->high();
-      case Kind::BYTE_LOW:  return all()->low();
+      if (dynamic_cast<const VariableValue *>(all())) {
+         return this;
+      } else {
+         switch (kind()) {
+         case Kind::BYTE_HIGH: return all()->high();
+         case Kind::BYTE_LOW:  return all()->low();
+         }
       }
    }
 

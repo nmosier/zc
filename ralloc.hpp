@@ -2,51 +2,81 @@
 #define __RALLOC_HPP
 
 #include <unordered_map>
-#include <set>
+#include <unordered_set>
 #include <list>
 #include <ostream>
+#include <iterator>
 
 #include "asm.hpp"
 
 namespace zc::z80 {
+   struct RallocInterval;
+}
+
+namespace std {
+
+}
+
+namespace zc::z80 {
+
+   /**
+    * Check whether iterator comes before another iterator.
+    */
+   bool before(Instructions::const_iterator lhs, Instructions::const_iterator rhs,
+               Instructions::const_iterator end);
 
    /**
     * Interval as used in representing a variable lifetime or when a register is free.
     */
    struct RallocInterval {
-      int begin = -1;
-      Instructions::iterator begin_it;
-      int end = -1;
-      Instructions::iterator end_it;
+      Instructions::iterator begin;
+      Instructions::iterator end;
 
-      int length() const;
+      int length() const { return std::distance(begin, end); }
 
-      bool operator<(const RallocInterval& other) const {
-         return length() < other.length() || begin < other.begin;
-      }
+      bool operator<(const RallocInterval& other) const;
 
-      bool in(const RallocInterval& other) const {
-         assert(begin <= end && other.begin <= other.end);
-         return begin >= other.begin && end <= other.end;
-      }
+      bool in(const RallocInterval& other) const;
 
-      bool intersects(const RallocInterval& other) const {
-         return (begin >= other.begin && begin <= other.end) ||
-            (end >= other.begin && end <= other.end);
-      }
+      /* NOTE: Checks for exclusive intersection, i.e. overlap without containment. */
+      bool intersects(const RallocInterval& other) const;
 
       void Merge(const RallocInterval& with) { Merge(with, *this); }
       void Merge(const RallocInterval& with, RallocInterval& out) const;
 
-      void Dump(std::ostream& os) const { os << "[" << begin << "," << end << "]"; }
+      void Dump(std::ostream& os, Instructions::iterator instrs_begin) const {
+         os << "[" << std::distance(instrs_begin, begin) << ","
+            << std::distance(instrs_begin, end) << "]";
+      }
 
-      RallocInterval(int begin, Instructions::iterator begin_it,
-                     int end, Instructions::iterator end_it):
-         begin(begin), begin_it(begin_it), end(end), end_it(end_it) {}
+      RallocInterval(Instructions::iterator begin, Instructions::iterator end):
+         begin(begin), end(end) {}
+         
       RallocInterval() {}
+      
    };
 
-   typedef std::set<RallocInterval> RallocIntervals;
+#if 0
+   class RallocIntervals {
+   public:
+      typedef std::multiset<RallocInterval>::iterator iterator;
+      typedef std::multiset<RallocInterval>::const_iterator const_iterator;
+
+      iterator begin() { return intervals_.begin(); }
+      const_iterator begin() const { return intervals_.begin(); }
+      iterator end() { return intervals_.end(); }
+      const_iterator end() const { return intervals_.end(); }
+      
+   private:
+      std::multiset<RallocInterval> intervals_;
+   };
+   
+   typedef std::multiset<RallocInterval> RallocIntervals;
+#else
+
+   typedef std::list<RallocInterval> RallocIntervals;
+      
+#endif
 
    class NestedRallocIntervals {
    public:
@@ -84,10 +114,10 @@ namespace zc::z80 {
        */
       const VariableValue *joinable();
       
-      void Dump(std::ostream& os) const;
+      void Dump(std::ostream& os, Instructions::iterator instrs_begin) const;
 
-      VariableRallocInfo(const VariableValue *var, Instructions::iterator gen, int begin):
-         var(var), gen(gen), interval(begin, gen, begin, gen) {}
+      VariableRallocInfo(const VariableValue *var, Instructions::iterator gen):
+         var(var), gen(gen), interval(gen, gen) {}
 
       VariableRallocInfo(const VariableValue *var, Instructions::iterator gen,
                          const RallocInterval& interval):
@@ -110,10 +140,10 @@ namespace zc::z80 {
    struct RegisterFreeIntervals {
       RallocIntervals intervals;
 
-      RallocIntervals::iterator superinterval(const RallocInterval& subinterval) const;
+      RallocIntervals::iterator superinterval(const RallocInterval& subinterval);
       
       void remove_interval(const RallocInterval& interval);
-      void Dump(std::ostream& os) const;
+      void Dump(std::ostream& os, Instructions::iterator instrs_begin) const;
 
       RegisterFreeIntervals(const RallocIntervals& intervals): intervals(intervals) {}
    };
@@ -140,7 +170,7 @@ namespace zc::z80 {
       Block *block_; /*!< block containing instructions. */
       StackFrame& stack_frame_; /*!< stack frame for spilling locals. */
       typedef std::unordered_map<int, VariableRallocInfo> Vars;
-      Vars vars_;
+      Vars vars_; /*!< map from variable ID to register allocation information */
       typedef std::unordered_map<const ByteRegister *, RegisterFreeIntervals> Regs;
       Regs regs_;
       NestedRallocIntervals stack_spills_; /*!< intervals on which vars are stack-spilled */

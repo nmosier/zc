@@ -9,18 +9,84 @@
 
 namespace zc::z80 {
 
-   int RallocInterval::length() const {
-      assert(begin >= 0 && end >= begin);
-      return end - begin;
+   
+   bool before(Instructions::const_iterator lhs, Instructions::const_iterator rhs,
+               Instructions::const_iterator end) {
+      while (lhs != end && lhs != rhs) {
+         ++lhs;
+      }
+      
+      return lhs == rhs; /* NOTE: This also works if rhs == end. */
    }
 
-   void RegisterAllocator::ComputeIntervals() {
+
+   bool RallocInterval::in(const RallocInterval& other) const {
+      auto other_begin = other.begin;
+      while (other_begin != other.end && other_begin != begin) {
+         ++other_begin;
+      }
+      if (other_begin != begin) {
+         return false;
+      }
+
+      auto other_end = other.end;
+      while (other_end != other.begin && other_end != end) {
+         --other_end;
+      }
+      if (other_end != end) {
+         return false;
+      }
+      
+      return true;
+   }
+
+   bool RallocInterval::intersects(const RallocInterval& other) const {
+      if (in(other) || other.in(*this)) {
+         return false;
+      }
+      
+      auto begin_ = begin;
+      while (begin_ != end && begin_ != other.end) {
+         ++begin_;
+      }
+      if (begin_ == other.end) {
+         return true;
+      }
+
+      auto end_ = end;
+      while (end_ != begin && end_ != other.begin) {
+         --end_;
+      }
+      if (end_ == other.begin) {
+         return true;
+      }
+
+      return false;
+   }
+
+   bool RallocInterval::operator<(const RallocInterval& other) const {
+      /* first sort by length */
+      return length() < other.length();
+   }
+
+   
       enum class mode {GEN, USE};
+      template <typename Key>
+      using IntervalMap = std::map<Key, std::vector<std::pair<Instructions::iterator,mode>>>;
+
+   void RegisterAllocator::ComputeIntervals() {
+
       std::list<const Value *> gens, uses;
+
+      IntervalMap<const ByteRegister *> byte_regs;
+      IntervalMap<const VariableValue *> vars;
+
+      /*
       std::unordered_map<const ByteRegister *,
                          std::map<int,std::pair<Instructions::iterator,mode>>> byte_regs;
       std::unordered_map<const VariableValue *,
                          std::map<int,std::pair<Instructions::iterator,mode>>> vars;
+      */
 
       /* populate local regs maps with all alloc'able regs */
       for (const ByteRegister *reg : {&r_a, &r_b, &r_c, &r_d, &r_e, &r_h, &r_l}) {
@@ -56,14 +122,15 @@ namespace zc::z80 {
                      for (const ByteRegister *byte_reg : cur_regs) {
                         auto it = byte_regs.find(byte_reg);
                         if (it != byte_regs.end()) {
-                           it->second.insert({instr_index, {instr_it, m}});
+                           it->second.push_back({instr_it, m});
+                           // it->second.insert({instr_it, m});
                         }
                      }
                   }
 
                   /* add variable */
                   if (var) {
-                     vars[var].insert({instr_index, {instr_it, m}});
+                     vars[var].push_back({instr_it, m});
                   }
                }
             };
@@ -82,33 +149,32 @@ namespace zc::z80 {
          RallocInterval cur_int;
 
          /* loop invariant: end set */
-         cur_int.end = block()->instrs().size() - 1;
-         cur_int.end_it = --block()->instrs().end();
+         cur_int.end = --block()->instrs().end();
          do {
             /* Find 1st `use'. */
-            while (info_it != info_end && info_it->second.second != mode::USE) {
+            while (info_it != info_end && info_it->second != mode::USE) {
                ++info_it;
             }
             if (info_it == info_end) {
-               cur_int.begin = 0;
-               cur_int.begin_it = block()->instrs().begin();
+               // cur_int.begin = 0;
+               cur_int.begin = block()->instrs().begin();
             } else {
-               cur_int.begin = info_it->first;
-               auto tmp_it = info_it->second.first;
-               cur_int.begin_it = tmp_it;
+               // cur_int.begin = info_it->first;
+               auto tmp_it = info_it->first;
+               cur_int.begin = tmp_it;
             }
 
-            if (cur_int.begin <= cur_int.end) {
-               reg_free_ints.insert(cur_int);
+            if (before(cur_int.begin, cur_int.end, block()->instrs().end())) {
+               // if (cur_int.begin <= cur_int.end) {
+               reg_free_ints.push_back(cur_int);
             }
 
             /* skip until `gen' */
-            while (info_it != info_end && info_it->second.second != mode::GEN) {
+            while (info_it != info_end && info_it->second != mode::GEN) {
                ++info_it;
             }
             if (info_it != info_end) {
-               cur_int.end = info_it->first;
-               cur_int.end_it = (Instructions::iterator) info_it->second.first;
+               cur_int.end = (Instructions::iterator) info_it->first;
             }
          } while (info_it != info_end);
 
@@ -120,15 +186,14 @@ namespace zc::z80 {
       for (auto var_it : vars) {
          auto info_it = var_it.second.begin();
          auto info_end = var_it.second.end();
-         assert(info_it->second.second == mode::GEN);
+         assert(info_it->second == mode::GEN);
 
-         VariableRallocInfo info(var_it.first, info_it->second.first, info_it->first);
+         VariableRallocInfo info(var_it.first, info_it->first);
 
          /* add uses */
          ++info_it;
          while (info_it != info_end) {
-            info.uses.push_back(info_it->second.first);
-            info.interval.end_it = info_it->second.first;
+            info.uses.push_back(info_it->first);
             info.interval.end = info_it->first;
 
             ++info_it;
@@ -374,8 +439,7 @@ namespace zc::z80 {
       }
    }
 
-   RallocIntervals::iterator RegisterFreeIntervals::superinterval(const RallocInterval& interval)
-      const {
+   RallocIntervals::iterator RegisterFreeIntervals::superinterval(const RallocInterval& interval) {
       auto it = intervals.begin(), end = intervals.end();      
       for (; it != end; ++it) {
          if (interval.in(*it)) {
@@ -388,8 +452,8 @@ namespace zc::z80 {
    void RegisterFreeIntervals::remove_interval(const RallocInterval& interval) {
       auto it = superinterval(interval);
       if (it == intervals.end()) { throw std::logic_error("asked to remove interval not present"); }
-      intervals.insert(RallocInterval(it->begin, it->begin_it, interval.begin, interval.begin_it));
-      intervals.insert(RallocInterval(interval.end, interval.end_it, it->end, it->end_it));
+      intervals.emplace_back(it->begin, interval.begin);
+      intervals.emplace_back(interval.end, it->end);
       intervals.erase(it);
    }
 
@@ -404,21 +468,22 @@ namespace zc::z80 {
 
 
    /*** DUMPS ***/
-   void RegisterFreeIntervals::Dump(std::ostream& os) const {
+   void RegisterFreeIntervals::Dump(std::ostream& os, Instructions::iterator instrs_begin)
+      const {
       for (const RallocInterval& interval : intervals) {
-         interval.Dump(os);
+         interval.Dump(os, instrs_begin);
          os << ","; 
       }
       os << std::endl;
    }
 
-   void VariableRallocInfo::Dump(std::ostream& os) const {
+   void VariableRallocInfo::Dump(std::ostream& os, Instructions::iterator instrs_begin) const {
       var->Emit(os);
       os << " " << alloc_kind;
       if (allocated_val) { os << " "; allocated_val->Emit(os); }
       os << std::endl;
       os << "\tinterval:\t";
-      interval.Dump(os);
+      interval.Dump(os, instrs_begin);
       os << std::endl;
       os << "\tgen:\t";
       (*gen)->Emit(os); 
@@ -433,14 +498,14 @@ namespace zc::z80 {
          it.first->Dump(os);
          os << ": ";
          for (auto interval : it.second.intervals) {
-            interval.Dump(os);
+            interval.Dump(os, block()->instrs().begin());
             os << " ";
          }
          os << std::endl;
       }
 
       for (auto it : vars_) {
-         it.second.Dump(os);
+         it.second.Dump(os, block()->instrs().begin());
       }
    }
 
@@ -484,7 +549,7 @@ namespace zc::z80 {
          }
       }
       
-      intervals_.insert(interval);
+      intervals_.push_back(interval);
       return true;
    }
 
@@ -555,14 +620,10 @@ namespace zc::z80 {
    void RallocInterval::Merge(const RallocInterval& with, RallocInterval& out) const {
       if (end == with.begin) {
          out.begin = begin;
-         out.begin_it = begin_it;
          out.end = with.end;
-         out.end_it = with.end_it;
       } else if (begin == with.end) {
          out.begin = with.begin;
-         out.begin_it = with.begin_it;
          out.end = end;
-         out.end_it = end_it;
       } else {
          throw std::logic_error("attempt to merge non-incident intervals");
       }
