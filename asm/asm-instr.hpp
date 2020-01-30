@@ -230,41 +230,14 @@ namespace zc::z80 {
       JumpInstruction(Args... args): UnaryInstruction(args..., "jp") {}
    protected:
    };
-
-#if 0
-   template <class Base>
-   class CondInstruction: public Base {
-   public:
-      const FlagState *cond() const { return cond_; }
-
-      template <typename... Args>
-      CondInstruction(const FlagState *cond, Args... args): Base(args...), cond_(cond) {}
-
-   protected:
-      const FlagState *cond_;
-   };
-
-   /**
-    * "JP cc,Mmm" instruction class
-    */
-   class JumpCondInstruction: public JumpInstruction {
-   public:
-      const FlagState *cond() const { return cond_; }
-      
-      template <typename... Args>
-      JumpCondInstruction(const FlagState *cond, bool state, Args... args):
-         JumpInstruction(args...), cond_(cond) {}
-      
-   protected:
-      const FlagState *cond_;
-   };
-#endif
    
    /**
     * "JR" instruction class
     */
    class JrInstruction: public UnaryInstruction {
    public:
+      virtual void Emit(std::ostream& os) const override;
+      
       template <typename... Args>
       JrInstruction(Args... args): UnaryInstruction(args..., "jr") {}
    };

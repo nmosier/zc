@@ -26,16 +26,23 @@ namespace zc::z80 {
       typedef const_iterator (*replace_t)
       (const_iterator in_begin, const_iterator in_end, Instructions& out);
 
-      void Pass(FunctionImpl *impl) const;
-      void ReplaceAll(Instructions& input) const;
-      const_iterator ReplaceAt(Instructions& input, const_iterator begin) const;
+      void Pass(FunctionImpl *impl);
+      void ReplaceAll(Instructions& input);
+      const_iterator ReplaceAt(Instructions& input, const_iterator begin);
 
-      PeepholeOptimization(replace_t replace): replace_(replace) {}
+      void Dump(std::ostream& os) const;
+
+      PeepholeOptimization(const std::string& name, replace_t replace, int bytes_saved):
+         name_(name), replace_(replace), bytes_saved_(bytes_saved) {}
       
    protected:
-      replace_t replace_;
+      const std::string name_;
+      const replace_t replace_;
+      const int bytes_saved_; /*!< bytes saved per replacement */
+      int hits_ = 0;
+      int total_ = 0;
 
-      static void PassBlock(Block *block, const PeepholeOptimization *optim);      
+      static void PassBlock(Block *block, PeepholeOptimization *optim);      
 
    public:
       template <class InputIt, class... Ts>
@@ -44,7 +51,7 @@ namespace zc::z80 {
       }
    };
 
-   extern const std::forward_list<PeepholeOptimization> peephole_optims;
+   extern std::forward_list<PeepholeOptimization> peephole_optims;
 }
 
 #endif

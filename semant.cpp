@@ -1,11 +1,12 @@
 #include <unordered_set>
 
- #include "ast.hpp"
- #include "asm.hpp"
- #include "symtab.hpp"
- #include "semant.hpp"
- #include "c.tab.hpp"
- #include "util.hpp"
+#include "ast.hpp"
+#include "asm.hpp"
+#include "symtab.hpp"
+#include "semant.hpp"
+#include "c.tab.hpp"
+#include "util.hpp"
+#include "optim.hpp"
 
  extern const char *g_filename;
 
@@ -405,7 +406,7 @@
 
     void IfStat::TypeCheck(SemantEnv& env) {
        cond()->TypeCheck(env);
-       cond_ = cond()->Cast(IntegralType::Create(IntegralType::IntKind::SPEC_BOOL, loc()));
+       cond_ = cond()->Cast(g_optim.bool_type());
        if_body()->TypeCheck(env);
        if (else_body() != nullptr) {
           else_body()->TypeCheck(env);
@@ -415,7 +416,7 @@
     void WhileStat::TypeCheck(SemantEnv& env) {
        env.stat_stack().Push(this);
        pred()->TypeCheck(env);
-       pred_ = pred()->Cast(int_type<IntegralType::IntKind::SPEC_BOOL>);
+       pred_ = pred()->Cast(g_optim.bool_type());
        body()->TypeCheck(env);
        env.stat_stack().Pop();
     }
@@ -424,7 +425,7 @@
        env.stat_stack().Push(this);
        init()->TypeCheck(env);
        pred()->TypeCheck(env);
-       pred_ = pred()->Cast(int_type<IntegralType::IntKind::SPEC_BOOL>);
+       pred_ = pred()->Cast(g_optim.bool_type());
        after()->TypeCheck(env);
        body()->TypeCheck(env);
        env.stat_stack().Pop();
@@ -608,8 +609,7 @@
 
       case Kind::UOP_LOGICAL_NOT:
          {
-            IntegralType *bool_type = IntegralType::Create
-               (IntegralType::IntKind::SPEC_BOOL, loc());         
+            IntegralType *bool_type = g_optim.bool_type();
             if (expr()->type()->kind() != ASTType::Kind::TYPE_INTEGRAL &&
              expr()->type()->kind() != ASTType::Kind::TYPE_POINTER) {
                env.error()(g_filename, this) << "logical not requires integral or pointer type"
@@ -664,7 +664,7 @@
                            };
             expr_ok(lhs());
             expr_ok(rhs());
-            auto bool_type = IntegralType::Create(IntegralType::IntKind::SPEC_BOOL, loc());
+            auto bool_type = g_optim.bool_type();
             lhs_ = lhs()->Cast(bool_type);
             rhs_ = rhs()->Cast(bool_type);
             type_ = bool_type;
@@ -712,7 +712,7 @@
             }
 
             if (is_logical()) {
-               type_ = IntegralType::Create(IntegralType::IntKind::SPEC_BOOL, loc());
+               type_ = g_optim.bool_type();
             }
          }
          break;

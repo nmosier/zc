@@ -52,14 +52,16 @@ extern int ast_yydebug;                  // Control Bison debugging (set to 1 to
 extern int yyparse(void);            // Entry point to the AST parser
 extern zc::TranslationUnit *g_AST_root;  // AST produced by parser
 
-zc::CgenOptimInfo zc::g_optim;
-
 namespace {
 
-void usage(const char *program) {
-  std::cerr << "Usage: " << program << " [-crgtTO] [-o file]" << std::endl;
+   void usage(const char *program) {
+      std::cerr << "Usage: " << program << " [-h] [-O <optims>] [-p print_opts] [-o file]"
+                << std::endl;
+   }
 }
-}
+
+zc::PrintOpts zc::g_print({{"peephole-stats", &PrintOpts::peephole_stats},
+   });
 
 int main(int argc, char *argv[]) {
   yy_flex_debug = 0;
@@ -67,7 +69,7 @@ int main(int argc, char *argv[]) {
 
   int c;
   opterr = 0;  // getopt shouldn't print any messages
-  while ((c = getopt(argc, argv, "lpscrgtTO:o:h")) != -1) {
+  while ((c = getopt(argc, argv, "O:o:p:h")) != -1) {
     switch (c) {
     case 'o':  // set the name of the output file
        out_filename = optarg;
@@ -75,15 +77,28 @@ int main(int argc, char *argv[]) {
     case 'O':  // enable optimization
        if (zc::g_optim.set_flags(optarg,
                    [=](const char *flag) {
-                      std::cerr << argv[0] << ": -O: unknown flag " << flag << std::endl;
+                      std::cerr << argv[0] << ": -O: unknown flag '" << flag << "'" << std::endl;
                    },
                    [](const char *flag) {
-                      std::cerr << "\t" << flag << "\n";
+                      std::cerr << "\t" << flag << std::endl;
                    })
            < 0) {
           return 85;
        }
        break;
+    case 'p': // print options
+       if (zc::g_print.set_flags(optarg,
+                             [=](auto flag) {
+                                std::cerr << argv[0] << ": -p: unknown flag '" << flag << "'"
+                                          << std::endl;
+                             },
+                             [](auto flag) {
+                                std::cerr << "\t" << flag << std::endl;
+                             }) < 0) {
+          return 85;
+       }
+       break;
+       
     case 'h':
        usage(argv[0]);
        return 0;

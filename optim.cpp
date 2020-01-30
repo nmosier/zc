@@ -5,92 +5,48 @@
 #include "cgen.hpp"
 #include "peephole.hpp"
 #include "ralloc.hpp"
-
-#define PEEPHOLE 1
+#include "config.hpp"
 
 namespace zc {
 
    void OptimizeAST(TranslationUnit *root) {
-      root->ReduceConst();
+      if (g_optim.reduce_const) {
+         root->ReduceConst();
+      }
    }
 
    void OptimizeIR(CgenEnv& env) {
       /* pass 0: register allocation */
-      RegisterAllocator::Ralloc(env);
+      // RegisterAllocator::Ralloc(env);
 
-#if PEEPHOLE
       /* pass 1: peephole optimization */
-      for (FunctionImpl& impl : env.impls().impls()) {
-         for (const PeepholeOptimization& optim : peephole_optims) {
-            optim.Pass(&impl);
+      if (g_optim.peephole) {
+         for (FunctionImpl& impl : env.impls().impls()) {
+            for (PeepholeOptimization& optim : peephole_optims) {
+               optim.Pass(&impl);
+            }
+         }
+
+         if (g_print.peephole_stats) {
+            std::cerr << "peephole-stats:" << std::endl << "NAME\t\tHITS\tTOTAL\tSAVED" << std::endl;
+            for (PeepholeOptimization& optim : peephole_optims) {
+               optim.Dump(std::cerr);
+               std::cerr << std::endl;
+            }
          }
       }
-#endif
    }
 
    /*** OPTIMIZATION SETTINGS ***/
 
-   CgenOptimInfo::NameTable CgenOptimInfo::nametab {
+   CgenOptimInfo g_optim ({
       {"join-vars", &CgenOptimInfo::join_vars},
-         {"reduce-const", &CgenOptimInfo::reduce_const},
-   };
+      {"reduce-const", &CgenOptimInfo::reduce_const},
+      {"peephole", &CgenOptimInfo::peephole},
+      {"bool-flag", &CgenOptimInfo::bool_flag},
+      {"minimize-transitions", &CgenOptimInfo::minimize_transitions},
+   });
 
-#if 0
-   int CgenOptimInfo::set_flag(const char *flag, void (*err)(const char *flag),
-                               void (*help)(const char *flag)) {
-      /* check for special flags: `all', `none' */
-      if (strcmp(flag, "all") == 0) {
-         set_all();
-         return 0;
-      }
-      if (strcmp(flag, "none") == 0) {
-         clear_all();
-         return 0;
-      }
-      if (strcmp(flag, "help") == 0) {
-         for (auto pair : nametab) {
-            help(pair.first.c_str());
-         }
-         return -1;
-      }
-      
-      const char *no = "no-";
-      auto it = nametab.find(flag);
-      if (it != nametab.end()) {
-         this->*(it->second) = true;
-         return 0;
-      }
-
-      /* search for `no-' */
-      if (strncmp(flag, no, strlen(no)) == 0) {
-         const char *no_flag = flag + strlen(no);
-         auto it = nametab.find(no_flag);
-         if (it != nametab.end()) {
-            this->*(it->second) = false;
-            return 0;
-         }
-      }
-
-      err(flag);
-      return -1;
-   }
-
-   int CgenOptimInfo::set_flags(const char *flags, void (*err)(const char *flag),
-                                void (*help)(const char *flag)) {
-      char *buf = strdup(flags);
-      assert(buf);
-
-      int retv = 0;
-      const char *flag;
-      while ((flag = strsep(&buf, ",")) != NULL) {
-         if (set_flag(flag, err, help) < 0) {
-            retv = -1;
-         }
-      }
-
-      return retv;
-   }
-#endif
    
    /*** CONSTANTS ***/
 

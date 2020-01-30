@@ -7,6 +7,7 @@
 #include "asm.hpp"
 #include "optim.hpp"
 #include "cgen.hpp"
+#include "ralloc.hpp"
 
 #define PREDUMP 1
 
@@ -19,17 +20,22 @@ namespace zc {
       CgenEnv env;
       root->CodeGen(env);
 
-      env.Resolve();
       // env.Serialize();
-                         
-      
+      env.Resolve();
+
 #if PREDUMP
       env.DumpAsm(std::cerr);
 #endif
-      OptimizeIR(env);
 
+
+      
+      RegisterAllocator::Ralloc(env);
+      
       /* resolve */
-      env.Resolve();      
+      env.Resolve();
+      
+      OptimizeIR(env);
+      // OptimizeIR(env);
       
       env.DumpAsm(os);
    }
@@ -504,8 +510,6 @@ namespace zc {
 
    Block *BinaryExpr::CodeGen(CgenEnv& env, Block *block, const Value **out,
                               ExprKind mode) {
-      // const Value *lhs_var = new VariableValue(lhs()->type()->bytes());
-      // const Value *rhs_var = new VariableValue(rhs()->type()->bytes());
       const Value *lhs_var, *rhs_var;
       
       switch (kind()) {
@@ -535,7 +539,6 @@ namespace zc {
             Block *cont_block = new Block(cont_label);
             BlockTransition *cont_transition = new JumpTransition
                (cont_block, and_not_or ? flag1->cond_1() : flag1->cond_0());
-            // and_not_or ? Cond::NZ : Cond::Z);
             block->transitions().vec().push_back(cont_transition);
 
             /* Evaluate rhs */
@@ -544,26 +547,28 @@ namespace zc {
             emit_nonzero_test(env, cont_block, rhs_var, &flag2);
             assert(flag1->Eq(flag2));
             
-            // emit_booleanize(env, cont_block, rhs_var);
             cont_block->transitions().vec().push_back(new JumpTransition(end_block, Cond::ANY));
 
-            *out = flag1;
+            if (g_optim.bool_flag) {
+               *out = flag1;
+            } else {
+               assert(type()->bytes() == byte_size);
+               emit_booleanize_flag_byte(env, end_block, flag1, out);
+            }
+            
             return end_block;
          }
 
       case Kind::BOP_EQ:
       case Kind::BOP_NEQ:
          {
-            bool eq = (kind() == Kind::BOP_EQ);
+            bool eq_not_neq = (kind() == Kind::BOP_EQ);
             
             block = emit_binop(env, block, this, &lhs_var, &rhs_var);
             switch (lhs_var->size()) {
             case byte_size:
                /* ld a,<lhs>
                 * cp a,<rhs>
-                * ld <out>,0/1
-                * jr nz,_
-                * inc/dec <out>
                 * _
                 */
                block->instrs().push_back(new LoadInstruction(&rv_a, lhs_var));
@@ -576,10 +581,6 @@ namespace zc {
                 * or a,a
                 * sbc hl,<rhs>
                 * add hl,<rhs>
-                * ld <out>,0
-                * jr nz/z,_
-                * inc <out>
-                * _
                 */
                block->instrs().push_back(new LoadInstruction(&rv_hl, lhs_var));
                block->instrs().push_back(new OrInstruction(&rv_a, &rv_a));
@@ -593,21 +594,19 @@ namespace zc {
             if (out == nullptr) {
                return block;
             }
-            
-            *out = new VariableValue(byte_size);
-            block->instrs().push_back(new LoadInstruction(*out, &imm_b<0>));
-            
-            Block *join_block = new Block(new_label("BOP_EQ_NEQ"));
-            Block *cont_block = new Block(new_label("BOP_EQ_NEQ"));
-            
-            block->transitions().vec().push_back
-               (new JumpTransition(join_block, eq ? Cond::NZ : Cond::Z));
-            block->transitions().vec().push_back(new JumpTransition(cont_block, Cond::ANY));
-            
-            cont_block->instrs().push_back(new IncInstruction(*out));
-            cont_block->transitions().vec().push_back(new JumpTransition(join_block, Cond::ANY));
-            
-            return join_block;
+
+            auto flag = new FlagValue(eq_not_neq ? Cond::NZ : Cond::Z,
+                                 eq_not_neq ? Cond::Z : Cond::NZ);
+            if (g_optim.bool_flag) {
+               *out = flag; 
+            } else {
+               *out = new VariableValue(g_optim.bool_type()->bytes());
+               block->instrs().push_back(new LoadInstruction(*out, &imm_b<0>));
+               block->instrs().push_back(new JrInstruction(&imm_b<3>, flag->cond_0()));
+               block->instrs().push_back(new IncInstruction(*out));
+            }
+
+            return block;
          }
 
       case Kind::BOP_LT:
@@ -619,6 +618,9 @@ namespace zc {
             bool lg_not_eq = (kind() == Kind::BOP_LT || kind() == Kind::BOP_GT);
             bool rev_vars = (lt_not_gt == lg_not_eq);
             block = emit_binop(env, block, this, &lhs_var, &rhs_var);
+            
+            if (out == nullptr) { return block; }
+            
             switch (lhs()->type()->bytes()) {
             case byte_size:
                /* ld a,<lhs>/<rhs>
@@ -632,28 +634,33 @@ namespace zc {
             case word_size: abort();
             case long_size:
                /* ld hl,<lhs>
-                * xor a,a
+                * or a,a
                 * sbc hl,<rhs>
                 */
                block->instrs().push_back(new LoadInstruction(&rv_hl, rev_vars ? lhs_var : rhs_var));
-               block->instrs().push_back(new XorInstruction(&rv_a, &rv_a));
+               block->instrs().push_back(new OrInstruction(&rv_a, &rv_a));
                block->instrs().push_back(new SbcInstruction(&rv_hl, rev_vars ? rhs_var : lhs_var));
                break;
             
             default: abort();
             }
 
-            // block->instrs().push_back(new AdcInstruction(&rv_a, &rv_a));
-
-            if (out) {
-               // *out = new VariableValue(byte_size);
-               if (lg_not_eq) {
-                  *out = new FlagValue(Cond::NC, Cond::C);
-               } else {
-                  *out = new FlagValue(Cond::C, Cond::NC);
-               }
-               // block->instrs().push_back(new LoadInstruction(*out, &rv_a));
+            const FlagValue *flag;
+            if (lg_not_eq) {
+               flag = new FlagValue(Cond::NC, Cond::C);
+            } else {
+               flag = new FlagValue(Cond::C, Cond::NC);
             }
+
+            if (g_optim.bool_flag) {
+               *out = flag;
+            } else {
+               *out = new VariableValue(type()->bytes());
+               block->instrs().push_back(new LoadInstruction(*out, &imm_b<0>));
+               block->instrs().push_back(new JrInstruction(&imm_b<3>, flag->cond_0()));
+               block->instrs().push_back(new IncInstruction(*out));
+            }
+            
             return block;
          }
          break;
@@ -1652,20 +1659,26 @@ namespace zc {
          return;
       }
 
-      auto it = vec().begin();
-      auto last = --vec().end();
-      for (; it != last; ++it) {
-         (*it)->DumpAsm(os);
-      }
-
-      /* omit last transition but output block, if it hasn't been emitted already */
-      auto dst = (*last)->dst();
-      assert(dst);
-      if (visited.find(dst) == visited.end()) {
-         void (*fn)(Block *, std::ostream& os, Blocks&) = Block::DumpAsm;      
-         dst->for_each_block(visited, fn, os, visited);
+      if (g_optim.minimize_transitions) {
+         auto it = vec().begin();
+         auto last = --vec().end();
+         for (; it != last; ++it) {
+            (*it)->DumpAsm(os);
+         }
+         
+         /* omit last transition but output block, if it hasn't been emitted already */
+         auto dst = (*last)->dst();
+         assert(dst);
+         if (visited.find(dst) == visited.end()) {
+            void (*fn)(Block *, std::ostream& os, Blocks&) = Block::DumpAsm;      
+            dst->for_each_block(visited, fn, os, visited);
+         } else {
+            (*last)->DumpAsm(os);
+         }
       } else {
-         (*last)->DumpAsm(os);
+         for (auto trans : vec()) {
+            trans->DumpAsm(os);
+         }
       }
    }
 
@@ -1679,19 +1692,6 @@ namespace zc {
    BlockTransition *ReturnTransition::Resolve(const FunctionImpl *impl) {
       return new JumpTransition(impl->fin(), cond());
    }
-
-#if 0
-   void ReturnTransition::DumpAsm(std::ostream& os, const FunctionImpl *impl) const
-   {
-      os << "\tjp\t";
-      os << cond();
-      if (cond() != Cond::ANY) { os << ","; }
-      
-      impl->fin()->label()->EmitRef(os);
-
-      os << std::endl;
-   }
-#endif
 
    void CgenEnv::Resolve() {
       for (auto impl : impls().impls()) {
@@ -1714,8 +1714,6 @@ namespace zc {
          /* TODO? */
       }
    }
-
-   // void StackFrame::add_local(const VarDeclaration *local) { add_local(local->bytes()); }
 
    VarSymInfo *StackFrame::next_arg(const VarDeclaration *arg) {
       int bytes = arg->bytes();

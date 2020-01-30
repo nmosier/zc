@@ -2,19 +2,26 @@
 
 #include "peephole.hpp"
 #include "asm.hpp"
+#include "optim.hpp"
 
 namespace zc::z80 {
 
-   void PeepholeOptimization::ReplaceAll(Instructions& input) const {
+   void PeepholeOptimization::ReplaceAll(Instructions& input) {
       for (const_iterator it = input.begin(), end = input.end(); it != end; ) {
          it = ReplaceAt(input, it);
       }
    }
 
    Instructions::const_iterator PeepholeOptimization::ReplaceAt(Instructions& input,
-                                                                const_iterator it) const {
+                                                                const_iterator it) {
       Instructions new_instrs;
       const_iterator rm_end = replace_(it, input.end(), new_instrs);
+      
+      if (rm_end != it) {
+         ++hits_;
+      }
+      ++total_;
+      
       const_iterator ret_it;
       const_iterator new_end = input.erase(it, rm_end);
       input.splice(new_end, new_instrs);
@@ -24,18 +31,21 @@ namespace zc::z80 {
       return new_end;
    }
 
-   void PeepholeOptimization::PassBlock(Block *block,
-                                        const PeepholeOptimization *optim) {
+   void PeepholeOptimization::PassBlock(Block *block, PeepholeOptimization *optim) {
       Instructions& instrs = block->instrs();
       optim->ReplaceAll(instrs);
    }
 
-   void PeepholeOptimization::Pass(FunctionImpl *impl) const {
+   void PeepholeOptimization::Pass(FunctionImpl *impl) {
       Blocks visited;
-      void (*fn)(Block *block, const PeepholeOptimization *optim) =
+      void (*fn)(Block *block, PeepholeOptimization *optim) =
          PeepholeOptimization::PassBlock;
       impl->entry()->for_each_block(visited, fn, this);
       impl->fin()->for_each_block(visited, fn, this);
+   }
+
+   void PeepholeOptimization::Dump(std::ostream& os) const {
+      os << name_ << "\t" << hits_ << "\t" << total_ << "\t" << bytes_saved_ * hits_;
    }
 
    /*** PEEPHOLE OPTIMIZATION FUNCTIONS ***/
@@ -201,11 +211,11 @@ namespace zc::z80 {
    
 
 
-   const std::forward_list<PeepholeOptimization> peephole_optims = 
-      {PeepholeOptimization(peephole_indexed_load_store),
-       PeepholeOptimization(peephole_push_pop), 
-       PeepholeOptimization(peephole_pea),
-       PeepholeOptimization(peephole_self_load),
+   std::forward_list<PeepholeOptimization> peephole_optims = 
+      {PeepholeOptimization("indexed-load", peephole_indexed_load_store, 2),
+       PeepholeOptimization("push-pop", peephole_push_pop, 2), 
+       PeepholeOptimization("pea", peephole_pea, 1),
+       PeepholeOptimization("self-load", peephole_self_load, 1),
       };
 
    

@@ -22,6 +22,16 @@ namespace zc::z80 {
       os << std::endl;
    }
 
+   void JrInstruction::Emit(std::ostream& os) const {
+      os << "\t" << name() << "\t";
+      if (cond_) {
+         os << *cond_ << ",";
+      }
+      os << "$+";
+      dst()->Emit(os);
+      os << std::endl;
+   }
+
    bool Instruction::Eq(const Instruction *other) const {
       if (name() != other->name()) {
          return false;

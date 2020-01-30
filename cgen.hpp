@@ -180,7 +180,7 @@ namespace zc {
          throw std::logic_error("attempt to serialize return transition ");
       }
       virtual void DumpAsm(std::ostream& os) const override {
-         throw std::logic_error("return transition should have been resolved");
+         os << "RETURN" << std::endl;
       }
       
       template <typename... Args>
