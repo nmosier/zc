@@ -45,6 +45,7 @@ namespace zc {
       {"peephole", &CgenOptimInfo::peephole},
       {"bool-flag", &CgenOptimInfo::bool_flag},
       {"minimize-transitions", &CgenOptimInfo::minimize_transitions},
+      {"direct-call", &CgenOptimInfo::direct_call},
    });
 
    
@@ -162,6 +163,12 @@ namespace zc {
       return this;
    }
 
-   
+   void CallExpr::ReduceConst_rec() {
+      fn_ = fn()->ReduceConst();
+
+      for (auto it = params()->vec().begin(), end = params()->vec().end(); it != end; ++it) {
+         *it = (*it)->ReduceConst();
+      }
+   }
    
 }

@@ -248,6 +248,9 @@ namespace zc {
     
        virtual void Emit(std::ostream& os) const override;
        virtual Value *Add(const intmax_t& offset) const override;
+       virtual const Value *Resolve() const override {
+          return new IndexedRegisterValue(val(), index());
+       }
 
        IndexedRegisterValue(const RegisterValue *val, int8_t index):
           Value_(long_size), val_(val), index_(Index(index)) {}
@@ -278,6 +281,10 @@ namespace zc {
 
       virtual void Emit(std::ostream& os) const override;
       virtual Value *Add(const intmax_t& offset) const override;
+
+       virtual const Value *Resolve() const override {
+          return new ImmediateValue(index(), byte_size);
+       }
 
       FrameValue(FrameIndices *indices, FrameIndices::iterator pos, bool negate = false):
          Value_<FrameValue>(*pos), indices_(indices), pos_(pos), negate_(negate) {}

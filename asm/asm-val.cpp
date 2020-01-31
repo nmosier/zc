@@ -241,4 +241,5 @@ namespace zc::z80 {
    void FlagValue::Emit(std::ostream& os) const {
       os << "[" << cond_0() << "|" << cond_1() << "]";
    }
+
 }

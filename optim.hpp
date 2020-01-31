@@ -11,6 +11,7 @@ namespace zc {
    struct CgenOptimInfo: public Config<CgenOptimInfo> {
       /** AST optimization flags */      
       bool reduce_const = true;
+      bool direct_call = true;
       bool bool_flag = true;
       IntegralType::IntKind bool_spec() const {
          return bool_flag ? IntegralType::IntKind::SPEC_BOOL : IntegralType::IntKind::SPEC_CHAR;

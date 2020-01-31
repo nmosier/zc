@@ -891,11 +891,17 @@ namespace zc {
       }
 
       /* codegen callee */
-      const Value *fn_var;
-      block = fn()->CodeGen(env, block, &fn_var, ExprKind::EXPR_RVALUE);
-      block->instrs().push_back(new LoadInstruction(&rv_iy, fn_var));
-
-      emit_crt("__indcall", block);
+      if (g_optim.direct_call && fn()->val_const(env)) {
+         /* direct call */
+         block->instrs().push_back(new CallInstruction(fn()->val_const(env)));
+      } else {
+         /* indirect call */
+         const Value *fn_var;
+         block = fn()->CodeGen(env, block, &fn_var, ExprKind::EXPR_RVALUE);
+         block->instrs().push_back(new LoadInstruction(&rv_iy, fn_var));
+         
+         emit_crt("__indcall", block);
+      }
       
       /* pop off args */
       for (ASTExpr *param : params()->vec()) {
@@ -1874,4 +1880,13 @@ namespace zc {
                              });
    }
 
+
+   const Value *IdentifierExpr::val_const(const CgenEnv& env) const {
+      const SymInfo *id_info = env.symtab().Lookup(id()->id());
+      assert(id_info);
+      const VarSymInfo *var_info = dynamic_cast<const VarSymInfo *>(id_info);
+      if (var_info == nullptr) { return nullptr; }
+
+      return dynamic_cast<const LabelValue *>(var_info->addr());
+   }
 }

@@ -40,6 +40,7 @@ namespace zc {
       virtual intmax_t int_const() const {
          throw std::logic_error("attempt to evaluate expression that is not constant");
       }
+      virtual const Value *val_const(const CgenEnv& env) const { return nullptr; }
       
       virtual void TypeCheck(SemantEnv& env) = 0;
 
@@ -281,6 +282,7 @@ namespace zc {
       virtual ExprKind expr_kind() const override;
       virtual bool is_const() const override { return is_const_; }
       virtual intmax_t int_const() const override;
+      virtual const Value *val_const(const CgenEnv& env) const override;
       
       static IdentifierExpr *Create(Identifier *id, const SourceLoc& loc) {
          return new IdentifierExpr(id, loc);
@@ -339,6 +341,8 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override { os << "CallExpr"; }
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
 
+      virtual void ReduceConst_rec() override;
+      
       virtual void TypeCheck(SemantEnv& env) override;
 
       virtual Block *CodeGen(CgenEnv& env, Block *block, const Value **out, ExprKind mode) override;

@@ -47,6 +47,8 @@ namespace zc::z80 {
    bool MultibyteRegister::Eq_aux(const MultibyteRegister *other) const {
       for (auto it = regs().begin(), other_it = other->regs().begin(), end = regs().end();
            it != end; ++it, ++other_it) {
+         if (*it == *other_it) { continue; }
+         if (*it == nullptr || *other_it == nullptr) { return false; }
          if (!(*it)->Eq(*other_it)) {
             return false;
          }
