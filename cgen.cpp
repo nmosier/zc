@@ -268,6 +268,7 @@ namespace zc {
       
       Label *pred_label = new_label("while_pred");
       Block *pred_block = new Block(pred_label);
+      BlockTransition *pred_trans = new JumpTransition(pred_block, Cond::ANY);
 
       Label *join_label = new_label("while_end");
       Block *join_block = new Block(join_label);
@@ -276,10 +277,11 @@ namespace zc {
       StatInfo *stat_info = new StatInfo(this, body_block, join_block);
       env.stat_stack().Push(stat_info);
 
-      emit_predicate(env, block, pred(), body_block, join_block);
+      block->transitions().vec().push_back(pred_trans);
+      emit_predicate(env, pred_block, pred(), body_block, join_block);
 
       body_block = body()->CodeGen(env, body_block);
-      body_block->transitions().vec().push_back(new JumpTransition(pred_block, Cond::ANY));
+      body_block->transitions().vec().push_back(pred_trans);
 
       block->transitions().vec().push_back(new JumpTransition(pred_block, Cond::ANY));
 
@@ -515,40 +517,37 @@ namespace zc {
       switch (kind()) {
       case Kind::BOP_LOGICAL_AND:
       case Kind::BOP_LOGICAL_OR:
-         /* Short-circuit evaluation dictates that evaluation stops if the first operand 
-          * is 0. 
-          */
          {
             bool and_not_or = (kind() == Kind::BOP_LOGICAL_AND);
             const char *name = and_not_or ? "BOP_LOGICAL_AND" : "BOP_LOGICAL_OR";
             
+            const Label *cont_label = new_label(name);
+            Block *cont_block = new Block(cont_label);
+
+            const Label *end_label = new_label(name);
+            Block *end_block = new Block(end_label);
+
             /* evaluate lhs */
             block = lhs()->CodeGen(env, block, &lhs_var, ExprKind::EXPR_RVALUE);
-
             const FlagValue *flag1;
             emit_nonzero_test(env, block, lhs_var, &flag1);
 
-            /* create transitions */
-             const Label *end_label = new_label(name);
-            Block *end_block = new Block(end_label);
-            BlockTransition *end_transition =
-               new JumpTransition(end_block, and_not_or ? flag1->cond_0() : flag1->cond_1());
-            block->transitions().vec().push_back(end_transition);
-
-            const Label *cont_label = new_label(name);
-            Block *cont_block = new Block(cont_label);
             BlockTransition *cont_transition = new JumpTransition
                (cont_block, and_not_or ? flag1->cond_1() : flag1->cond_0());
+            BlockTransition *end_transition =
+               new JumpTransition(end_block, and_not_or ? flag1->cond_0() : flag1->cond_1());
+            
             block->transitions().vec().push_back(cont_transition);
+            block->transitions().vec().push_back(end_transition);
 
             /* Evaluate rhs */
             cont_block = rhs()->CodeGen(env, cont_block, &rhs_var, ExprKind::EXPR_RVALUE);
             const FlagValue *flag2;
             emit_nonzero_test(env, cont_block, rhs_var, &flag2);
-            assert(flag1->Eq(flag2));
-            
-            cont_block->transitions().vec().push_back(new JumpTransition(end_block, Cond::ANY));
+            emit_convert_flag(cont_block, flag2, flag1);
 
+            cont_block->transitions().vec().push_back(new JumpTransition(end_block, Cond::ANY));
+            
             if (g_optim.bool_flag) {
                *out = flag1;
             } else {
@@ -1458,7 +1457,77 @@ namespace zc {
       block->instrs().push_back(new RetInstruction());
    }
 
-   // void emit_cast(CgenEnv& env, Block *block, const Varialbe
+   void emit_invert_flag(Block *block, const FlagValue *flag) {
+      switch (flag->cond_0()) {
+      case Cond::Z:
+      case Cond::NZ:
+         /* ld a,0
+          * jr nz,_
+          * inc a
+          * _
+          * or a,a
+          * ------ 6
+          */
+         block->instrs().push_back(new LoadInstruction(&rv_a, &imm_b<0>));
+         block->instrs().push_back(new JrInstruction(&imm_b<3>, Cond::NZ));
+         block->instrs().push_back(new IncInstruction(&rv_a));
+         block->instrs().push_back(new OrInstruction(&rv_a, &rv_a));
+         break;
+         
+      case Cond::C:
+      case Cond::NC:
+         /* ccf */
+         block->instrs().push_back(new CcfInstruction());
+         break;
+      case Cond::ANY: abort();
+      }
+   }
+
+   void emit_convert_flag(Block *block, const FlagValue *from, const FlagValue *to) {
+      if (from->Eq(to)) { return; }
+
+      if (from->Eq(to->invert())) {
+         emit_invert_flag(block, from);
+         return;
+      }
+
+      switch (from->cond_0()) {
+      case Cond::C:
+      case Cond::NC:
+         /* CF -> ZF
+          * [ccf]
+          * sbc a,a
+          */
+         {
+            bool ccf = ((from->cond_0() == Cond::NZ) != (to->cond_0() == Cond::C));
+            if (ccf) {
+               block->instrs().push_back(new CcfInstruction());
+            }
+            block->instrs().push_back(new SbcInstruction(&rv_a, &rv_a));
+         }
+         break;
+
+      case Cond::Z:
+      case Cond::NZ:
+         /* ZF -> CF
+          * scf
+          * jr z/nz,_ ; 
+          * ccf
+          * _      
+          */
+         {
+            Cond cc = ((from->cond_0() == Cond::Z) == (to->cond_0() == Cond::C)) ?
+               Cond::NZ : Cond::Z;
+            block->instrs().push_back(new ScfInstruction());
+            block->instrs().push_back(new JrInstruction(&imm_b<3>, cc));
+            block->instrs().push_back(new CcfInstruction());
+         }
+         break;
+         
+      case Cond::ANY: abort();
+      }
+   }
+
 
    /*** Other ***/
    void ByteRegister::Cast(Block *block, const Register *from) const {
