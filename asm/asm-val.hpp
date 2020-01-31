@@ -83,7 +83,7 @@ namespace zc {
      */
     class VariableValue: public Value_<VariableValue> {
     public:
-       bool force_reg() const { return force_reg_; }
+       bool force_reg() const { return *force_reg_; }
        virtual bool requires_alloc() const { return true; }
        int id() const { return *id_; }
 
