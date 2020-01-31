@@ -23,7 +23,7 @@ if ! [ -f "$PARAMSF" ]; then
     echo "$0: $PARAMSF: file does not exist"
     exit 2
 fi
-PARAMS=$(< "$PARAMSF")
+# PARAMS=$(< "$PARAMSF")
 
 if ! [ -d "$(dirname "$OUTF")" ]; then
     echo "$0: " $(dirname "$OUTF"): directory does not exist
@@ -37,24 +37,30 @@ fi
 # $2: PARAM
 getsize() {
     BIN="$(dirname $1)"/bare-"$(basename $1 .c)".bin
-    # BIN="${1/%.c/.bin}"
-    make -B "$BIN" CFLAGS="$2" > /dev/null 2> /dev/null
+    rm -f "$BIN"
+    if ! make -B "$BIN" $2 > /dev/null 2> /dev/null; then
+        echo "encountered error testing \"$1\" on \"$2\"" >&2
+        return 1
+    fi
     wc -c < "$BIN"
 }
 
-PARAM_ARR=($PARAMS)
-PARAM1=${PARAM_ARR[0]}
+PARAM1=$(head -n1 "$PARAMSF")
+# PARAM_ARR=($PARAMS)
+# PARAM1=${PARAM_ARR[0]}
 
 
 for SRC in $SRCS; do
     echo "$SRC" >> "$OUTF"
     # LEGEND
     printf "NAME\tTOTAL\tABS-DIFF\tPCT-DIFF\n" >> "$OUTF"
-    REFSIZE=$(getsize "$SRC" "$PARAM1")
-    for PARAM in $PARAMS; do
-        SIZE=$(getsize "$SRC" $PARAM)
+    REFSIZE=$(getsize "$SRC" "$PARAM1") || exit 1
+    while read PARAM; do
+    # for PARAM in $PARAMS; do
+        SIZE=$(getsize "$SRC" "$PARAM") || exit 1
         DIFF=$(($SIZE - $REFSIZE))
         PCTDIFF=$(awk "BEGIN {print ${DIFF}*100/${REFSIZE}}")
         printf "\t%s\t%d\t%d\t%.1f\n" $PARAM $SIZE $DIFF $PCTDIFF  >> "$OUTF"
-    done
+    done < "$PARAMSF"
+    echo >> "$OUTF"
 done
