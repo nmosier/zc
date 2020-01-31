@@ -57,10 +57,10 @@ for SRC in $SRCS; do
     REFSIZE=$(getsize "$SRC" "$PARAM1") || exit 1
     while read PARAM; do
     # for PARAM in $PARAMS; do
-        SIZE=$(getsize "$SRC" "$PARAM") || exit 1
+        SIZE=$(getsize "$SRC" "$PARAM") || continue
         DIFF=$(($SIZE - $REFSIZE))
         PCTDIFF=$(awk "BEGIN {print ${DIFF}*100/${REFSIZE}}")
         printf "\t%s\t%d\t%d\t%.1f\n" $PARAM $SIZE $DIFF $PCTDIFF  >> "$OUTF"
     done < "$PARAMSF"
-    echo >> "$OUTF"
+    printf "\n" >> "$OUTF"
 done
