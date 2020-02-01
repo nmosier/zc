@@ -42,6 +42,7 @@ limitations under the License.
 #include "ast.hpp"
 #include "cgen.hpp"
 #include "optim.hpp"
+#include "symtab.hpp"
 
 // Lexer and parser associated variables
 extern int yy_flex_debug;                // Control Flex debugging (set to 1 to turn on)
@@ -51,6 +52,10 @@ std::string g_outpath;                   // Path to output (assembly) file being
 extern int ast_yydebug;                  // Control Bison debugging (set to 1 to turn on)
 extern int yyparse(void);            // Entry point to the AST parser
 extern zc::TranslationUnit *g_AST_root;  // AST produced by parser
+
+IdentifierTable g_id_tab;
+StringTable g_str_tab;
+
 
 namespace {
 

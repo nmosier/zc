@@ -9,39 +9,31 @@ find_package(BISON)
 find_package(FLEX 2.5.35 REQUIRED)
 
 add_compile_options("-pedantic;-DEZ80")
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/inc)
 
-BISON_TARGET(zc_parser c.ypp ${CMAKE_CURRENT_BINARY_DIR}/zc-parser.cpp)
-FLEX_TARGET(zc_lexer c.l ${CMAKE_CURRENT_BINARY_DIR}/zc-lexer.cpp)
-ADD_FLEX_BISON_DEPENDENCY(zc_lexer zc_parser)
 
-set_source_files_properties(
-  ${FLEX_zc_lexer_OUTPUTS}
-  PROPERTIES
-  COMPILE_FLAGS -Wno-register
-)
 
 add_subdirectory(ast)
 add_subdirectory(asm)
+add_subdirectory(cgen)
+add_subdirectory(optim)
+add_subdirectory(ralloc)
+add_subdirectory(util)
+add_subdirectory(semant)
 
 add_library(zc_objs
   OBJECT
-  cgen.cpp
-  emit.cpp
   env.cpp
-  optim.cpp
-  peephole.cpp
-  ralloc.cpp
-  semant.cpp
-  symtab.cpp
-  util.cpp
 )
 
 add_executable(cgen-main
   cgen-main.cc
-  ${FLEX_zc_lexer_OUTPUTS}
-  ${BISON_zc_parser_OUTPUTS}
   $<TARGET_OBJECTS:zc_objs>
   $<TARGET_OBJECTS:ast_objs>
   $<TARGET_OBJECTS:asm_objs>
+  $<TARGET_OBJECTS:cgen_objs>
+  $<TARGET_OBJECTS:optim_objs>
+  $<TARGET_OBJECTS:ralloc_objs>
+  $<TARGET_OBJECTS:util_objs>
+  $<TARGET_OBJECTS:semant_objs>
 )

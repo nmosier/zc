@@ -7,14 +7,10 @@
 #include <vector>
 #include <unordered_map>
 
-#include "c.tab.hpp"
+//#include "c.tab.hpp"
 
 
 namespace zc {
-
-   const char *token_to_str(int tok);
-   void dump_token(std::ostream& out, int lineno, int token, YYSTYPE yylval);
-   void print_token(std::ostream& out, int token, YYSTYPE yylval);   
 
    inline std::ostream& indent(std::ostream& out, int padding) {
       if (padding > 80)

@@ -4,7 +4,8 @@
 #include "asm.hpp"
 #include "symtab.hpp"
 #include "semant.hpp"
-#include "c.tab.hpp"
+//#include "zc-parser.hpp"
+#include ZC_PARSER_HEADER
 #include "util.hpp"
 #include "optim.hpp"
 

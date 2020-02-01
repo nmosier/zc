@@ -6,7 +6,9 @@
 #include <string>
 #include <istream>
 #include "ast.hpp"
-#include "c.tab.hpp"
+    /* #include "c.tab.hpp" */
+#include ZC_PARSER_HEADER
+    
 
 #define YY_NO_UNPUT
 #define yywrap() 1
