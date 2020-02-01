@@ -70,7 +70,7 @@ trap "rm -rf $OUT_DIR" 0
 cd "$TEST_DIR"
 
 # Find all tests
-tests=( $(find "." -name "*.test") )
+tests=( $(find "." -name "*.test" ! -name "*.c") )
 
 # Track number of passing tests
 total=0
