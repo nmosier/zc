@@ -19,6 +19,7 @@ FLEX_SRC = lex.yy.c
 FLEX_OBJ = $(FLEX_SRC:.c=.o)
 
 TOP_SRCS = cgen.cpp semant.cpp env.cpp symtab.cpp util.cpp optim.cpp peephole.cpp ralloc.cpp
+TOP_SRCS += emit.cpp
 TOP_HDRS = $(wildcard *.hpp)
 TOP_OBJS = $(TOP_SRCS:.cpp=.o)
 
@@ -57,7 +58,7 @@ ast/%.o: ast/%.cpp $(AST_HDRS) cgen.hpp semant.hpp env.hpp symtab.hpp util.hpp
 semant.o: semant.cpp $(AST_HDRS) $(ASM_HDRS) symtab.hpp semant.hpp $(BISON_HDR) util.hpp env.hpp scopedtab.hpp
 	c++ -c $(CXXFLAGS) -o $@ $<
 
-cgen.o: cgen.cpp $(AST_HDRS) $(ASM_HDRS) scopedtab.hpp optim.hpp
+cgen.o: cgen.cpp $(AST_HDRS) $(ASM_HDRS) scopedtab.hpp optim.hpp emit.hpp
 	c++ -c $(CXXFLAGS) -o $@ $<
 
 %.o: %.cpp $(HDRS)
