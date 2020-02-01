@@ -11,8 +11,6 @@
 
 namespace zc {
 
-   class Block;
-
    std::ostream& indent(std::ostream& os, int level);
 
    class ASTNode {
@@ -28,8 +26,6 @@ namespace zc {
       ASTNode(const SourceLoc& loc): loc_(loc) {}
    };
 
-
-   
    template <class Node>
    class ASTNodeVec: public ASTNode {
    public:
@@ -75,24 +71,7 @@ namespace zc {
       
    };
 
-   typedef ASTNodeVec<ASTStat> ASTStats;
-   template <> const char *ASTStats::name() const;
    
-
-   
-   template <class... Types>
-   class ASTVariantFeature {
-   public:
-      typedef std::variant<Types*...> Variant;
-      const Variant& variant() const { return variant_; }
-      
-   protected:
-      Variant variant_;
-
-      ASTVariantFeature(const Variant& variant): variant_(variant) {}
-   };
-
-
 }
 
 #endif

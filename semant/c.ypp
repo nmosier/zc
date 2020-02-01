@@ -46,7 +46,6 @@
     zc::FunctionDef *function_def;
     zc::ASTDeclarators *declarators;
     zc::ASTDeclarator *declarator;
-    zc::Decls *param_types;
     zc::ASTStat *stat;
     zc::ASTStats *stats;
     zc::CompoundStat *compound_stat;

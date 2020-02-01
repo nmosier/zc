@@ -7,7 +7,7 @@
 
 #include <iostream>
 
-#include "ast-base.hpp"
+#include "cgen-fwd.hpp"
 
 namespace zc {
 
@@ -15,7 +15,9 @@ namespace zc {
    public:
       ExternalDecls *decls() const { return decls_; }
       
-      static TranslationUnit *Create(ExternalDecls *decls, SourceLoc& loc) { return new TranslationUnit(decls, loc); }
+      static TranslationUnit *Create(ExternalDecls *decls, SourceLoc& loc) {
+         return new TranslationUnit(decls, loc);
+      }
 
       virtual void DumpNode(std::ostream& os) const override { os << "TranslationUnit"; }
 

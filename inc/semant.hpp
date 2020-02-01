@@ -39,7 +39,9 @@
 
 #include <unordered_set>
 
-#include "ast.hpp"
+#include "ast-fwd.hpp"
+#include "semant-fwd.hpp"
+
 #include "symtab.hpp"
 #include "scopedtab.hpp"
 #include "env.hpp"
@@ -95,9 +97,6 @@ namespace zc {
       Labels label_defs_;
    };
 
-   class TaggedType;
-   class ASTStat;
-   class Declaration;
    class SemantEnv: public Env<Declaration, TaggedType, ASTStat, SemantExtEnv> {
    public:
       SemantEnv(SemantError& error): Env<Declaration, TaggedType, ASTStat, SemantExtEnv>(),
@@ -108,7 +107,6 @@ namespace zc {
       SemantError& error_;
    };
 
-   class IntegralType;
    IntegralType *combine_integral_type_specs(std::unordered_multiset<int>& type_specs,
                                              SemantError& error, const SourceLoc& loc);   
    

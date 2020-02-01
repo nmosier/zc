@@ -8,20 +8,14 @@
 #include <cstdint>
 #include <variant>
 
+#include "cgen-fwd.hpp"
+#include "asm-fwd.hpp"
 #include "symtab.hpp"
 
 namespace zc {
 
-   namespace z80 {
-      class Value;
-      class VariableValue;
-   }
-   using Value = z80::Value;
-   // using VariableValue = z80::VariableValue;
+   using z80::Value;
    
-   
-   class ASTExpr;
-   typedef ASTNodeVec<ASTExpr> ASTExprs;
    
    class ASTExpr: public ASTNode {
    public:
@@ -81,6 +75,8 @@ namespace zc {
       ASTExpr(ASTType *type, Args... args): ASTNode(args...), type_(type) {}
    };
 
+
+   
    class ASTUnaryExpr: public ASTExpr {
    public:
       ASTExpr *expr() const { return expr_; }

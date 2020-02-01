@@ -5,9 +5,9 @@
 #ifndef __AST_STAT_HPP
 #define __AST_STAT_HPP
 
-namespace zc {
+#include "asm-fwd.hpp"
 
-   class Block;
+namespace zc {
 
    class ASTStat: public ASTNode {
    public:
@@ -26,7 +26,8 @@ namespace zc {
       
    protected:
       ASTStat(const SourceLoc& loc): ASTNode(loc) {}
-   };   
+   };
+   template <> const char *ASTStats::name() const;   
 
    class CompoundStat: public ASTStat {
    public:

@@ -6,6 +6,7 @@
 #include <unordered_set>
 #include <numeric>
 
+#include "cgen-fwd.hpp"
 #include "asm.hpp"
 #include "ast.hpp"
 #include "scopedtab.hpp"
@@ -13,9 +14,6 @@
 namespace zc {
 
    using namespace zc::z80;
-
-   class Block;
-   typedef std::unordered_set<Block *> Blocks;
 
    /**
     * Entry point to code generator.
@@ -121,7 +119,6 @@ namespace zc {
    std::ostream& operator<<(std::ostream& os, Cond cond);
    Cond invert(Cond cond);
    
-   class BlockTransition;
    class BlockTransitions {
    public:
       typedef std::vector<BlockTransition *> Transitions;

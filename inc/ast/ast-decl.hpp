@@ -5,13 +5,13 @@
 #ifndef __AST_DECL_HPP
 #define __AST_DECL_HPP
 
-#include "ast/ast-base.hpp"
+#include <ostream>
+
+#include "cgen-fwd.hpp"
 
 namespace zc {
 
-   class ASTType;
    class Declaration;
-   typedef std::vector<Declaration *> Declarations;
 
    class ExternalDecl: public ASTNode {
    public:
@@ -44,6 +44,8 @@ namespace zc {
       template <typename... Args>
       ExternalDecl(Declaration *decl, Args... args): ASTNode(args...), decl_(decl) {}
    };
+
+   
    
    template <> const char *ExternalDecls::name() const;
 
@@ -80,8 +82,6 @@ namespace zc {
       
    };
 
-   class DeclSpecs;
-   
    class TypeSpec: public ASTNode {
    public:
       virtual void AddTo(DeclSpecs *decl_specs) = 0;
@@ -208,6 +208,7 @@ namespace zc {
       Declaration(ASTType *type, Args... args):
          ASTNode(args...), type_(type) {}
    };
+
  
    class VarDeclaration: public Declaration {
    public:

@@ -14,11 +14,6 @@ extern const char *g_filename;
 
 namespace zc {
 
-
-   class FunctionType;
-   class ASTType;
-   typedef std::vector<ASTType *> Types;
-
    bool TypeEq(const Types *lhs, const Types *rhs);   
 
    class ASTType: public ASTNode {
@@ -77,7 +72,6 @@ namespace zc {
       template <typename... Args>
       ASTType(Args... args): ASTNode(args...) {}
    };
-
    std::ostream& operator<<(std::ostream& os, ASTType::Kind kind);
 
 
@@ -378,7 +372,6 @@ namespace zc {
    /**
     * Abstract tagged type that has members (i.e. struct or union).
     */
-   class VarDeclaration;
    class CompoundType: public TaggedType_aux<VarDeclaration> {
    public:
       virtual void get_declarables(Declarations* output) const override;
@@ -453,7 +446,6 @@ namespace zc {
       UnionType(Args... args): CompoundType(args...) {}
    };
 
-   class EnumType;
    class Enumerator: public ASTNode {
    public:
       Identifier *id() const { return id_; }
@@ -495,8 +487,6 @@ namespace zc {
          ASTNode(args...), id_(id), val_(val), prev_(prev), enum_type_(nullptr) {}
    };
    
-
-   class Enumerator;
    class EnumType: public TaggedType_aux<Enumerator> {
    public:
       virtual TagKind tag_kind() const override {return TagKind::TAG_ENUM; }

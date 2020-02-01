@@ -9,12 +9,12 @@
 #include <type_traits>
 #include <stdint.h>
 
-#include "ast/ast-fwd.hpp"
+#include "ast-fwd.hpp"
 
-#include "ast/ast-main.hpp"
 #include "ast/ast-base.hpp"
-#include "ast/ast-expr.hpp"
 #include "ast/ast-decl.hpp"
+#include "ast/ast-main.hpp"
+#include "ast/ast-expr.hpp"
 #include "ast/ast-stat.hpp"
 #include "ast/ast-type.hpp"
 
