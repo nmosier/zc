@@ -109,13 +109,16 @@ namespace zc {
       }
    }
 
+   /*** TYPE EQUALITY ***/
+
    bool VoidType::TypeEq(const ASTType *other) const {
       return dynamic_cast<const VoidType *>(other) != nullptr;
    }
 
    bool IntegralType::TypeEq(const ASTType *other) const {
       auto int_other = dynamic_cast<const IntegralType *>(other);
-      return int_other == nullptr ? false : int_other->int_kind() == int_kind();
+      if (int_other == nullptr) { return false; }
+      return int_other->int_kind() == int_kind() && int_other->is_signed() == is_signed();
    }
 
    /* NOTE: This doesn't check if the arrays are of the same size.
@@ -129,10 +132,122 @@ namespace zc {
       }
    }
 
+    bool PointerType::TypeEq(const ASTType *other) const {
+       const PointerType *ptr_other = dynamic_cast<const PointerType *>(other);
+       if (ptr_other == nullptr) {
+          return false;
+       } else {
+          return this->depth() == ptr_other->depth() && pointee()->TypeEq(ptr_other->pointee());
+       }
+    }
+
+    bool FunctionType::TypeEq(const ASTType *other) const {
+       const FunctionType *fn_other = dynamic_cast<const FunctionType *>(other);
+       if (fn_other == nullptr) {
+          return false;
+       } else {
+          /* get param type lists */
+          Types this_types, other_types;
+          std::transform(params()->begin(), params()->end(), std::back_inserter(this_types),
+                         [](const auto decl) { return decl->type(); });
+          std::transform(fn_other->params()->begin(), fn_other->params()->end(),
+                         std::back_inserter(other_types),
+                         [](const auto decl) { return decl->type(); });
+          return return_type()->TypeEq(fn_other->return_type()) &&
+             ::zc::TypeEq(&this_types, &other_types);
+       }
+    }
+
+    bool TaggedType::TypeEq(const ASTType *other) const {
+       const TaggedType *tagged_other = dynamic_cast<const TaggedType *>(other);
+       if (tagged_other == nullptr) {
+          return false;
+       } else {
+          return unique_id() == tagged_other->unique_id();
+       }
+    }
+
+    bool TypeEq(const Types *lhs, const Types *rhs) {
+       if (lhs->size() != rhs->size()) {
+          return false;
+       }
+
+       for (auto lhs_it = lhs->begin(), rhs_it = rhs->begin();
+            lhs_it != lhs->end();
+            ++lhs_it, ++rhs_it) {
+          if (!(*lhs_it)->TypeEq(*rhs_it)) {
+             return false;
+          }
+       }
+    
+       return true;
+    }
+
+   /* TYPE COERCION */
+
    bool ArrayType::TypeCoerce(const ASTType *from) const {
       /* Arrays can decay into pointers, but not vice versa. */
       return TypeEq(from);
    }
+
+   bool PointerType::TypeCoerce(const ASTType *from) const {
+      /* -1. Check if types are equal. */
+      if (this->TypeEq(from)) {
+         return true;
+      }
+
+      bool isvoid = pointee()->kind() == ASTType::Kind::TYPE_VOID;
+
+      /* check if `from' is an array. */
+      const ArrayType *from_arr = dynamic_cast<const ArrayType *>(from);
+      if (from_arr != nullptr) {
+         /* ensure base elements are of same type */
+         return from_arr->TypeEq(pointee()) || is_void();
+      }
+
+      /* check if this is a function pointer and `from' is a function */
+      if (pointee()->kind() == Kind::TYPE_FUNCTION && depth() == 1 &&
+          from->kind() == Kind::TYPE_FUNCTION) {
+          return pointee()->TypeCoerce(from);
+      }
+      
+      /* 0. Verify `from' is a pointer. */
+      const PointerType *from_ptr = dynamic_cast<const PointerType *>(from);
+      if (from_ptr == nullptr) {
+         return false; /* can never implicitly cast from non-pointer type to pointer type */
+      }
+
+      return from_ptr->is_void() || is_void();
+   }
+   
+   bool FunctionType::TypeCoerce(const ASTType *from) const {
+      return TypeEq(from);
+   }
+
+    bool CompoundType::TypeCoerce(const ASTType *from) const {
+       return TypeEq(from);
+    }
+
+    bool EnumType::TypeCoerce(const ASTType *from) const {
+       return int_type_->TypeCoerce(from);
+    }
+
+
+    void EnumType::TypeCheckMembs(SemantEnv& env) {
+       if (membs()) {
+          for (auto memb : *membs()) {
+             memb->TypeCheck(env, this);
+          }
+       }
+    }
+
+
+
+
+
+
+
+   
 
    ASTType *IntegralType::Address() {
       return PointerType::Create(1, this, loc());

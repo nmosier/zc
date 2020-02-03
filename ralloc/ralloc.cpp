@@ -81,13 +81,6 @@ namespace zc::z80 {
       IntervalMap<const ByteRegister *> byte_regs;
       IntervalMap<const VariableValue *> vars;
 
-      /*
-      std::unordered_map<const ByteRegister *,
-                         std::map<int,std::pair<Instructions::iterator,mode>>> byte_regs;
-      std::unordered_map<const VariableValue *,
-                         std::map<int,std::pair<Instructions::iterator,mode>>> vars;
-      */
-
       /* populate local regs maps with all alloc'able regs */
       for (const ByteRegister *reg : {&r_a, &r_b, &r_c, &r_d, &r_e, &r_h, &r_l}) {
          byte_regs[reg];
@@ -511,19 +504,23 @@ namespace zc::z80 {
 
    /*** ***/
    void RegisterAllocator::RallocBlock(Block *block, StackFrame& stack_frame) {
-      std::cerr << block->label()->name() << ":" << std::endl;
       RegisterAllocator ralloc(block, stack_frame);
       ralloc.ComputeIntervals();
 
       if (g_optim.join_vars) {
          ralloc.JoinVars();
       }
-      
-      ralloc.Dump(std::cerr);
+
+      if (g_print.ralloc_info) {
+         std::cerr << block->label()->name() << ":" << std::endl;
+         ralloc.Dump(std::cerr);
+      }
 
       ralloc.RunAllocation();
 
-      ralloc.Dump(std::cerr);
+      if (g_print.ralloc_info) {
+         ralloc.Dump(std::cerr);
+      }
    }
 
    void RegisterAllocator::Ralloc(FunctionImpl& impl, StackFrame& frame) {

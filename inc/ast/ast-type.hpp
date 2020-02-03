@@ -206,7 +206,7 @@ namespace zc {
       virtual ASTType *TypeResolve(SemantEnv& env) override { return this; }      
       virtual void TypeCheck(SemantEnv& env, bool allow_void) override {}
       virtual bool TypeEq(const ASTType *other)  const override;
-      virtual bool TypeCoerce(const ASTType *from) const override { return true; }
+      virtual bool TypeCoerce(const ASTType *from) const override { return true; } // TODO: huh?
       IntegralType *Max(const IntegralType *other) const;
 
       virtual ASTType *Address() override;

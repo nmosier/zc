@@ -16,7 +16,10 @@ namespace zc {
       IntegralType::IntKind bool_spec() const {
          return bool_flag ? IntegralType::IntKind::SPEC_BOOL : IntegralType::IntKind::SPEC_CHAR;
       }
-      IntegralType *bool_type() const { return IntegralType::Create(bool_spec(), false, 0); }
+      IntegralType *bool_type() const {
+         return bool_flag ? int_type<IntegralType::IntKind::SPEC_BOOL, false> :
+            int_type<IntegralType::IntKind::SPEC_CHAR, false>;
+      }
       
       /** Register allocation flags */
       bool join_vars = true;

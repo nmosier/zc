@@ -10,8 +10,6 @@
 #include "ralloc.hpp"
 #include "emit.hpp"
 
-#define PREDUMP 1
-
 namespace zc {
 
    static Block dead_block;
@@ -24,11 +22,9 @@ namespace zc {
       // env.Serialize();
       env.Resolve();
 
-#if PREDUMP
-      env.DumpAsm(std::cerr);
-#endif
-
-
+      if (g_print.ralloc_info) {
+         env.DumpAsm(std::cerr);
+      }
       
       RegisterAllocator::Ralloc(env);
       
@@ -37,7 +33,7 @@ namespace zc {
       
       OptimizeIR(env);
       // OptimizeIR(env);
-      
+
       env.DumpAsm(os);
    }
 

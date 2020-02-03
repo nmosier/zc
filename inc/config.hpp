@@ -93,6 +93,7 @@ namespace zc {
 
    struct PrintOpts: public Config<PrintOpts> {
       bool peephole_stats = false;
+      bool ralloc_info = false;
       
       PrintOpts(const NameTable& nametab): Config(nametab) {}
    };

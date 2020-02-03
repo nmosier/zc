@@ -77,50 +77,6 @@
        return map[token];
     }
 
-#if 0
-    /**
-     * combine basic type spec tags into one during parsing
-     */
-    IntegralType *combine_integral_type_specs(std::unordered_multiset<int>& int_specs,
-                                              SemantError& error, const SourceLoc& loc) {
-       using Kind = IntegralType::IntKind;
-       
-       switch (int_specs.size()) {
-       case 0:
-          error(g_filename, loc) << "declaration missing type specifier" << std::endl;
-          return int_type<Kind::SPEC_INT,true>;
-          
-       case 1:
-          return IntegralType::Create(token_to_intspec(*int_specs.begin()), loc);
-
-       case 2:
-          if (int_specs.count(LONG) == 2) {
-             return IntegralType::Create(Kind::SPEC_LONG_LONG, loc);
-          } else if (int_specs.count(CHAR) > 0) {
-             error(g_filename, loc) << "cannot combine 'char' type specifier with other "
-                                     << "type specifiers" << std::endl;
-             return IntegralType::Create(token_to_intspec(*int_specs.begin()), loc);
-          } else if (int_specs.count(INT) == 1) {
-             int_specs.erase(INT);
-             return IntegralType::Create(token_to_intspec(*int_specs.begin()), loc);
-          } else {
-             error(g_filename, loc) << "too many type specifiers given" << std::endl;
-             return IntegralType::Create(token_to_intspec(*int_specs.begin()), loc);
-          }
-          
-       case 3:
-          if (int_specs.count(LONG) == 2 && int_specs.count(INT) == 1) {
-             return IntegralType::Create(token_to_intspec(*int_specs.begin()), loc);
-          }
-          
-       default:
-             error(g_filename, loc) << "too many type specifiers given; "
-                                            << "how about I just pick one at random?"
-                                            << std::endl;
-             return IntegralType::Create(token_to_intspec(*int_specs.begin()), loc);
-       }
-    }
-#endif
 
 
     /*** TYPE CHECK ***/
@@ -400,9 +356,8 @@
           env.error()(g_filename, this) << "value in return statement has incompatible type"
                                         << std::endl;
        } else if (!ret_type->TypeEq(expr_type)) {
-           /* add explicit cast */
+          /* add explicit cast */
           expr_ = expr()->Cast(ret_type);
-          // expr_ = CastExpr::Create(ret_type, expr(), loc());
        }
     }
 
@@ -768,6 +723,9 @@
        type_ = VoidType::Create(loc());
     }
 
+    void VarDeclaration::TypeCheck(SemantEnv& env) {
+       type()->TypeCheck(env, false);
+    }    
 
     /*** EXPRESSION KIND (LVALUE or RVALUE) ***/
     ASTExpr::ExprKind AssignmentExpr::expr_kind() const {
@@ -851,112 +809,8 @@
     }
 
     /*** TYPE EQUALITY ***/
-    bool PointerType::TypeEq(const ASTType *other) const {
-       const PointerType *ptr_other = dynamic_cast<const PointerType *>(other);
-       if (ptr_other == nullptr) {
-          return false;
-       } else {
-          return this->depth() == ptr_other->depth() && pointee()->TypeEq(ptr_other->pointee());
-       }
-    }
-
-    bool FunctionType::TypeEq(const ASTType *other) const {
-       const FunctionType *fn_other = dynamic_cast<const FunctionType *>(other);
-       if (fn_other == nullptr) {
-          return false;
-       } else {
-          /* get param type lists */
-          Types this_types, other_types;
-          std::transform(params()->begin(), params()->end(), std::back_inserter(this_types),
-                         [](const auto decl) { return decl->type(); });
-          std::transform(fn_other->params()->begin(), fn_other->params()->end(),
-                         std::back_inserter(other_types),
-                         [](const auto decl) { return decl->type(); });
-          return return_type()->TypeEq(fn_other->return_type()) &&
-             ::zc::TypeEq(&this_types, &other_types);
-       }
-    }
-
-    bool TaggedType::TypeEq(const ASTType *other) const {
-       const TaggedType *tagged_other = dynamic_cast<const TaggedType *>(other);
-       if (tagged_other == nullptr) {
-          return false;
-       } else {
-          return unique_id() == tagged_other->unique_id();
-       }
-    }
-
-    bool TypeEq(const Types *lhs, const Types *rhs) {
-       if (lhs->size() != rhs->size()) {
-          return false;
-       }
-
-       for (auto lhs_it = lhs->begin(), rhs_it = rhs->begin();
-            lhs_it != lhs->end();
-            ++lhs_it, ++rhs_it) {
-          if (!(*lhs_it)->TypeEq(*rhs_it)) {
-             return false;
-          }
-       }
-    
-       return true;
-    }
 
     /*** TYPE COERCION ***/
-   bool PointerType::TypeCoerce(const ASTType *from) const {
-      /* -1. Check if types are equal. */
-      if (this->TypeEq(from)) {
-         return true;
-      }
-
-      bool isvoid = pointee()->kind() == ASTType::Kind::TYPE_VOID;
-
-      /* check if `from' is an array. */
-      const ArrayType *from_arr = dynamic_cast<const ArrayType *>(from);
-      if (from_arr != nullptr) {
-         /* ensure base elements are of same type */
-         return from_arr->TypeEq(pointee()) || is_void();
-      }
-
-      /* check if this is a function pointer and `from' is a function */
-      if (pointee()->kind() == Kind::TYPE_FUNCTION && depth() == 1 &&
-          from->kind() == Kind::TYPE_FUNCTION) {
-          return pointee()->TypeCoerce(from);
-      }
-      
-      /* 0. Verify `from' is a pointer. */
-      const PointerType *from_ptr = dynamic_cast<const PointerType *>(from);
-      if (from_ptr == nullptr) {
-         return false; /* can never implicitly cast from non-pointer type to pointer type */
-      }
-
-      return from_ptr->is_void() || is_void();
-   }
-   
-   bool FunctionType::TypeCoerce(const ASTType *from) const {
-      return TypeEq(from);
-   }
-
-    bool CompoundType::TypeCoerce(const ASTType *from) const {
-       return TypeEq(from);
-    }
-
-    bool EnumType::TypeCoerce(const ASTType *from) const {
-       return int_type_->TypeCoerce(from);
-    }
-
-
-    void EnumType::TypeCheckMembs(SemantEnv& env) {
-       if (membs()) {
-          for (auto memb : *membs()) {
-             memb->TypeCheck(env, this);
-          }
-       }
-    }
-
-    void VarDeclaration::TypeCheck(SemantEnv& env) {
-       type()->TypeCheck(env, false);
-    }
     
    /*** JOIN POINTERS ***/
 

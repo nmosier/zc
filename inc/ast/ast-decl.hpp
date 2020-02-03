@@ -382,8 +382,6 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override { os << "FunctionDeclarator"; }
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override;
 
-      // virtual void TypeCheck(SemantEnv& env) override;
-      
       virtual ASTType *Type(ASTType *init_type) const override;
       
       virtual void JoinPointers() override;

@@ -56,7 +56,6 @@ extern zc::TranslationUnit *g_AST_root;  // AST produced by parser
 IdentifierTable g_id_tab;
 StringTable g_str_tab;
 
-
 namespace {
 
    void usage(const char *program) {
@@ -66,6 +65,7 @@ namespace {
 }
 
 zc::PrintOpts zc::g_print({{"peephole-stats", &PrintOpts::peephole_stats},
+                           {"ralloc-info", &PrintOpts::ralloc_info},
    });
 
 int main(int argc, char *argv[]) {

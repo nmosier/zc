@@ -31,8 +31,6 @@
    void dump_token(std::ostream& out, int lineno, int token, YYSTYPE yylval);
    void print_token(std::ostream& out, int token, YYSTYPE yylval);   
 
-//#include "util.hpp"
-
 %}
                         
 %union {
@@ -346,6 +344,15 @@ param_decl:     decl_specs declarator {
                     auto type_specs_type = $1->Type(zc::g_semant_error);
                     auto type = zc::ASTType::Create(type_specs_type, $2);
                     $$ = zc::VarDeclaration::Create($2->sym(), false, type, @1);
+                }
+        |       decl_specs abstract_declarator {
+                    auto type_specs_type = $1->Type(zc::g_semant_error);
+                    auto type = zc::ASTType::Create(type_specs_type, $2);
+                    $$ = zc::VarDeclaration::Create(nullptr, false, type, @1);
+                }   
+        |       decl_specs {
+                    auto type = $1->Type(zc::g_semant_error);
+                    $$ = zc::VarDeclaration::Create(nullptr, false, type, @1);
                 }
         ; /* incomplete */
 stat:           exp_stat { $$ = $1; }
