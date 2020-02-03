@@ -3,27 +3,23 @@
 #error "include \"asm.hpp\", not \"asm-base.hpp\" directly"
 #endif
 
-#ifndef __ASM_BASE_HPP
-#define __ASM_BASE_HPP
+#ifndef __ASM_INSTR_HPP
+#define __ASM_INSTR_HPP
 
 #include <list>
 #include <vector>
 
-#include "asm/asm-mem.hpp"
+#include "asm-fwd.hpp"
 #include "asm/asm-reg.hpp"
+#include "asm/asm-val.hpp"
+#include "asm/asm-lab.hpp"
 #include "asm/asm-cond.hpp"
+
 #include "util.hpp"
 
 namespace zc { enum class Cond; }
 
 namespace zc::z80 {
-
-   class Value;
-   class VariableValue;
-   typedef std::vector<portal<const Value *>> Values;
-
-   class Instruction;
-   typedef std::list<Instruction *> Instructions;
    
    class Instruction {
    public:

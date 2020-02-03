@@ -93,7 +93,7 @@ namespace zc {
 
    class BasicTypeSpec: public TypeSpec {
    public:
-      enum class Kind {TS_VOID, TS_CHAR, TS_SHORT, TS_INT, TS_LONG};
+      enum class Kind {TS_VOID, TS_CHAR, TS_SHORT, TS_INT, TS_LONG, TS_UNSIGNED, TS_SIGNED};
       Kind kind() const { return kind_; }
 
       virtual void AddTo(DeclSpecs *decl_specs) override;

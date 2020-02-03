@@ -4,7 +4,6 @@
 #include "asm.hpp"
 #include "symtab.hpp"
 #include "semant.hpp"
-//#include "zc-parser.hpp"
 #include ZC_PARSER_HEADER
 #include "util.hpp"
 #include "optim.hpp"
@@ -78,6 +77,7 @@
        return map[token];
     }
 
+#if 0
     /**
      * combine basic type spec tags into one during parsing
      */
@@ -88,7 +88,7 @@
        switch (int_specs.size()) {
        case 0:
           error(g_filename, loc) << "declaration missing type specifier" << std::endl;
-          return IntegralType::Create(Kind::SPEC_INT, loc);
+          return int_type<Kind::SPEC_INT,true>;
           
        case 1:
           return IntegralType::Create(token_to_intspec(*int_specs.begin()), loc);
@@ -120,6 +120,7 @@
              return IntegralType::Create(token_to_intspec(*int_specs.begin()), loc);
        }
     }
+#endif
 
 
     /*** TYPE CHECK ***/
@@ -493,7 +494,7 @@
        const FunctionType *type;
        if ((type = fn()->type()->get_callable()) == nullptr) {
           env.error()(g_filename, this) << "expression is not callable" << std::endl;
-          type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());
+          type_ = default_type;
           return;
        }
 
@@ -538,14 +539,14 @@
           env.error()(g_filename, this) << "member access into incomplete "
                                         << compound_type->kind() << "'"
                                         << compound_type->tag() << "'" << std::endl;
-          type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());
+          type_ = default_type;
        } else {
           auto it = compound_type->membs()->find(memb());
           if (it == compound_type->membs()->end()) {
              env.error()(g_filename, this) << "no member named '" << *memb() << "' in "
                                            << compound_type->kind() << "'"
                                            << compound_type->tag() << "'" << std::endl;
-             type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());
+             type_ = default_type;
           } else {
              type_ = (*it)->type();
           }
@@ -557,7 +558,7 @@
              [&](auto val) { val->TypeCheck(env); }
                 }, variant_);
 
-       type_ = IntegralType::Create(IntegralType::IntKind::SPEC_LONG_LONG, loc());
+       type_ = IntegralType::Create(IntegralType::IntKind::SPEC_LONG_LONG, false, loc());
     }
 
     void IndexExpr::TypeCheck(SemantEnv& env) {
@@ -571,8 +572,8 @@
        } else {
           const IntegralType *int_type = dynamic_cast<const IntegralType *>(index()->type());
           if (int_type->bytes() != z80::long_size) {
-             index_ = CastExpr::Create
-                (IntegralType::Create(IntKind::SPEC_LONG, loc()), index(), loc());
+             index_ = CastExpr::Create(IntegralType::Create(IntKind::SPEC_LONG, true, loc()),
+                                       index(), loc());
           }
        }
        type_ = base()->type()->get_containee();
@@ -629,7 +630,8 @@
       case Kind::UOP_DEC_PRE:
       case Kind::UOP_DEC_POST:
          /* require integral or pointer type */
-         if (!IntegralType::Create(IntegralType::IntKind::SPEC_INT, 0)->TypeCoerce(expr_->type()) &&
+         // IntegralType::Create(IntegralType::IntKind::SPEC_INT, 0)->TypeCoerce(expr_->type())
+         if (!int_type<IntegralType::IntKind::SPEC_INT,true>->TypeCoerce(expr_->type()) &&
              expr_->type()->kind() != ASTType::Kind::TYPE_POINTER) {
             env.error()(g_filename, this) << "operand to increment/decrement must be "
                                           << "of integral or pointer type"
@@ -734,12 +736,11 @@
     }
     
    void LiteralExpr::TypeCheck(SemantEnv& env) {
-      type_ = IntegralType::Create(IntegralType::min_type(val()), loc());
+      type_ = IntegralType::Create(val(), loc());
    }
 
    void StringExpr::TypeCheck(SemantEnv& env) {
-      type_ = PointerType::Create(1, IntegralType::Create(IntegralType::IntKind::SPEC_CHAR, loc()),
-                                  loc());
+      type_ = PointerType::Create(1, char_type, loc());
    }
 
    void IdentifierExpr::TypeCheck(SemantEnv& env) {
@@ -747,7 +748,7 @@
       if ((decl = env.symtab().Lookup(id()->id())) == nullptr) {
          env.error()(g_filename, this) << "use of undeclared identifier '" << *id()->id()
                                        << "'" << std::endl;
-         type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());         
+         type_ = default_type;
       } else {
          auto var = dynamic_cast<const VarDeclaration *>(decl);
          if (var) {
@@ -757,7 +758,7 @@
             env.error()(g_filename, this) << "identifier '" << *id()->id()
                                           << "' is incorrect kind of symbol"
                                           << std::endl;
-            type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());
+            type_ = default_type;
          }
       }
    }

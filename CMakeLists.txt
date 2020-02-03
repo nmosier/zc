@@ -18,7 +18,6 @@ add_subdirectory(asm)
 add_subdirectory(cgen)
 add_subdirectory(optim)
 add_subdirectory(ralloc)
-add_subdirectory(util)
 add_subdirectory(semant)
 
 add_library(zc_objs
@@ -34,6 +33,5 @@ add_executable(cgen-main
   $<TARGET_OBJECTS:cgen_objs>
   $<TARGET_OBJECTS:optim_objs>
   $<TARGET_OBJECTS:ralloc_objs>
-  $<TARGET_OBJECTS:util_objs>
   $<TARGET_OBJECTS:semant_objs>
 )

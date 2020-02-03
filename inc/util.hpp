@@ -1,14 +1,10 @@
-
 #ifndef __UTIL_HPP
 #define __UTIL_HPP
 
-
+#include <variant>
 #include <iostream>
 #include <vector>
 #include <unordered_map>
-
-//#include "c.tab.hpp"
-
 
 namespace zc {
 
@@ -57,7 +53,8 @@ namespace zc {
    template <class InputIt, typename... Ts>
    std::optional<std::tuple<Ts...>> vec_to_tuple(InputIt begin, InputIt end) {
       std::optional<std::tuple<Ts...>> t;
-      vec_to_tupler<InputIt, Ts...>::template do_it<std::tuple_size<std::tuple<Ts...>>::value>(t, begin, end);
+      vec_to_tupler<InputIt, Ts...>::template
+         do_it<std::tuple_size<std::tuple<Ts...>>::value>(t, begin, end);
       return t;
    }
 
@@ -83,7 +80,5 @@ namespace zc {
    };
    
 }
-
-
 
 #endif

@@ -1,6 +1,8 @@
 #ifndef __CGEN_FWD_HPP
 #define __CGEN_FWD_HPP
 
+#include <unordered_set>
+
 namespace zc {
 
    class Block;

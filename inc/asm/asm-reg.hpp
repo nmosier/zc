@@ -6,14 +6,13 @@
 #define __ASM_REG_HPP
 
 #include <array>
+#include <ostream>
 
+#include "asm-fwd.hpp"
 #include "asm/asm-mode.hpp"
+#include "cgen-fwd.hpp"
 
 namespace zc::z80 {
-
-   class ByteRegister;
-   class MultibyteRegister;
-   class RegisterValue;
 
    extern const ByteRegister r_a, r_b, r_c, r_d, r_e, r_f, r_h, r_l, r_ixh,
       r_ixl, r_iyh, r_iyl;
@@ -90,7 +89,8 @@ namespace zc::z80 {
    class MultibyteRegister: public Register_<MultibyteRegister> {
    public:
       virtual int size() const override { return long_size; }
-      typedef std::array<const ByteRegister *, word_size> ByteRegs;
+      typedef std::vector<const ByteRegister *> ByteRegs;
+      // typedef std::array<const ByteRegister *, word_size> ByteRegs;
       virtual Kind kind() const override { return Kind::REG_MULTIBYTE; }
       const ByteRegs& regs() const { return regs_; }
       bool contains(const Register *reg) const;

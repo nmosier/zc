@@ -2,8 +2,8 @@
 #error "include \"asm.hpp\""
 #endif
 
-#ifndef __ASM_MEM_HPP
-#define __ASM_MEM_HPP
+#ifndef __ASM_LAB_HPP
+#define __ASM_LAB_HPP
 
 #include <string>
 #include <vector>
@@ -33,32 +33,6 @@ namespace zc::z80 {
       const std::string name_;
    };
 
-   /*******************
-    * MEMORY LOCATION *
-    *******************/
-
-#if 0
-   class Value;
-   /**
-    * Base class representing a memory location.
-    */
-   class MemoryLocation {
-   public:
-      const Value *addr() const { return addr_; }
-
-      MemoryLocation *Advance(const intmax_t& offset) const;
-      void Emit(std::ostream& os) const;
-
-      bool Eq(const MemoryLocation *other) const;
-
-      MemoryLocation(const Value *addr): addr_(addr) {}
-      
-   protected:
-      const Value *addr_;
-   };
-#endif
-
-   
 }
 
 #endif

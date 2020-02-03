@@ -107,25 +107,41 @@ namespace zc {
       /* otherwise, all basic. */
       using Kind = BasicTypeSpec::Kind;
       std::multiset<Kind> specs;
-      std::transform(basic_type_specs.begin(), basic_type_specs.end(), std::inserter(specs, specs.begin()),
+      std::transform(basic_type_specs.begin(), basic_type_specs.end(),
+                     std::inserter(specs, specs.begin()),
                      [](auto spec) { return spec->kind(); });
+
+      /* if `signed' or `unsigned' keywords are present, remove now and record sign */
+      bool is_signed = true; /* signed by default */
+      if (specs.count(Kind::TS_SIGNED) == 1) {
+         specs.erase(Kind::TS_SIGNED);
+         is_signed = true;
+      } else if (specs.count(Kind::TS_UNSIGNED) == 1) {
+         specs.erase(Kind::TS_UNSIGNED);
+         is_signed = false;
+      }
+      
       using IntKind = IntegralType::IntKind;
       std::map<std::multiset<Kind>,ASTType *> valid_combos
          {{{Kind::TS_VOID}, VoidType::Create(loc())},
-          {{Kind::TS_CHAR}, IntegralType::Create(IntKind::SPEC_CHAR, loc())},
-          {{Kind::TS_SHORT}, IntegralType::Create(IntKind::SPEC_SHORT, loc())},
-          {{Kind::TS_INT}, IntegralType::Create(IntKind::SPEC_INT, loc())},
-          {{Kind::TS_LONG}, IntegralType::Create(IntKind::SPEC_LONG, loc())},
-          {{Kind::TS_SHORT, Kind::TS_INT}, IntegralType::Create(IntKind::SPEC_SHORT, loc())},
-          {{Kind::TS_LONG, Kind::TS_INT}, IntegralType::Create(IntKind::SPEC_LONG, loc())},
-          {{Kind::TS_LONG, Kind::TS_LONG}, IntegralType::Create(IntKind::SPEC_LONG_LONG, loc())},
-          {{Kind::TS_LONG, Kind::TS_LONG, Kind::TS_INT}, IntegralType::Create(IntKind::SPEC_LONG_LONG,loc())}
+          {{Kind::TS_CHAR}, IntegralType::Create(IntKind::SPEC_CHAR, is_signed, loc())},
+          {{Kind::TS_SHORT}, IntegralType::Create(IntKind::SPEC_SHORT, is_signed, loc())},
+          {{Kind::TS_INT}, IntegralType::Create(IntKind::SPEC_INT, is_signed, loc())},
+          {{Kind::TS_LONG}, IntegralType::Create(IntKind::SPEC_LONG, is_signed, loc())}, 
+          {{Kind::TS_SHORT, Kind::TS_INT}, IntegralType::Create(IntKind::SPEC_SHORT,
+                                                                is_signed, loc())},
+          {{Kind::TS_LONG, Kind::TS_INT}, IntegralType::Create(IntKind::SPEC_LONG,
+                                                               is_signed, loc())},
+          {{Kind::TS_LONG, Kind::TS_LONG}, IntegralType::Create(IntKind::SPEC_LONG_LONG,
+                                                                is_signed, loc())},
+          {{Kind::TS_LONG, Kind::TS_LONG, Kind::TS_INT},
+           IntegralType::Create(IntKind::SPEC_LONG_LONG, is_signed, loc())}
          };
 
       auto it = valid_combos.find(specs);
       if (it == valid_combos.end()) {
          err(g_filename, this) << "incompatible type specifiers" << std::endl;
-         return IntegralType::Create(IntKind::SPEC_INT, loc());
+         return default_type;
       } else {
          return it->second;
       }

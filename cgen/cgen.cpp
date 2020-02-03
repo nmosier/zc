@@ -1515,9 +1515,13 @@ namespace zc {
       }
    }
 
-
+#if 0
    int PointerType::bytes() const {
       return long_size;
+   }
+
+   int PointerType::bits() const {
+      return long_size * 8;
    }
 
    int FunctionType::bytes() const {
@@ -1527,48 +1531,8 @@ namespace zc {
    int VoidType::bytes() const {
       return 0;
    }
+#endif
 
-   int IntegralType::bytes() const {
-      using Kind = IntegralType::IntKind;
-      switch (int_kind()) {
-      case Kind::SPEC_BOOL: return flag_size;
-      case Kind::SPEC_CHAR: return byte_size;
-      case Kind::SPEC_SHORT: return word_size;
-      case Kind::SPEC_INT:
-      case Kind::SPEC_LONG:
-      case Kind::SPEC_LONG_LONG:
-         return long_size;
-      }
-   }
-
-   int StructType::bytes() const {
-      return std::accumulate(membs()->begin(), membs()->end(), 0,
-                             [](int acc, auto it) -> int {
-                                return acc + it->bytes();
-                             });
-   }
-
-   int UnionType::bytes() const {
-      std::vector<int> sizes;
-      std::transform(membs()->begin(), membs()->end(), std::back_inserter(sizes),
-                     [](auto it) { return it->bytes(); });
-      return *std::max_element(sizes.begin(), sizes.end());
-   }
-
-   int ArrayType::bytes() const {
-      return elem()->bytes() * int_count();
-   }
-
-   int StructType::offset(const Symbol *sym) const {
-      auto it = std::find_if(membs()->begin(), membs()->end(),
-                             [&](auto it) -> bool {
-                                return it->sym() == sym;
-                             });
-      return std::accumulate(membs()->begin(), it, 0,
-                             [](int acc, auto it) -> int {
-                                return acc + it->bytes();
-                             });
-   }
 
 
    const Value *IdentifierExpr::val_const(const CgenEnv& env) const {

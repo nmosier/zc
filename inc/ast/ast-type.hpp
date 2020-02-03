@@ -9,12 +9,16 @@
 
 #include "uniq_vector.hpp"
 #include "ast-decl.hpp"
+#include "asm.hpp"
 
 extern const char *g_filename;
 
 namespace zc {
 
    bool TypeEq(const Types *lhs, const Types *rhs);   
+
+   int unsigned_bits(int bytes);
+   int signed_bits(int bytes);
 
    class ASTType: public ASTNode {
    public:
@@ -62,6 +66,8 @@ namespace zc {
       virtual ASTType *Decay() { return this; }
 
       virtual int bytes() const = 0;
+      virtual int bits() const = 0;
+      
       void FrameGen(StackFrame& frame) const;
 
       static ASTType *Create(ASTType *specs, ASTDeclarator *declarator) {
@@ -104,7 +110,8 @@ namespace zc {
       virtual ASTType *Address() override;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) override;
 
-      virtual int bytes() const override;
+      virtual int bytes() const override { return z80::long_size; }
+      virtual int bits() const override { return unsigned_bits(bytes()); }
       
    protected:
       int depth_;
@@ -139,7 +146,8 @@ namespace zc {
       virtual ASTType *Address() override;
       virtual ASTType *Dereference(SemantEnv *env = nullptr) override;
 
-      virtual int bytes() const override;
+      virtual int bytes() const override { return z80::long_size; }
+      virtual int bits() const override { return unsigned_bits(bytes()); }
       
    protected:
       ASTType *return_type_;
@@ -172,7 +180,8 @@ namespace zc {
          throw std::logic_error("attempted to dereference 'void' type");
       }
 
-      virtual int bytes() const override;      
+      virtual int bytes() const override { return 0; }
+      virtual int bits() const override { return 0; }
       
       template <typename... Args>
       static VoidType *Create(Args... args) { return new VoidType(args...); }
@@ -187,6 +196,7 @@ namespace zc {
       enum class IntKind {SPEC_BOOL, SPEC_CHAR, SPEC_SHORT, SPEC_INT, SPEC_LONG, SPEC_LONG_LONG};
       virtual Kind kind() const override { return Kind::TYPE_INTEGRAL; }
       IntKind int_kind() const { return int_kind_; }
+      bool is_signed() const { return is_signed_; }
 
       virtual void get_declarables(Declarations* output) const override {}      
 
@@ -205,6 +215,9 @@ namespace zc {
       }
 
       virtual int bytes() const override;
+      virtual int bits() const override {
+         return (is_signed() ? signed_bits : unsigned_bits)(bytes());
+      }
 
       template <typename... Args>
       static IntegralType *Create(Args... args) { return new IntegralType(args...); }
@@ -212,16 +225,20 @@ namespace zc {
       /**
        * Find smallest type that can fit this value.
        */
-      static IntKind min_type(intmax_t val);
 
    protected:
       IntKind int_kind_;
+      bool is_signed_;
       
-      template <typename... Args>
-      IntegralType(IntKind int_kind, Args... args): ASTType(args...), int_kind_(int_kind) {}
+      static IntKind min_type(intmax_t val);
 
       template <typename... Args>
-      IntegralType(intmax_t val, Args... args): ASTType(args...), int_kind_(min_type(val)) {}
+      IntegralType(IntKind int_kind, bool is_signed_, Args... args):
+         ASTType(args...), int_kind_(int_kind) {}
+
+      template <typename... Args>
+      IntegralType(intmax_t val, Args... args):
+         ASTType(args...), int_kind_(min_type(val)), is_signed_(val < 0) {}
    };
 
    /**
@@ -296,10 +313,6 @@ namespace zc {
 
       TaggedType(Symbol *tag, const SourceLoc& loc):
          DeclarableType(loc), tag_(tag), unique_id_(-1) {}
-
-      //template <typename... Args>
-      //TaggedType(Symbol *tag, int unique_id, Args... args):
-      //DeclarableType(args...), tag_(tag), unique_id_(unique_id) {}
    };
 
    template <typename Memb>
@@ -362,7 +375,8 @@ namespace zc {
 
          membs_ = new Membs(vec.begin(), vec.end(),
                             [&](Memb *first, Memb *second) {
-                               err(g_filename, second) << "duplicate member '" << *second->sym() << "'"
+                               err(g_filename, second) << "duplicate member '"
+                                                       << *second->sym() << "'"
                                                        << std::endl;
                                
                             });
@@ -420,6 +434,7 @@ namespace zc {
       static StructType *Create(Args... args) { return new StructType(args...); }
 
       virtual int bytes() const override;
+      virtual int bits() const override { return unsigned_bits(bytes()); }
       virtual int offset(const Symbol *sym) const override;
 
    protected:
@@ -437,6 +452,7 @@ namespace zc {
       static UnionType *Create(Args... args) { return new UnionType(args...); }
 
       virtual int bytes() const override;
+      virtual int bits() const override { return unsigned_bits(bytes()); }
       virtual int offset(const Symbol *sym) const override { return 0; }
       
    protected:
@@ -501,6 +517,7 @@ namespace zc {
       virtual void Declare(CgenEnv& env) override;
       
       virtual int bytes() const override { return int_type_->bytes(); }
+      virtual int bits() const override { return int_type_->bits(); }
 
       template <typename... Args>
       static EnumType *Create(Args... args) { return new EnumType(args...); }
@@ -515,17 +532,12 @@ namespace zc {
       template <typename InputIt>
       EnumType(SemantError& err, InputIt begin, InputIt end, Symbol *tag, const SourceLoc& loc):
          TaggedType_aux<Enumerator>(err, begin, end, tag, loc) {
-         int_type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, 0);
-         #if 0
-         for (auto memb : *membs()) {
-            // memb->set_enum_type(this);
-         }
-         #endif
+         int_type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, true, 0);
       }
 
       EnumType(Symbol *tag, const SourceLoc& loc):
          TaggedType_aux<Enumerator>(tag, loc) {
-         int_type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, 0);
+         int_type_ = IntegralType::Create(IntegralType::IntKind::SPEC_INT, true, 0);
       }
    };
 
@@ -556,6 +568,7 @@ namespace zc {
       virtual ASTType *Decay() override;
 
       virtual int bytes() const override;
+      virtual int bits() const override { return unsigned_bits(bytes()); }
 
       template <typename... Args>
       static ArrayType *Create(Args... args) { return new ArrayType(args...); }
@@ -594,6 +607,7 @@ namespace zc {
          throw std::logic_error("unresolved named type");
       }
       virtual int bytes() const override { throw std::logic_error("unresolved named type"); }
+      virtual int bits() const override { throw std::logic_error("unresolved named type"); }
       
       template <typename... Args>
       static NamedType *Create(Args... args) { return new NamedType(args...); }
@@ -609,9 +623,11 @@ namespace zc {
    std::ostream& operator<<(std::ostream& os, CompoundType::TagKind kind);
 
    /*** PROTOTYPES ***/
-   template <IntegralType::IntKind int_kind> IntegralType *int_type =
-                           IntegralType::Create(int_kind, 0);
-   
+   template <IntegralType::IntKind int_kind, bool is_signed> IntegralType *int_type =
+                           IntegralType::Create(int_kind, is_signed, 0);
+   extern IntegralType *default_type;
+   extern IntegralType *char_type;
+
 }
    
 #endif

@@ -10,6 +10,9 @@ extern zc::SemantError g_semant_error;
 
 namespace zc {
 
+   IntegralType *default_type = int_type<IntegralType::IntKind::SPEC_INT, true>;
+   IntegralType *char_type = int_type<IntegralType::IntKind::SPEC_CHAR, false>;
+   
    int TaggedType::unique_id_counter_ = 0;
 
    std::ostream& operator<<(std::ostream& os, IntegralType::IntKind kind) {
@@ -35,8 +38,15 @@ namespace zc {
 
       auto this_it = std::find(ordering.begin(), ordering.end(), int_kind());
       auto other_it = std::find(ordering.begin(), ordering.end(), other->int_kind());
-      
-      return IntegralType::Create(*std::max(this_it, other_it), loc());
+
+      bool signedness;
+      if (this_it < other_it) {
+         return IntegralType::Create(*other_it, other->is_signed(), loc());
+      } else if (this_it == other_it) {
+         return IntegralType::Create(*this_it, is_signed() || other->is_signed(), loc());
+      } else {
+         return IntegralType::Create(*this_it, is_signed(), loc());
+      }
    }
 
    void PointerType::DumpNode(std::ostream& os) const {
@@ -213,17 +223,70 @@ namespace zc {
       if (decl == nullptr) {
          env.error()(g_filename, this) <<  "undeclared symbol '" << *sym() << "'"
                                        << std::endl;
-         return IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());
+         return default_type;
       }
       
       auto typename_decl = dynamic_cast<TypenameDeclaration *>(decl);
       if (typename_decl == nullptr) {
          env.error()(g_filename, this) << "symbol '" << *sym() << "' declared with conflicting "
                                        << "type" << std::endl;
-         return IntegralType::Create(IntegralType::IntKind::SPEC_INT, loc());
+         return default_type;
       }
 
       return typename_decl->type();
    }
+
+   /*** BYTES & BITS ***/
+
+   int IntegralType::bytes() const {
+      using Kind = IntegralType::IntKind;
+      switch (int_kind()) {
+      case Kind::SPEC_BOOL: return z80::flag_size;
+      case Kind::SPEC_CHAR: return z80::byte_size;
+      case Kind::SPEC_SHORT: return z80::word_size;
+      case Kind::SPEC_INT:
+      case Kind::SPEC_LONG:
+      case Kind::SPEC_LONG_LONG:
+         return z80::long_size;
+      }
+   }
+
+   int StructType::bytes() const {
+      return std::accumulate(membs()->begin(), membs()->end(), 0,
+                             [](int acc, auto it) -> int {
+                                return acc + it->bytes();
+                             });
+   }
+
+   int UnionType::bytes() const {
+      std::vector<int> sizes;
+      std::transform(membs()->begin(), membs()->end(), std::back_inserter(sizes),
+                     [](auto it) { return it->bytes(); });
+      return *std::max_element(sizes.begin(), sizes.end());
+   }
+
+   int ArrayType::bytes() const {
+      return elem()->bytes() * int_count();
+   }
+
+   int StructType::offset(const Symbol *sym) const {
+      auto it = std::find_if(membs()->begin(), membs()->end(),
+                             [&](auto it) -> bool {
+                                return it->sym() == sym;
+                             });
+      return std::accumulate(membs()->begin(), it, 0,
+                             [](int acc, auto it) -> int {
+                                return acc + it->bytes();
+                             });
+   }   
    
- }
+   int unsigned_bits(int bytes) {
+      return bytes * 8;
+   }
+
+   int signed_bits(int bytes) {
+      return bytes * 8 - 1;
+   }
+
+
+}
