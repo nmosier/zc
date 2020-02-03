@@ -48,15 +48,17 @@ for test in "${tests[@]}"; do
 
 
     SPASM_ERR="$OUT_DIR/${test}.spasm" 
-    if ! spasm -E "$test".z80 "$OUT_8XP" > "$SPASM_ERR"; then
+    if ! spasm -E -L "$test".z80 "$OUT_8XP" > "$SPASM_ERR"; then
         fail "$test" "assembler failed"
         cat "$SPASM_ERR"
         continue
     fi
 
     # run autotester
-    if ! cemu-autotester "$test".json >/dev/null; then
+    AUTO_ERR="$OUT_DIR/${test}.auto"
+    if ! cemu-autotester "$test".json >"$AUTO_ERR"; then
         fail "$test" "autotester failed"
+        cat "$AUTO_ERR"
         continue
     fi
 
