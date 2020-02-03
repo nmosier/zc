@@ -1,5 +1,5 @@
 SPASM = spasm
-CGEN ?= ../cgen-main
+CGEN ?= ../zc
 
 SPASM_FLAGS = -E -L
 

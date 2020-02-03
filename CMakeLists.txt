@@ -25,7 +25,7 @@ add_library(zc_objs
   env.cpp
 )
 
-add_executable(cgen-main
+add_executable(zc
   cgen-main.cc
   $<TARGET_OBJECTS:zc_objs>
   $<TARGET_OBJECTS:ast_objs>
