@@ -1,2 +1,2 @@
 #!/bin/sh
-./runner.sh -e -s semant /Users/nicholas/Projects/zc/src/semant-main
+./runner.sh -e -s semant /Users/nicholas/Projects/zc/src/cgen-main -A

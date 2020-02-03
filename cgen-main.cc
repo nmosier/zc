@@ -60,7 +60,7 @@ StringTable g_str_tab;
 namespace {
 
    void usage(const char *program) {
-      std::cerr << "Usage: " << program << " [-h] [-O <optims>] [-p print_opts] [-o file]"
+      std::cerr << "Usage: " << program << " [-Ah] [-O <optims>] [-p print_opts] [-o file]"
                 << std::endl;
    }
 }
@@ -73,8 +73,10 @@ int main(int argc, char *argv[]) {
   std::string out_filename;
 
   int c;
+  enum class Stage {SEMANT, CGEN};
+  Stage stage = Stage::CGEN;
   opterr = 0;  // getopt shouldn't print any messages
-  while ((c = getopt(argc, argv, "O:o:p:h")) != -1) {
+  while ((c = getopt(argc, argv, "O:o:p:Ah")) != -1) {
     switch (c) {
     case 'o':  // set the name of the output file
        out_filename = optarg;
@@ -91,6 +93,10 @@ int main(int argc, char *argv[]) {
           return 85;
        }
        break;
+    case 'A':
+       stage = Stage::SEMANT;
+       break;
+       
     case 'p': // print options
        if (zc::g_print.set_flags(optarg,
                              [=](auto flag) {
@@ -131,13 +137,15 @@ int main(int argc, char *argv[]) {
 
   Semant(g_AST_root);
 
-  /* first optimization pass */
-  OptimizeAST(g_AST_root);
-
   if (zc::g_semant_error.errors() > 0) {
      std::cerr << "Encountered semantic errors, exiting..." << std::endl;
      exit(0);
   }
+
+  if (stage == Stage::SEMANT) { exit(0); }  
+
+  /* first optimization pass */
+  OptimizeAST(g_AST_root);
 
   // Don't touch the output file until we know that earlier phases of the
   // compiler have succeeded.

@@ -641,7 +641,7 @@ void yyerror(const char *s) {
          out << " '" << (char) static_cast<zc::LiteralExpr *>(yylval.expr)->val() << "'";
          break;
       case ID:
-         out << " " << yylval.identifier->id();
+         out << " '" << *yylval.identifier->id() << "'";
          break;
       case ERROR:
          out << " \"" << yylval.error_msg << "\"";
