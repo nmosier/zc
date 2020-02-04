@@ -143,6 +143,15 @@ namespace zc {
          block->instrs().push_back(new SbcInstruction(&rv_a, &rv_a));
          block->instrs().push_back(new IncInstruction(&rv_a));
          break;
+
+      case Cond::P:
+         emit_crt("___sftob", block);
+         break;
+         
+      case Cond::M:
+         emit_crt("___sftobn", block);
+         break;
+         
       }
    }
 
@@ -180,7 +189,16 @@ namespace zc {
          block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_hl));
          block->instrs().push_back(new IncInstruction(&rv_hl));
          break;
+
+      case Cond::P:
+         emit_crt("___sftol", block);
+         break;
+
+      case Cond::M:
+         emit_crt("___sftoln", block);
+         break;
       }
+      
    }
 
    Block *emit_incdec(CgenEnv& env, Block *block, bool inc_not_dec, bool pre_not_post,
@@ -350,6 +368,12 @@ namespace zc {
          /* ccf */
          block->instrs().push_back(new CcfInstruction());
          break;
+
+      case Cond::P:
+      case Cond::M:
+         emit_crt("___sfinv", block);
+         break;
+         
       case Cond::ANY: abort();
       }
    }
@@ -383,6 +407,11 @@ namespace zc {
                     block->instrs().push_back(new SbcInstruction(&rv_a, &rv_a));
                 }
                 break;
+
+            case Cond::C:
+            case Cond::NC:
+            case Cond::ANY:
+               abort();
             }
               
         case Cond::Z:
@@ -426,7 +455,10 @@ namespace zc {
                 }
                 break;
 
-            case Cond::ANY: abort();
+            case Cond::Z:
+            case Cond::NZ:
+            case Cond::ANY:
+               abort();
             }
             break;
           
@@ -436,18 +468,26 @@ namespace zc {
             case Cond::C:
             case Cond::NC:
                 /* SF -> CF
-                 * call ___sftocf
+                 * call ___sftocf[n]
                  */
-                emit_crt("___sftocf", block);
-                break;
+               {
+                  const char *crt = ((from->cond_1() == Cond::M) == (to->cond_1() == Cond::C)) ?
+                     "___sftocf" : "___sftocfn";
+                  emit_crt(crt, block);
+               }
+               break;
                 
             case Cond::Z:
             case Cond::NZ:
                 /* SF -> ZF
                  * call ___sftozf
                  */
-                emit_crt("___sftozf", block);
-                break;
+               {
+                  const char *crt = ((from->cond_1() == Cond::M) == (to->cond_1() == Cond::Z)) ?
+                     "___sftozf" : "___sftozfn";
+                  emit_crt(crt, block);
+               }
+               break;
 
             default: abort();
             }
