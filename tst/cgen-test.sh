@@ -30,9 +30,10 @@ fail()
 
 for test in "${tests[@]}"; do
     (( ++total ))
-    name=$(basename "$test")
-    OUT_ASM="$(basename "$test" .c)".z80
-    OUT_8XP="$(basename "$test" .c)".8xp
+
+    name="$(basename $test)"
+    OUT_ASM="${test/%.c/.z80}"
+    OUT_8XP="${test/%.c/.8xp}"
 
     # code generation
     if ! "$@" -o "$OUT_ASM" "$test" >/dev/null; then
@@ -47,15 +48,15 @@ for test in "${tests[@]}"; do
     fi
 
 
-    SPASM_ERR="$OUT_DIR/${test}.spasm" 
-    if ! spasm -E -L "$test".z80 "$OUT_8XP" > "$SPASM_ERR"; then
+    SPASM_ERR="$OUT_DIR/${name}.spasm"
+    if ! spasm -E -L -I. -I"$(dirname $test)" "$test".z80 "$OUT_8XP" > "$SPASM_ERR"; then
         fail "$test" "assembler failed"
         cat "$SPASM_ERR"
         continue
     fi
 
     # run autotester
-    AUTO_ERR="$OUT_DIR/${test}.auto"
+    AUTO_ERR="$OUT_DIR/${name}.auto"
     if ! cemu-autotester "$test".json >"$AUTO_ERR"; then
         fail "$test" "autotester failed"
         cat "$AUTO_ERR"
