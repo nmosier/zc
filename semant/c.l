@@ -55,6 +55,9 @@ E  [Ee][+-]?{D}+
 "struct" { return STRUCT; }
 "union" { return UNION; }
 "enum" { return ENUM; }
+"signed" { return SIGNED; }
+"unsigned" { return UNSIGNED; }
+
 "sizeof" { return SIZEOF; }
 "goto" { return GOTO; }
 "continue" { return CONTINUE; }
