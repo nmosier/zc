@@ -1,0 +1,21 @@
+{
+    "rom": "ce.rom",
+    "transfer_files": ["lor.8xp"],
+    "target": {
+        "name": "LOR",
+        "isASM": true
+    },
+    "sequence": [
+        "action|launch",
+        "hashWait|1"
+    ],
+    "hashes": {
+        "1": {
+            "description": "true",
+            "start": "saveSScreen",
+            "size": 12,
+            "expected_CRCs": ["011fdc3c"],
+            "timeout": 10000
+        }
+    }
+}

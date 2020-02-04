@@ -15,6 +15,11 @@ extern const char *g_filename;
 
 namespace zc {
 
+   extern IntegralType *default_type;
+   extern IntegralType *char_type;
+   extern IntegralType *intptr_type;
+
+   
    bool TypeEq(const Types *lhs, const Types *rhs);   
 
    int unsigned_bits(int bytes);
@@ -40,6 +45,8 @@ namespace zc {
       bool has_type(T list) const
       { return std::find(list.begin(), list.end(), kind()) != list.end(); }
 
+      virtual const IntegralType *int_type() const { return nullptr; }
+      
       /**
        * Add all declarable types to list.
        */
@@ -50,9 +57,9 @@ namespace zc {
        */
       bool is_container() const { return get_containee() != nullptr; }
       virtual ASTType *get_containee() const { return nullptr; }
-
+      
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
-
+      
       virtual ASTType *TypeResolve(SemantEnv& env) = 0;
       void TypeCheck(SemantEnv& env) { TypeCheck(env, true); }
       virtual void TypeCheck(SemantEnv& env, bool allow_void) = 0;
@@ -80,7 +87,6 @@ namespace zc {
    };
    std::ostream& operator<<(std::ostream& os, ASTType::Kind kind);
 
-
    class PointerType: public ASTType {
    public:
       virtual Kind kind() const override { return Kind::TYPE_POINTER; }
@@ -89,11 +95,13 @@ namespace zc {
       int depth() const { return depth_; }
       ASTType *pointee() const { return pointee_; }
       bool is_void() const { return pointee()->kind() == Kind::TYPE_VOID; }
-      
+
       template <typename... Args>
       static PointerType *Create(Args... args) {
          return new PointerType(args...);
       }
+
+      virtual const IntegralType *int_type() const override { return intptr_type; }
 
       virtual void get_declarables(Declarations* output) const override;
 
@@ -150,8 +158,8 @@ namespace zc {
       virtual int bits() const override { return unsigned_bits(bytes()); }
       
    protected:
-      ASTType *return_type_;
-      VarDeclarations *params_;
+      ASTType *return_type_ = nullptr;
+      VarDeclarations *params_ = nullptr;
 
       template <typename... Args>
       FunctionType(ASTType *return_type, VarDeclarations *params, Args... args):
@@ -198,7 +206,8 @@ namespace zc {
       IntKind int_kind() const { return int_kind_; }
       bool is_signed() const { return is_signed_; }
 
-      virtual void get_declarables(Declarations* output) const override {}      
+      virtual void get_declarables(Declarations* output) const override {}
+      virtual const IntegralType *int_type() const override { return this; }
 
       virtual void DumpNode(std::ostream& os) const override;
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {}
@@ -233,8 +242,8 @@ namespace zc {
       static IntKind min_type(intmax_t val);
 
       template <typename... Args>
-      IntegralType(IntKind int_kind, bool is_signed_, Args... args):
-         ASTType(args...), int_kind_(int_kind) {}
+      IntegralType(IntKind int_kind, bool is_signed, Args... args):
+         ASTType(args...), int_kind_(int_kind), is_signed_(is_signed) {}
 
       template <typename... Args>
       IntegralType(intmax_t val, Args... args):
@@ -506,7 +515,7 @@ namespace zc {
    class EnumType: public TaggedType_aux<Enumerator> {
    public:
       virtual TagKind tag_kind() const override {return TagKind::TAG_ENUM; }
-      IntegralType *int_type() const { return int_type_; }
+      virtual IntegralType *int_type() const override { return int_type_; }
       
       virtual ASTType *TypeResolve(SemantEnv& env) override { return this; } /* TODO */
       virtual void TypeCheckMembs(SemantEnv& env) override;
@@ -625,8 +634,6 @@ namespace zc {
    /*** PROTOTYPES ***/
    template <IntegralType::IntKind int_kind, bool is_signed> IntegralType *int_type =
                            IntegralType::Create(int_kind, is_signed, 0);
-   extern IntegralType *default_type;
-   extern IntegralType *char_type;
 
 }
    

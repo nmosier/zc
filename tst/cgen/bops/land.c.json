@@ -1,0 +1,21 @@
+{
+    "rom": "ce.rom",
+    "transfer_files": ["land.8xp"],
+    "target": {
+        "name": "LAND",
+        "isASM": true
+    },
+    "sequence": [
+        "action|launch",
+        "hashWait|1"
+    ],
+    "hashes": {
+        "1": {
+            "description": "true",
+            "start": "saveSScreen",
+            "size": 12,
+            "expected_CRCs": ["1a11616d"],
+            "timeout": 10000
+        }
+    }
+}

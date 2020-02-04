@@ -1,0 +1,21 @@
+{
+    "rom": "ce.rom",
+    "transfer_files": ["leq.8xp"],
+    "target": {
+        "name": "LEQ",
+        "isASM": true
+    },
+    "sequence": [
+        "action|launch",
+        "hashWait|1"
+    ],
+    "hashes": {
+        "1": {
+            "description": "greater than (both unsigned and signed)",
+            "start": "saveSScreen",
+            "size": 4,
+            "expected_CRCs": ["30637301"],
+            "timeout": 10000
+        }
+    }
+}

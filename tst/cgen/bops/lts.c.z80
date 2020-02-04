@@ -1,0 +1,32 @@
+#include "ti84pce.inc"
+
+_indcall .equ __indcall
+
+.assume ADL=1
+
+.org userMem - 2
+.db tExtTok, tAsm84CeCmp
+
+_start:
+   ld hl,-10
+   ld de,0
+   push de
+   push hl
+   call _lts
+   pop de
+   pop de
+   ld (saveSScreen+0),a ; 1
+
+   ld hl,-10
+   ld de,0
+   push hl
+   push de
+   call _lts
+   pop de
+   pop de
+   ld (saveSScreen+1),a ; 0
+
+   ld iy,flags
+   ret
+
+#include "lts.z80"

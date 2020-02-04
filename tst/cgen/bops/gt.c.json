@@ -1,0 +1,21 @@
+{
+    "rom": "ce.rom",
+    "transfer_files": ["gt.8xp"],
+    "target": {
+        "name": "GT",
+        "isASM": true
+    },
+    "sequence": [
+        "action|launch",
+        "hashWait|1"
+    ],
+    "hashes": {
+        "1": {
+            "description": "greater than (both unsigned and signed)",
+            "start": "saveSScreen",
+            "size": 4,
+            "expected_CRCs": ["9522e17f"],
+            "timeout": 10000
+        }
+    }
+}

@@ -75,7 +75,7 @@ namespace zc {
    
    /* ast-type */
    class ASTType;
-   typedef std::vector<ASTType *> Types;   
+   typedef std::vector<ASTType *> Types;
    class PointerType;
    class FunctionType;
    class VoidType;

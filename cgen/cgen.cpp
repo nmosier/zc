@@ -364,11 +364,9 @@ namespace zc {
       
       /* compute right-hand rvalue */
       const Value *lhs_lval, *rhs_rval;
-      // const Value *rhs_var = new VariableValue(rhs()->type()->bytes());
       block = rhs()->CodeGen(env, block, &rhs_rval, ExprKind::EXPR_RVALUE);
 
       /* compute left-hand lvalue */
-      // const Value *lhs_var = new VariableValue(long_size);
       block = lhs()->CodeGen(env, block, &lhs_lval, ExprKind::EXPR_LVALUE);
       
       /* assign */
@@ -379,7 +377,6 @@ namespace zc {
       /* propogate result */
       if (out) {
          *out = rhs_rval;
-         // block->instrs().push_back(new LoadInstruction(out, rhs_var));
       }
 
       return block;
@@ -624,7 +621,6 @@ namespace zc {
                 */
                block->instrs().push_back(new LoadInstruction(&rv_a, rev_vars ? lhs_var : rhs_var));
                block->instrs().push_back(new CompInstruction(&rv_a, rev_vars ? rhs_var : lhs_var));
-               // block->instrs().push_back(new LoadInstruction(&rv_a, &imm_b<0>));
                break;
                                   
             case word_size: abort();
@@ -642,12 +638,16 @@ namespace zc {
             }
 
             const FlagValue *flag;
-            if (lg_not_eq) {
-               flag = new FlagValue(Cond::NC, Cond::C);
+            if (type()->int_type()->is_signed()) {
+               flag = new FlagValue(Cond::P, Cond::M);
             } else {
-               flag = new FlagValue(Cond::C, Cond::NC);
+               flag = new FlagValue(Cond::NC, Cond::C);
             }
 
+            if (!lg_not_eq) {
+               flag = flag->invert();
+            }
+            
             if (g_optim.bool_flag) {
                *out = flag;
             } else {

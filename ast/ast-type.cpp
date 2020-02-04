@@ -12,6 +12,7 @@ namespace zc {
 
    IntegralType *default_type = int_type<IntegralType::IntKind::SPEC_INT, true>;
    IntegralType *char_type = int_type<IntegralType::IntKind::SPEC_CHAR, false>;
+   IntegralType *intptr_type = int_type<IntegralType::IntKind::SPEC_LONG_LONG, false>;
    
    int TaggedType::unique_id_counter_ = 0;
 

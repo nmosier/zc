@@ -1,0 +1,42 @@
+#include "ti84pce.inc"
+
+_indcall .equ __indcall
+
+.assume ADL=1
+
+.org userMem - 2
+.db tExtTok, tAsm84CeCmp
+
+_start:
+   ld hl,$123456
+   ld de,$123455
+   push hl \ push de
+   call _lt
+   pop de \ pop de
+   ld (saveSScreen+0),a ; 1
+   
+   ld hl,$123456
+   ld de,$123356
+   push hl \ push de
+   call _lt
+   pop de \ pop de
+   ld (saveSScreen+1),a ; 0
+
+   ld hl,$123456
+   ld de,$123357
+   push hl \ push de
+   call _lt
+   pop de \ pop de
+   ld (saveSScreen+2),a ; 0
+
+   ld hl,$000000
+   ld de,$123456
+   push hl \ push de
+   call _lt
+   pop de \ pop de
+   ld (saveSScreen+3),a ; 0
+
+   ld iy,flags
+   ret
+
+#include "lt.z80"

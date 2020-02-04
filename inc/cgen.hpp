@@ -115,7 +115,7 @@ namespace zc {
       StackFrame frame_;
    };
 
-   enum class Cond {Z, NZ, C, NC, ANY};
+   enum class Cond {Z, NZ, C, NC, M, P, ANY};
    std::ostream& operator<<(std::ostream& os, Cond cond);
    Cond invert(Cond cond);
    
