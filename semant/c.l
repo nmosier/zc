@@ -105,6 +105,7 @@ E  [Ee][+-]?{D}+
 }
 
 "&&" { return AND; }
+"||" { return OR; }
 "<=" { return LEQ; }
 "==" { return EQ; }
 ">=" { return GEQ; }
