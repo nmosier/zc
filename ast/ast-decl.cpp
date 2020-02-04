@@ -106,13 +106,20 @@ namespace zc {
 
       /* otherwise, all basic. */
       using Kind = BasicTypeSpec::Kind;
+      using IntKind = IntegralType::IntKind;      
       std::multiset<Kind> specs;
       std::transform(basic_type_specs.begin(), basic_type_specs.end(),
                      std::inserter(specs, specs.begin()),
                      [](auto spec) { return spec->kind(); });
 
       /* if `signed' or `unsigned' keywords are present, remove now and record sign */
-      bool is_signed = true; /* signed by default */
+      bool is_signed;
+      if (specs.count(Kind::TS_CHAR) > 0) {
+         is_signed = false; /* chars are unsigned by default */
+      } else {
+         is_signed = true; /* all other type specs are signed by default */
+      }
+      
       if (specs.count(Kind::TS_SIGNED) == 1) {
          specs.erase(Kind::TS_SIGNED);
          is_signed = true;
@@ -121,7 +128,6 @@ namespace zc {
          is_signed = false;
       }
       
-      using IntKind = IntegralType::IntKind;
       std::map<std::multiset<Kind>,ASTType *> valid_combos
          {{{Kind::TS_VOID}, VoidType::Create(loc())},
           {{Kind::TS_CHAR}, IntegralType::Create(IntKind::SPEC_CHAR, is_signed, loc())},
@@ -135,7 +141,8 @@ namespace zc {
           {{Kind::TS_LONG, Kind::TS_LONG}, IntegralType::Create(IntKind::SPEC_LONG_LONG,
                                                                 is_signed, loc())},
           {{Kind::TS_LONG, Kind::TS_LONG, Kind::TS_INT},
-           IntegralType::Create(IntKind::SPEC_LONG_LONG, is_signed, loc())}
+           IntegralType::Create(IntKind::SPEC_LONG_LONG, is_signed, loc())},
+          {{}, IntegralType::Create(IntKind::SPEC_INT, is_signed, loc())}
          };
 
       auto it = valid_combos.find(specs);
