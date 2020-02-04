@@ -651,10 +651,14 @@ namespace zc {
             if (g_optim.bool_flag) {
                *out = flag;
             } else {
+#if 0                
                *out = new VariableValue(type()->bytes());
                block->instrs().push_back(new LoadInstruction(*out, &imm_b<0>));
                block->instrs().push_back(new JrInstruction(&imm_b<3>, flag->cond_0()));
                block->instrs().push_back(new IncInstruction(*out));
+#else
+               emit_booleanize_flag(env, block, flag, out, type()->bytes());
+#endif
             }
             
             return block;
@@ -1284,6 +1288,8 @@ namespace zc {
       case Cond::NZ: return os << "nz";
       case Cond::C: return os << "c";
       case Cond::NC: return os << "nc";
+      case Cond::P: return os << "p";
+      case Cond::M: return os << "m";
       case Cond::ANY: return os;
       }
    }
@@ -1294,6 +1300,8 @@ namespace zc {
       case Cond::NZ: return Cond::Z;
       case Cond::C: return Cond::NC;
       case Cond::NC: return Cond::C;
+      case Cond::P: return Cond::M;
+      case Cond::M: return Cond::P;
       case Cond::ANY: return Cond::ANY;
       }
    }

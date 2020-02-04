@@ -96,6 +96,21 @@ namespace zc {
       }
    }
 
+    void emit_booleanize_flag(CgenEnv& env, Block *block, const FlagValue *in, const Value **out,
+                              int bytes) {
+        switch (bytes) {
+        case flag_size: abort();
+        case byte_size:
+            emit_booleanize_flag_byte(env, block, in, out);
+            break;
+        case word_size: abort();
+        case long_size:
+            emit_booleanize_flag_long(env, block, in, out);
+            break;
+        default: abort();
+        }
+    }
+
    void emit_booleanize_flag_byte(CgenEnv& env, Block *block, const FlagValue *in,
                                   const Value **out) {
       *out = &rv_a;
@@ -339,49 +354,106 @@ namespace zc {
       }
    }
 
-   void emit_convert_flag(Block *block, const FlagValue *from, const FlagValue *to) {
-      if (from->Eq(to)) { return; }
+    void emit_convert_flag(Block *block, const FlagValue *from, const FlagValue *to) {
+        if (from->Eq(to)) { return; }
 
-      if (from->Eq(to->invert())) {
-         emit_invert_flag(block, from);
-         return;
-      }
+        if (from->Eq(to->invert())) {
+            emit_invert_flag(block, from);
+            return;
+        }
 
-      switch (from->cond_0()) {
-      case Cond::C:
-      case Cond::NC:
-         /* CF -> ZF
-          * [ccf]
-          * sbc a,a
-          */
-         {
-            bool ccf = ((from->cond_0() == Cond::NZ) != (to->cond_0() == Cond::C));
-            if (ccf) {
-               block->instrs().push_back(new CcfInstruction());
+        switch (from->cond_0()) {
+        case Cond::C:
+        case Cond::NC:
+            switch (to->cond_0()) {
+            case Cond::Z:
+            case Cond::NZ:
+            case Cond::P:
+            case Cond::M:
+                /* CF -> ZF|SF
+                 * [ccf]
+                 * sbc a,a
+                 */
+                {
+                    bool ccf = ((from->cond_1() == Cond::C) ==
+                                (to->cond_1() == Cond::Z || to->cond_1() == Cond::P));
+                    if (ccf) {
+                        block->instrs().push_back(new CcfInstruction());
+                    }
+                    block->instrs().push_back(new SbcInstruction(&rv_a, &rv_a));
+                }
+                break;
             }
-            block->instrs().push_back(new SbcInstruction(&rv_a, &rv_a));
-         }
-         break;
+              
+        case Cond::Z:
+        case Cond::NZ:
+            switch (to->cond_0()) {
+            case Cond::C:
+            case Cond::NC:
+                /* ZF -> CF
+                 * scf
+                 * jr z/nz,_ ; 
+                 * ccf
+                 * _      
+                 */
+                {
+                    Cond cc = ((from->cond_0() == Cond::Z) == (to->cond_0() == Cond::C)) ?
+                        Cond::NZ : Cond::Z;
+                    block->instrs().push_back(new ScfInstruction());
+                    block->instrs().push_back(new JrInstruction(&imm_b<3>, cc));
+                    block->instrs().push_back(new CcfInstruction());
+                }
+                break;
 
-      case Cond::Z:
-      case Cond::NZ:
-         /* ZF -> CF
-          * scf
-          * jr z/nz,_ ; 
-          * ccf
-          * _      
-          */
-         {
-            Cond cc = ((from->cond_0() == Cond::Z) == (to->cond_0() == Cond::C)) ?
-               Cond::NZ : Cond::Z;
-            block->instrs().push_back(new ScfInstruction());
-            block->instrs().push_back(new JrInstruction(&imm_b<3>, cc));
-            block->instrs().push_back(new CcfInstruction());
-         }
-         break;
-         
-      case Cond::ANY: abort();
-      }
-   }
+            case Cond::M:
+            case Cond::P:
+                /* ZF -> SF
+                 * ld a,0
+                 * jr z/nz,_
+                 * dec a
+                 * _
+                 * or a,a
+                 * ---------
+                 * NOTE: ZF and SF are always modified together as far as I can tell,
+                 *       so Z => P (or ZF => ~SF). Converse/inverse does not hold.
+                 */
+                {
+                    Cond cc = ((from->cond_1() == Cond::Z) == (to->cond_1() == Cond::P)) ?
+                        Cond::Z : Cond::NZ;
+                    block->instrs().push_back(new LoadInstruction(&rv_a, &imm_b<0>));
+                    block->instrs().push_back(new JrInstruction(&imm_b<3>, cc));
+                    block->instrs().push_back(new OrInstruction(&rv_a, &rv_a));
+                }
+                break;
+
+            case Cond::ANY: abort();
+            }
+            break;
+          
+        case Cond::P:
+        case Cond::M:
+            switch (to->cond_0()) {
+            case Cond::C:
+            case Cond::NC:
+                /* SF -> CF
+                 * call ___sftocf
+                 */
+                emit_crt("___sftocf", block);
+                break;
+                
+            case Cond::Z:
+            case Cond::NZ:
+                /* SF -> ZF
+                 * call ___sftozf
+                 */
+                emit_crt("___sftozf", block);
+                break;
+
+            default: abort();
+            }
+            
+        default: abort();
+        }
+    }
 
 }

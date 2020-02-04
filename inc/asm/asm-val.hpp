@@ -136,7 +136,12 @@ namespace zc::z80 {
 
       template <typename... Args>
       FlagValue(portal<Cond> cond_0, portal<Cond> cond_1, Args... args):
-         Value_(args..., flag_size), cond_0_(cond_0), cond_1_(cond_1) {}
+         Value_(args..., flag_size), cond_0_(cond_0), cond_1_(cond_1) {
+          /* ensure the flags are complementary */
+          if (cond_0 && cond_1) {
+              assert(::zc::invert(*cond_0) == *cond_1);
+          }
+      }
        
    protected:
       portal<Cond> cond_0_;

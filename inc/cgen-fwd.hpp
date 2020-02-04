@@ -18,6 +18,8 @@ namespace zc {
    class StringConstants;
    class CgenEnv;
    enum class Cond;
+   Cond invert(Cond cond);
+    
    
 }
 

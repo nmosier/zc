@@ -25,3 +25,30 @@ _: djnz __bdivu.loop
    ld c,e
    pop de
    ret
+
+; convert sign flag (SF) to carry flag (CF)
+; DESTROYS: f
+___sftocf:
+   push bc
+   call ___sftocc.base
+   rra
+   ld a,b
+   pop bc
+   ret
+
+; convert sign flag (SF) to zero flag (ZF)
+; DESTROYS: f
+___sftozf:
+   push bc
+   call ___sftocc.base
+   or a,a
+   ld a,b
+   pop bc
+   ret
+
+___sftocc.base:
+   ld b,a
+   ld a,1
+   ret m
+   dec a
+   ret
