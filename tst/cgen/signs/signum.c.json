@@ -1,0 +1,21 @@
+{
+    "rom": "ce.rom",
+    "transfer_files": ["signum.8xp"],
+    "target": {
+        "name": "SIGNUM",
+        "isASM": true
+    },
+    "sequence": [
+        "action|launch",
+        "hashWait|1"
+    ],
+    "hashes": {
+        "1": {
+            "description": "results",
+            "start": "saveSScreen",
+            "size": 3,
+            "expected_CRCs": ["030a0bd1"],
+            "timeout": 10000
+        }
+    }
+}
