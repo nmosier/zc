@@ -1,0 +1,22 @@
+#include "ti84pce.inc"
+
+_indcall .equ __indcall
+
+.assume ADL=1
+
+.org userMem - 2
+.db tExtTok, tAsm84CeCmp
+
+BUFSIZE .equ 10
+buf .equ saveSScreen
+
+_start:
+   ld hl,BUFSIZE \ push hl
+   ld a,$42 \ push af
+   ld hl,buf \ push hl
+   call _mymemset
+   pop de \ pop de \ pop de
+   ld iy,flags
+   ret
+   
+#include "memset.z80"

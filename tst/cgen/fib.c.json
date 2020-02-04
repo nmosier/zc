@@ -1,0 +1,21 @@
+{
+    "rom": "ce.rom",
+    "transfer_files": ["fib.8xp"],
+    "target": {
+        "name": "FIB",
+        "isASM": true
+    },
+    "sequence": [
+        "action|launch",
+        "hashWait|1"
+    ],
+    "hashes": {
+        "1": {
+            "description": "fibonacci term",
+            "start": "saveSScreen",
+            "size": 3,
+            "expected_CRCs": ["a69316b9"],
+            "timeout": 10000
+        }
+    }
+}

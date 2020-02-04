@@ -1,0 +1,25 @@
+#include "ti84pce.inc"
+
+_indcall .equ __indcall
+
+.assume ADL=1
+
+.org userMem - 2
+.db tExtTok, tAsm84CeCmp
+
+out_buf .equ saveSScreen
+#define BUFSIZE in_buf.end - in_buf
+
+_start:
+   ld hl,BUFSIZE \ push hl
+   ld hl,in_buf \ push hl
+   ld hl,out_buf \ push hl
+   call _mymemcpy
+   pop de \ pop de \ pop de
+   ld iy,flags
+   ret
+   
+in_buf: .db 0,1,2,3,4,5,6,7,8,9
+in_buf.end:
+
+#include "memcpy.z80"

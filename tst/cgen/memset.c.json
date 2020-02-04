@@ -1,0 +1,21 @@
+{
+    "rom": "ce.rom",
+    "transfer_files": ["memset.8xp"],
+    "target": {
+        "name": "MEMSET",
+        "isASM": true
+    },
+    "sequence": [
+        "action|launch",
+        "hashWait|1"
+    ],
+    "hashes": {
+        "1": {
+            "description": "buffer output",
+            "start": "saveSScreen",
+            "size": 10,
+            "expected_CRCs": ["252a33f5"],
+            "timeout": 10000
+        }
+    }
+}

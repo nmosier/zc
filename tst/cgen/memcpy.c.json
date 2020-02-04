@@ -1,0 +1,21 @@
+{
+    "rom": "ce.rom",
+    "transfer_files": ["memcpy.8xp"],
+    "target": {
+        "name": "MEMCPY",
+        "isASM": true
+    },
+    "sequence": [
+        "action|launch",
+        "hashWait|1"
+    ],
+    "hashes": {
+        "1": {
+            "description": "buffer output",
+            "start": "saveSScreen",
+            "size": 10,
+            "expected_CRCs": ["022c2131"],
+            "timeout": 10000
+        }
+    }
+}

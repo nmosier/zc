@@ -1,0 +1,21 @@
+#include "ti84pce.inc"
+
+_indcall .equ __indcall
+
+.assume ADL=1
+
+.org userMem - 2
+.db tExtTok, tAsm84CeCmp
+
+_start:
+   ld hl,'b'
+   push hl
+   call _main
+   pop de
+   ld (saveSScreen),hl ; for autotester
+   ld iy,flags
+   ret
+
+ ; #include "crt.z80"
+
+#include "chars.z80"
