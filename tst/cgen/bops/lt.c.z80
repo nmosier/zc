@@ -39,4 +39,5 @@ _start:
    ld iy,flags
    ret
 
+#include "crt.z80"
 #include "lt.z80"

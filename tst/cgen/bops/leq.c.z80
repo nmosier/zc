@@ -46,4 +46,5 @@ _start:
    ld iy,flags
    ret
 
+#include "crt.z80"
 #include "leq.z80"

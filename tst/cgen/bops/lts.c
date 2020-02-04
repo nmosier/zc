@@ -2,7 +2,7 @@ char ilts(int a, int b) {
    return a < b;
 }
 
-char blts(char a, char b) {
+char blts(signed char a, signed char b) {
    return a < b;
 }
 
