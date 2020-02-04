@@ -638,7 +638,7 @@ namespace zc {
             }
 
             const FlagValue *flag;
-            if (type()->int_type()->is_signed()) {
+            if (lhs()->type()->int_type()->is_signed()) {
                flag = new FlagValue(Cond::P, Cond::M);
             } else {
                flag = new FlagValue(Cond::NC, Cond::C);
