@@ -26,12 +26,26 @@ _: djnz __bdivu.loop
    pop de
    ret
 
+;;; FLAG ROUTINES ;;;
+
 ; convert sign flag (SF) to carry flag (CF)
 ; DESTROYS: f
 ___sftocf:
    push bc
-   call ___sftocc.base
-   rra
+   ld c,$00
+   call ____sftocc.base
+   rrca
+   ld a,b
+   pop bc
+   ret
+
+; convert sign flag (SF) to carry flag (CF), inverted
+; DESTROYS: f
+___sftocfn:
+   push bc
+   ld c,$ff
+   call ____sftocc.base
+   rrca
    ld a,b
    pop bc
    ret
@@ -40,15 +54,65 @@ ___sftocf:
 ; DESTROYS: f
 ___sftozf:
    push bc
-   call ___sftocc.base
+   ld c,$00
+   call ____sftocc.base
    or a,a
    ld a,b
    pop bc
    ret
 
-___sftocc.base:
+___sftozfn:
+   push bc
+   ld c,$ff
+   call ____sftocc.base
+   or a,a
+   ld a,b
+   pop bc
+   ret
+
+____sftocc.base:
    ld b,a
-   ld a,1
+   ld a,c
    ret m
-   dec a
+   cpl
+   ret
+
+; convert sign flag to bool in char
+___sftob:
+   ld a,0
+   ret p
+   inc a
+   ret
+
+; convert sign flag to bool, inverted
+___sftobn:
+   ld a,0
+   ret m
+   inc a
+   ret
+
+; convert sign flag to long
+___sftol:
+   ld hl,0
+   ret p
+   inc hl
+   ret
+
+; convert sign flag to long, inverted
+___sftoln:
+   ld hl,0
+   ret m
+   inc hl
+   ret
+
+; invert sign flag
+___sfinv:
+   push bc
+   ld b,a
+   ld a,0 
+   jp p,_
+   cpl
+_  or a,a
+   ld a,b
+   pop bc
    ret
