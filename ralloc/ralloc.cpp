@@ -145,9 +145,19 @@ namespace zc::z80 {
          cur_int.end = --block()->instrs().end();
          do {
             /* Find 1st `use'. */
+#if 1
+            for (; info_it != info_end && info_it->second != mode::USE; ++info_it) {
+               assert(info_it->second == mode::GEN);
+               cur_int.begin = info_it->first;
+               reg_free_ints.push_back(cur_int);
+               cur_int.end = info_it->first;
+            }
+#else
             while (info_it != info_end && info_it->second != mode::USE) {
                ++info_it;
             }
+#endif
+            
             if (info_it == info_end) {
                // cur_int.begin = 0;
                cur_int.begin = block()->instrs().begin();
