@@ -8,7 +8,7 @@
 \usepackage{adjustbox}
 \usepackage{enumitem}
 \usepackage[backend=biber,style=numeric]{biblatex}
-\usepackage{emory-theme}
+\usepackage{emory-theme,multicol}
 \usepackage{tikz}
 \usepackage[utf8]{inputenc}
 \usepackage{longtable}
@@ -48,6 +48,15 @@
 \lstset{
   escapeinside={{*@}{@*}}
 }
+
+    \tikzset{
+      brace/.style={
+        decoration={brace,amplitude=0.5cm},
+        decorate
+      }
+    }
+    \tikzstyle{ar} = [arrows={-Triangle[scale=2]}]
+
 
 \usepackage{mwe} % for placeholder images
 
@@ -119,13 +128,6 @@
     }
     \end{minipage}
 
-    \tikzset{
-      brace/.style={
-        decoration={brace,amplitude=0.5cm},
-        decorate
-      }
-    }
-    \tikzstyle{ar} = [arrows={-Triangle[scale=2]}]
     
     \begin{tikzfigure}
       \begin{tikzpicture}[
@@ -233,33 +235,32 @@
     
   }
     
-  \block{Optimizations Overview}{
-
-    \begin{itemize}
-    \item Peephole optimization
-    \item Register allocation
-    \item Constant evaluation
-    \item Reducing boolean conversions
-    \item Transitions minimization
-    \item Direct calls
-    \end{itemize}
-    
-  }
   
   \column{0.5}
 
   
-  \block{Results}{
+  \block{Performance}{
+    We tested ZC on four programs against a reference compiler,
+    Zilog's C compiler for the eZ80.
+    On average, ZC's performance is comparable to the reference compiler,
+    though each compiler excels in different programs.
+    We find these results encouraging, since there are many unimplemented
+    optimizations for future work on ZC.
     \begin{tikzfigure}
       \begin{tikzpicture}
         \begin{axis}[
           width=0.9\linewidth,
+          height=20cm,
           ybar,
           symbolic x coords={register allocation, peephole optimization, constant folding, boolean elision, transition minimization, direct calls, all, reference compiler},
           enlarge x limits=true,
           xtick=data,
-          ytick={0,20,40,60,80,-20,-40,-60},
-          ylabel={Percentage (\%)},
+          ytick={0,20,-20,-40,-60},
+          yticklabels={0\%,+20\%,-20\%,-40\%,-60\%},
+          ymajorgrids=true,
+          ymax=20,
+          %ylabel={Percentage (\%)},
+          xlabel={Compiler modes},
           legend style={
             at={(0.5, -0.2)},
             anchor=north,
@@ -268,7 +269,9 @@
           },
           x tick label style={font=\small, text width=4cm, align=center},
           bar width=0.75cm,
-          title={Code size, relative to baseline (stack machine, no optimization)},
+          title style={align=center},
+          title={Code size, difference relative to baseline \\ \small (ZC's original
+            stack-machine implementation, with no optimization)},
           ]
 
           % chars.c
@@ -323,70 +326,147 @@
           \legend{\texttt{chars.c}, \texttt{fib.c}, \texttt{memcpy.c},
             \texttt{string.c}}
 
+          \path(axis cs:all,0) -- coordinate (m) (axis cs:reference compiler,0);
+          \draw[dashed] (m) -- (current axis.south -| m);
+          \draw[dashed] (m) -- (current axis.north -| m);
+
+          \path(axis cs:register allocation,0) -- coordinate (n) (axis cs:peephole optimization,0);
+          \draw[dashed] (n) -- (current axis.south -| n);
+          \draw[dashed] (n) -- (current axis.north -| n);          
+
+          \path(axis cs:direct calls,0) -- coordinate (o) (axis cs:all,0);
+          \draw[dashed] (o) -- (current axis.south -| o);
+          \draw[dashed] (o) -- (current axis.north -| o);
+
+          \draw[decoration={brace,raise=1.5cm,amplitude=0.5cm},decorate]
+          (n) -- node[above=2cm] {\small Singly selected optimizations} (o);
+
         \end{axis}
       \end{tikzpicture}
     \end{tikzfigure}
 
     \innerblock{}{
-    \begin{tikzfigure}
-      % \begin{table}
+      \begin{tikzfigure}
+        \centering
         \begin{tabular}{|c|c|c|c|c|}\hline
           & {\tt chars.c} & {\tt fib.c} & {\tt memcpy.c} & {\tt string.c} \\\hline
-          {\bf stack machine} & {\bf 245} & {\bf 126} & {\bf 305} & {\bf 219} \\\hline
-          register allocation & 233 & 122 & 313 & 208 \\\hline
+          {(stack machine)} & (245) & (126) & (305) & (219) \\\hline
+          register allocation & 233 & 122 & \color{red} 313 & 208 \\\hline
           peephole optimization & 192 & 99 & 283 & 173 \\\hline
-          constant folding & 228 & 122 & 315 & 208 \\\hline
+          constant folding & 228 & 122 & \color{red} 315 & 208 \\\hline
           boolean elision & 195 & 115 & 301 & 194 \\\hline
           transition minimization & 201 & 114 & 279 & 176 \\\hline
-          direct calls & 219 & 108 & 301 & 201 \\\hline
+          direct calls & 219 & 108 & 301 & 20 \\\hline
           {\bf all} & {\bf 108} & {\bf 71} & {\bf 221} & {\bf 122} \\\hline
           {\it reference compiler} & {\it 137} & {\it 67} & {\it 263} & {\it 93} \\\hline
         \end{tabular}
-      % \end{table}
-    \end{tikzfigure}
+
+      \end{tikzfigure}
     }
-}
-\block{Optimization Examples}{
-  {\tt
-    \begin{tabular}{>{\bf}ll}
-      \rowcolor{gray} or   & a,a   \\
-      \rowcolor{gray} sbc  & hl,hl \\
-      \rowcolor{gray} ld   & l,a   \\
-      \rowcolor{red} push & hl    \\
-      \rowcolor{red} pop  & hl \\
-      \rowcolor{gray} jp & label0 \\
-    \end{tabular}
   }
 
-  \bigskip
+  \block{Optimizations Overview}{
+
+    \begin{multicols}{2}
+    \begin{itemize}
+    \item {\bf Peephole optimization:} find suboptimal instruction patterns in a
+      sliding window and replace with shorter equivalent.
+    \item {\bf Constant folding:} compute constant expressions at compile-time.
+    \item {\bf Boolean elision:} skip producing boolean values in registers; use the flag states directly.
+    \item {\bf Transition minimization:} emit basic blocks in such an order that jump transitions can fall through to the destination block.
+    \item {\bf Direct calls:} when calling a constant function expression, call it directly (rather than loading the address into a register).
+    \end{itemize}
+    \end{multicols}
+    
+  }
   
-  {\tt
-    \begin{tabular}{>{\bf}ll}
-      \rowcolor{red} lea & ix,ix+0 \\
-      \rowcolor{red} ld & sp,ix \\
-      \rowcolor{gray} pop & ix \\
-      \rowcolor{gray} ret \\
-    \end{tabular}
-  }
+  \block{Optimization Examples}{
+    \innerblock{Peephole}{
+      \begin{minipage}{0.33\linewidth}
+        \centering
+        Useless pushes \& pops \\
+        \vspace{0.5cm}
+        \tt
+        \begin{tabular}{|>{\bf}ll|c|>{\bf}ll|}\cline{1-2}\cline{4-5}
+          or   & a,a   &\multirow{6}{*}{$\rightarrow$}& or & a,a \\
+          sbc  & hl,hl && sbc & hl,hl \\
+          ld   & l,a   && ld & l,a \\
+          \color{red} push & \color{red} hl &&& \\
+          \color{red} pop  & \color{red} hl &&& \\
+          jp & lbl0 && jp & lbl0 \\
+          \cline{1-2}\cline{4-5}
+        \end{tabular}
+      \end{minipage}
+      \begin{minipage}{0.33\linewidth}
+        \centering
+        Frame unsetting with \\ no local variables \\
+        \vspace{0.5cm}
+        \tt
+        \begin{tabular}{|>{\bf}ll|c|>{\bf}ll|}\cline{1-2}\cline{4-5}
+          \color{red} lea & \color{red} ix,ix+0 & \multirow{4}{*}{$\rightarrow$} && \\
+          \color{red} ld & \color{red} sp,ix &&& \\
+          pop & ix && pop & ix \\
+          ret &&& ret & \\
+          \cline{1-2}\cline{4-5}
+        \end{tabular}
+      \end{minipage}%
+      \begin{minipage}{0.33\linewidth}
+        \centering        
+        Loading zero becomes \\ self-subtraction \\
+        \vspace{0.5cm}
+        \tt
+        \begin{tabular}{|>{\bf}ll|c|>{\bf}ll|}\cline{1-2}\cline{4-5}
+          \color{red} ld & \color{red} a,a & \multirow{3}{*}{$\rightarrow$} & \color{green} or & \color{green} a,a \\
+          \color{red} ld & \color{red} hl,0 && \color{green} sbc & \color{green} hl,hl \\
+          ld & l,a && ld & l,a \\
+          \cline{1-2}\cline{4-5}
+        \end{tabular}
+      \end{minipage}
+    }
 
-  \bigskip
-
-  {\tt
-    \begin{tabular}{>{\bf}ll}
-      \rc{gray} ld & l,'A' \\
-      \rc{gray} cp & a,l \\
-      \rc{red} sbc & a,a \\
-      \rc{red} inc & a \\
-      \rc{red} or & a,a \\
-      \rc{red} jp & nz,label0 \\ \rc{green} jp & nc,label0 \\
-      \rc{red} jp & z,label1 \\ \rc{green} jp & c,label1 \\
-    \end{tabular}
-  }
+    \begin{minipage}{0.5\linewidth}
+    \innerblock{Boolean Elision}{
+      \tt
+      \centering
+        \begin{tabular}{|>{\bf}ll|c|>{\bf}ll|}\cline{1-2}\cline{4-5}
+          ld & l,`A' & \multirow{7}{*}{$\rightarrow$} & ld & l,`A' \\
+          cp & a,l && cp & a,l \\
+          \color{red} sbc & \color{red} a,a &&& \\
+          \color{red} inc & \color{red} a &&& \\
+          \color{red} or & \color{red} a,a &&& \\
+          \color{red} jp & \color{red} nz,label0 && \color{green} jp & \color{green} nc,label0 \\
+          \color{red} jp & \color{red} z,label1 && \color{green} jp & \color{green} c,label1 \\
+          \cline{1-2}\cline{4-5}
+        \end{tabular}
+      }
+      \end{minipage}
+      \begin{minipage}{0.5\linewidth}
+      \innerblock{Constant Folding}{
+        \tt
+        \centering
+        \begin{tabular}{|>{\bf}ll|c|>{\bf}ll|}\cline{1-2}\cline{4-5}
+          ld & l,(ix+7) & \multirow{5}{*}{$\rightarrow$} & ld & l,(ix+7) \\
+          ld & a,\color{red}`A' && ld & a,\color{green}-32 \\
+          \color{red} ld & \color{red} h,`a' &&& \\
+          \color{red} sub & \color{red} a,h &&& \\
+          add & a,l && add & a,l \\
+          \cline{1-2}\cline{4-5}
+        \end{tabular}
+      }
+      \end{minipage}
 }
 
-  \block{Future Work}{
-    Blah, blah, blah.
-  }
+%\block{Future Work}{
+%\begin{itemize}
+ %   \item Global register allocation (ZC currently only does local, i.e. basic block, register allocation)
+      
+  %  \end{itemize}
+  %}
+
+\block{Acknowledgements}{
+  Thanks to Professor Michael Linderman for adivising this project
+  during Winter 2020.
+}
   
 
 \end{columns}
