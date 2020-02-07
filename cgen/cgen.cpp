@@ -9,6 +9,7 @@
 #include "cgen.hpp"
 #include "ralloc.hpp"
 #include "emit.hpp"
+#include "crt.hpp"
 
 namespace zc {
 
@@ -651,14 +652,7 @@ namespace zc {
             if (g_optim.bool_flag) {
                *out = flag;
             } else {
-#if 0                
-               *out = new VariableValue(type()->bytes());
-               block->instrs().push_back(new LoadInstruction(*out, &imm_b<0>));
-               block->instrs().push_back(new JrInstruction(&imm_b<3>, flag->cond_0()));
-               block->instrs().push_back(new IncInstruction(*out));
-#else
                emit_booleanize_flag(env, block, flag, out, type()->bytes());
-#endif
             }
             
             return block;
@@ -738,12 +732,15 @@ namespace zc {
              * call __imulu
              * ld <out>,hl
              */
-            block->instrs().push_back(new LoadInstruction(&rv_hl, lhs_var));
-            block->instrs().push_back(new LoadInstruction(&rv_bc, rhs_var));
-            emit_crt("__imulu", block);
-            if (out) {
-               *out = new VariableValue(long_size);
-               block->instrs().push_back(new LoadInstruction(*out, &rv_hl));
+            {
+               bool is_signed = lhs()->type()->int_type()->is_signed();
+               block->instrs().push_back(new LoadInstruction(&rv_hl, lhs_var));
+               block->instrs().push_back(new LoadInstruction(&rv_bc, rhs_var));
+               emit_crt("__imul" + crt_suffix(is_signed), block);
+               if (out) {
+                  *out = new VariableValue(long_size);
+                  block->instrs().push_back(new LoadInstruction(*out, &rv_hl));
+               }
             }
             break;
          }
@@ -753,10 +750,11 @@ namespace zc {
       case Kind::BOP_MOD:
          {
             bool div_not_mod = (kind() == Kind::BOP_DIVIDE);
+            bool is_signed = lhs()->type()->int_type()->is_signed();
             block = emit_binop(env, block, this, &lhs_var, &rhs_var);
             block->instrs().push_back(new LoadInstruction(crt_arg1(lhs_var), lhs_var));
             block->instrs().push_back(new LoadInstruction(crt_arg2(rhs_var), rhs_var));
-            emit_crt(crt_prefix(lhs_var) + "divu", block);
+            emit_crt(crt_prefix(lhs_var) + "div" + crt_suffix(is_signed), block);
             if (out) {
                *out = new VariableValue(lhs_var->size());
                if (div_not_mod) {
@@ -924,23 +922,24 @@ namespace zc {
 
       int expr_bytes = expr()->type()->Decay()->bytes();
       int out_bytes = type()->Decay()->bytes();
+      bool expr_signed = expr()->type()->Decay()->int_type()->is_signed();
+      bool out_signed = type()->Decay()->int_type()->is_signed();
 
       assert(expr_bytes != word_size && out_bytes != word_size);
 
       if (expr_bytes == out_bytes) {
+         /* NOTE: Can ignore sign due to how two's complement works. */
          return expr()->CodeGen(env, block, out, mode);
       }
 
-      if (out == nullptr) { return block; }
-
-      // const Value *var = new VariableValue(expr_bytes);
       const Value *var;
       block = expr()->CodeGen(env, block, &var, mode);
       
+      if (out == nullptr) { return block; }
+
       switch (out_bytes) {
       case flag_size:
          {
-            // *out = new FlagValue(Cond::Z, Cond::NZ);
             emit_nonzero_test(env, block, var, (const FlagValue **) out);
          }
          break;
@@ -973,9 +972,27 @@ namespace zc {
          case byte_size:
             {
                *out = new VariableValue(out_bytes);                         
-               auto low_byte = new ByteValue(*out, ByteValue::Kind::BYTE_LOW);
-               block->instrs().push_back(new LoadInstruction(*out, &imm_l<0>));
-               block->instrs().push_back(new LoadInstruction(low_byte, var));
+               if (expr_signed) {
+                  /* sign-extend
+                   * rlc <var>
+                   * sbc hl,hl
+                   * rrc <var>
+                   * ld l,<var>
+                   */
+                  block->instrs().push_back(new RlcInstruction(var));
+                  block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_hl));
+                  block->instrs().push_back(new RrcInstruction(var));
+               } else {
+                  /* don't sign-extend 
+                   * or a,a
+                   * sbc hl,hl
+                   * ld l,<var>
+                   */
+                  block->instrs().push_back(new OrInstruction(&rv_a, &rv_a));
+                  block->instrs().push_back(new SbcInstruction(&rv_hl, &rv_hl));
+               }
+               block->instrs().push_back(new LoadInstruction(&rv_l, var));
+               block->instrs().push_back(new LoadInstruction(*out, &rv_hl));
             }
             break;
          case word_size: abort();            
@@ -1102,35 +1119,6 @@ namespace zc {
       }
    }
 
-   const RegisterValue *crt_arg1(const Value *val) { return crt_arg1(val->size()); }
-   const RegisterValue *crt_arg1(int bytes) {
-      switch (bytes) {
-      case byte_size: return &rv_a;
-      case word_size: return &rv_hl;
-      case long_size: return &rv_hl;
-      default:        abort();
-      }
-   }
-
-   const RegisterValue *crt_arg2(const Value *val) { return crt_arg2(val->size()); }   
-   const RegisterValue *crt_arg2(int bytes) {
-      switch (bytes) {
-      case byte_size: return &rv_b;
-      case word_size: return &rv_bc;
-      case long_size: return &rv_bc;
-      default:        abort();
-      }
-   }
-
-   std::string crt_prefix(const Value *val) { return crt_prefix(val->size()); }
-   std::string crt_prefix(int bytes) {
-      switch (bytes) {
-      case byte_size: return "__b";
-      case word_size: return "__s";
-      case long_size: return "__i";
-      default:        abort();
-      }
-   }
 
    const RegisterValue *accumulator(const Value *val) { return accumulator(val->size()); }
    const RegisterValue *accumulator(int bytes) {
