@@ -20,6 +20,7 @@ add_subdirectory(optim)
 add_subdirectory(ralloc)
 add_subdirectory(semant)
 add_subdirectory(crt)
+add_subdirectory(alg)
 
 add_library(zc_objs
   OBJECT
@@ -36,4 +37,5 @@ add_executable(zc
   $<TARGET_OBJECTS:ralloc_objs>
   $<TARGET_OBJECTS:semant_objs>
   $<TARGET_OBJECTS:crt_objs>
+  $<TARGET_OBJECTS:alg_objs>
 )
