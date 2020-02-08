@@ -21,6 +21,8 @@
 \usepackage{listings}
 \usepackage{multirow}
 
+\addbibresource{refs.bib}
+
 %% For code listings
 \definecolor{codegreen}{rgb}{0,0.6,0}
 \definecolor{codegray}{rgb}{0.5,0.5,0.5}
@@ -84,15 +86,30 @@
 \begin{columns}
   \column{0.5}
   \block{Introduction \& Motivation}{
-    The Zilog Z80, a CISC 8-bit microprocessor that used to be ubiquitious in personal computing and arcade gaming in the 1970-80's, is still used to this day in Texas Instrument's TI-83/84+ graphing calculators. More recently, the eZ80 processor, introduced in the early 2000's, features a minor, backwards-compatible update to the original Z80 ISA, and is used in the TI's higher-end calculators, e.g. the TI-84+ CE. TI calculator programmers (including me), 
+%    The Zilog Z80 is an 8-bit microprocessor that used to be ubiquitious in personal computing and arcade gaming in the 1970-80's. We introduce ZC, a C compiler for the eZ80 variant of the Z, is still used to this day in Texas Instrument's TI-83/84+ graphing calculators. More recently, the eZ80 processor, introduced in the early 2000's, features a minor, backwards-compatible update to the original Z80 ISA, and is used in the TI's higher-end calculators, e.g. the TI-84+ CE. TI calculator programmers (including me), 
 
-    \begin{itemize}
-    \item No C compilers target both the Z80 and eZ80.
-    \item Large code size output of existing C compilers targeting the eZ80.
-    \end{itemize}
-
-    To address this need, we introduce ZC, an optimizing C compiler for the eZ80 (and, eventually, the Z80 as well).
-
+    \begin{minipage}{0.5\linewidth}
+    \innerblock{The Zilog Z80 \& eZ80}{
+      \begin{itemize}
+      \item 8-bit CISC mircoprocessor
+      \item Accumulator machine model
+      \item 16-/24-bit register pairs \& addresses
+      \item Backwards-compatible eZ80 adds several new instructions to the Z80 ISA
+      \end{itemize}
+    }
+  \end{minipage}
+  \begin{minipage}{0.5\linewidth}
+    \innerblock{Motivation}{
+      \begin{itemize}
+      \item Z80 \& eZ80 still used in Texas Instruments graphing calculators
+      \item Most calculator programming done in Z80 assembly
+      \item No C compilers target both the Z80 and eZ80
+      \item Large code size output of existing C compilers targeting the eZ80
+      \item High-performance C compiler essential for large (e)Z80 projects
+      \end{itemize}
+    }
+  \end{minipage}
+  To fulfill this need, I wrote {\bf ZC}, a C compiler for the eZ80 architecture optimizing for code size.
   }
 
   \block{Compiler Anatomy}{
@@ -110,7 +127,7 @@
       representing the input program.
 
       {\bf Semantic Analysis:}
-      The ZC compiler infers the types of expressions in the AST,
+      ZC infers the types of expressions in the AST,
       resolves user-defined types such as {\tt struct}s and {\tt typedef}s,
       and checks semantic validity of the program.
     }
@@ -118,7 +135,7 @@
     \begin{minipage}{0.5\linewidth}
     \innerblock{Backend}{
       {\bf Code Generation:}
-      For each function definition, ZC generates a control flow diagram of
+      For each function, ZC generates a control flow diagram of
       basic blocks containing symbolic (e)Z80 instructions and determines
       an activation record layout.
 
@@ -168,22 +185,20 @@
     % Stack Machine vs. Register Allocation
     \begin{minipage}{0.5\linewidth}
       \innerblock{Stack Machine}{
-        When evaluating expressions, a stack-machine compiler pushes intermediate
-        values (e.g. the left-hand side of an addition)
-        onto the stack and pops them off when it is ready to be combined with another
-        intermediate value (e.g. added to the right-hand side of an addition).
+        A stack-machine compiler pushes intermediate values onto the stack and pops them
+        off when they are ready to be used.
         A stack machine is easy to implement; the first version of ZC's code generator
         was a stack machine.
       }
     \end{minipage}
     \begin{minipage}{0.5\linewidth}
       \innerblock{Register Allocation}{
-        A compiler with a register allocator moves intermediate values into registers
+        A compiler with a register allocator stores intermediate values into registers
         rather than pushing them onto the stack.
         However, there are often more intermediate values
         than there are physical registers.
-        For example, the (e)Z80 has {\bf 7 byte registers}
-        but only {\bf 3 allocatable multibyte registers}.
+        For example, the (e)Z80 has {\bf 7 single-byte registers}
+        but only {\bf 3 allocatable multi-byte registers}.
         When intermediate values exceed physical registers in number,
         those values must be \textit{spilled} into memory.
       }
@@ -202,32 +217,31 @@
     }
     \end{minipage}
     \begin{minipage}{0.5\linewidth}
-    \innerblock{Frame vs. Stack Spilling in ZC}{
-      Most compilers spill intermediate values into the callee's frame
-      (i.e. activation record), also where local variables are stored -- we call this
-      {\it frame spilling}.
-      On the (e)Z80, however, accessing memory through the frame pointer register
-      {\tt ix} is costly;
-      it is much more efficient to push/pop intermediate values directly to/from the
-      stack -- we call this {\it stack spilling}.
-      Stack spilling is cheap but restrictive; frame spilling is costly but versatile.
-      If a value cannot be assigned a register, ZC tries to spill onto the stack,
-      resorting to frame-spilling if it fails.
+      \innerblock{Frame vs. Stack Spilling in ZC}{
+        Most compilers use {\it frame spilling}, i.e. spill intermediate values to
+        the activation record.
+      However, accessing memory through the frame pointer register
+      {\tt ix} is costly in (e)Z80;
+      {\it stack spilling}, i.e. to push/pop intermediate values to/from the stack,
+      is more efficient.
+      Stack spilling is {\bf cheap but restrictive};
+      frame spilling is {\bf costly but versatile}.
     }
     \end{minipage}
 
     \begin{tikzfigure}
-    {\tt
-      \begin{tabular}{>{\bf}ll|>{\bf}ll|>{\bf}ll}
-        \multicolumn{2}{c|}{\bf Stack Machine}
-        & \multicolumn{4}{c}{\bf Register Allocation} \\
-        & & \multicolumn{2}{c}{\rm Before} & \multicolumn{2}{c}{\rm After}
+    {\tt \Large
+      \begin{tabular}{|>{\bf}ll|>{\bf}ll|>{\bf}ll|}\hline
+        \multicolumn{2}{|c|}{\hspace{0.5cm}\bf Stack Machine \hspace{0.5cm}}
+        & \multicolumn{4}{|c|}{\bf Register Allocation} \\
+        & & \multicolumn{2}{c}{\rm Before} & \multicolumn{2}{c|}{\rm After}
         \\\hline
         ld & a,(ix+7) & ld & {\it vb4} ,(ix+7) & ld & a,(ix+7) \\
         push & af & & & & \\
         ld & a,97 & ld & {\it vb5},97 & ld & l,97 \\
         pop & bc & ld & a,{\it vb4} & ld & a,a \\
         cp & a,b & cp & a,{\it vb5} & cp & a,l \\
+        \hline
       \end{tabular}
     }
     \end{tikzfigure}
@@ -240,11 +254,11 @@
 
   
   \block{Performance}{
-    We tested ZC on four programs against a reference compiler,
-    Zilog's C compiler for the eZ80.
+    I tested ZC on four programs against a reference compiler,
+    Zilog's C compiler for the eZ80 \cite{ez80cc}.
     On average, ZC's performance is comparable to the reference compiler,
-    though each compiler excels in different programs.
-    We find these results encouraging, since there are many unimplemented
+    though each compiler more compact code in a subset of programs.
+    These results are encouraging, since there are many unimplemented
     optimizations for future work on ZC.
     \begin{tikzfigure}
       \begin{tikzpicture}
@@ -270,8 +284,7 @@
           x tick label style={font=\small, text width=4cm, align=center},
           bar width=0.75cm,
           title style={align=center},
-          title={Code size, difference relative to baseline \\ \small (ZC's original
-            stack-machine implementation, with no optimization)},
+          title={Code size relative to ZC with no optimization}
           ]
 
           % chars.c
@@ -350,15 +363,15 @@
         \centering
         \begin{tabular}{|c|c|c|c|c|}\hline
           & {\tt chars.c} & {\tt fib.c} & {\tt memcpy.c} & {\tt string.c} \\\hline
-          {(stack machine)} & (245) & (126) & (305) & (219) \\\hline
-          register allocation & 233 & 122 & \color{red} 313 & 208 \\\hline
+          {(stack machine)} & (\textcolor{red}{245}) & (\textcolor{red}{126}) & (305) & (\textcolor{red}{219}) \\\hline
+          register allocation & 233 & 122 & 313 & 208 \\\hline
           peephole optimization & 192 & 99 & 283 & 173 \\\hline
           constant folding & 228 & 122 & \color{red} 315 & 208 \\\hline
           boolean elision & 195 & 115 & 301 & 194 \\\hline
           transition minimization & 201 & 114 & 279 & 176 \\\hline
           direct calls & 219 & 108 & 301 & 20 \\\hline
-          {\bf all} & {\bf 108} & {\bf 71} & {\bf 221} & {\bf 122} \\\hline
-          {\it reference compiler} & {\it 137} & {\it 67} & {\it 263} & {\it 93} \\\hline
+          {\bf all} & {\bf 108} & {71} & {\bf 221} & {122} \\\hline
+          {\it reference compiler} & {\it 137} & {\bf \textit{67}} & {\it 263} & {\bf\textit{93}} \\\hline
         \end{tabular}
 
       \end{tikzfigure}
@@ -439,8 +452,8 @@
           \cline{1-2}\cline{4-5}
         \end{tabular}
       }
-      \end{minipage}
-      \begin{minipage}{0.5\linewidth}
+    \end{minipage}%
+    \begin{minipage}{0.5\linewidth}
       \innerblock{Constant Folding}{
         \tt
         \centering
@@ -462,12 +475,24 @@
       
   %  \end{itemize}
   %}
-
-\block{Acknowledgements}{
-  Thanks to Professor Michael Linderman for adivising this project
-  during Winter 2020.
-}
-  
-
 \end{columns}
+
+\block{}{
+  \hrule
+  \begin{minipage}{0.5\linewidth}
+    \innerblock{Acknowledgements}{
+      Thanks to Professor Michael Linderman for adivising this project
+      during Winter 2020.
+    }
+  \end{minipage}
+  \begin{minipage}{0.5\linewidth}
+    \innerblock{References}{
+      \begin{footnotesize}
+        \printbibliography[heading=none]
+        \nocite{*}
+      \end{footnotesize}
+    }
+  \end{minipage}
+}
+
 \end{document}
