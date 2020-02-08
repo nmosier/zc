@@ -1,8 +1,3 @@
-
-#ifndef __ASM_HPP
-#error "include \"asm.hpp\", not \"asm-base.hpp\" directly"
-#endif
-
 #ifndef __ASM_INSTR_HPP
 #define __ASM_INSTR_HPP
 
@@ -15,9 +10,9 @@
 #include "asm/asm-lab.hpp"
 #include "asm/asm-cond.hpp"
 
+#include "cgen.hpp"
 #include "util.hpp"
-
-namespace zc { enum class Cond; }
+#include "alg.hpp"
 
 namespace zc::z80 {
    
@@ -32,8 +27,10 @@ namespace zc::z80 {
       const std::string& name() const { return name_; }
       FlagMod flagmod(const Flag& flag) const;
 
-      virtual void Gen(std::list<const Value *>& vals) const {}
-      virtual void Use(std::list<const Value *>& vals) const {}
+      virtual void Kill(alg::ValueInserter vals) const {}
+      virtual void Kill(alg::CondInserter conds) const {}
+      virtual void Gen(alg::ValueInserter vals) const {}
+      virtual void Gen(alg::CondInserter conds) const {}
 
       void ReplaceVar(const VariableValue *var, const Value *with);
 
@@ -65,8 +62,13 @@ namespace zc::z80 {
 
    class BinaryInstruction: public Instruction {
    public:
+#if 1
+      virtual void Kill(alg::ValueInserter vals) const override;
+      virtual void Gen(alg::ValueInserter vals) const override;
+#else
+      virtual void Kill(std::list<const Value *>& vals) const override;
       virtual void Gen(std::list<const Value *>& vals) const override;
-      virtual void Use(std::list<const Value *>& vals) const override;
+#endif
       
    protected:
       template <typename... Args>
@@ -76,8 +78,13 @@ namespace zc::z80 {
 
    class UnaryInstruction: public Instruction {
    public:
+#if 1
+      virtual void Kill(alg::ValueInserter vals) const override;
+      virtual void Gen(alg::ValueInserter vals) const override;
+#else
+      virtual void Kill(std::list<const Value *>& vals) const override;
       virtual void Gen(std::list<const Value *>& vals) const override;
-      virtual void Use(std::list<const Value *>& vals) const override;
+#endif
       
    protected:
       template <typename... Args>
@@ -87,14 +94,62 @@ namespace zc::z80 {
 
    class BitwiseInstruction: public BinaryInstruction {
    public:
-      virtual void Gen(std::list<const Value *>& vals) const override;
-      virtual void Use(std::list<const Value *>& vals) const override;
+      virtual void Kill(alg::ValueInserter vals) const override;
+      virtual void Kill(alg::CondInserter conds) const override {
+         *conds++ = Cond::C;
+         *conds++ = Cond::Z, *conds++ = Cond::NZ;
+      }
+      virtual void Gen(alg::ValueInserter vals) const override;
 
    protected:
       template <typename... Args>
       BitwiseInstruction(Args... args): BinaryInstruction(args...) {}
    };
 
+   class IncDecInstruction: public UnaryInstruction {
+   public:
+      virtual void Kill(alg::CondInserter conds) const override;
+      
+   protected:
+      template <typename... Args>
+      IncDecInstruction(Args... args): UnaryInstruction(args...) {}
+   };
+
+   class RotateInstruction: public UnaryInstruction {
+   public:
+      virtual void Kill(alg::CondInserter conds) const override {
+         *conds++ = Cond::C, *conds++ = Cond::NC;
+      }
+      
+   protected:
+      template <typename... Args>
+      RotateInstruction(Args... args): UnaryInstruction(args...) {}
+   };
+
+   class RotateCarryInstruction: public RotateInstruction {
+   public:
+      virtual void Gen(alg::CondInserter conds) const override {
+         *conds++ = Cond::C, *conds++ = Cond::NC;
+      }
+      
+   protected:
+      template <typename... Args>
+      RotateCarryInstruction(Args... args): RotateInstruction(args...) {}
+   };
+
+#if 0
+   class ShiftInstruction: public UnaryInstruction {
+   public:
+      virtual void Kill(alg::CondInserter conds) const override {
+         std::copy(alg::all_conds.begin(), alg::all_conds.end(), conds);
+      }
+      
+   protected:
+      template <typename... Args>
+      ShiftInstruction(Args... args): UnaryInstruction(args...) {}
+   };
+#endif
+   
    /***********************
     * INSTRUCTION CLASSES *
     ***********************/
@@ -104,6 +159,13 @@ namespace zc::z80 {
     */
    class AdcInstruction: public BinaryInstruction {
    public:
+      virtual void Gen(alg::CondInserter conds) const override {
+         *conds++ = Cond::C; *conds++ = Cond::NC;
+      }
+      virtual void Kill(alg::CondInserter conds) const override {
+         std::copy(alg::all_conds.begin(), alg::all_conds.end(), conds);
+      }
+      
       template <typename... Args>
       AdcInstruction(Args... args): BinaryInstruction(args..., "adc") {}
    };
@@ -114,6 +176,8 @@ namespace zc::z80 {
     */
    class AddInstruction: public BinaryInstruction {
    public:
+      virtual void Kill(alg::CondInserter conds) const override;
+      
       template <typename... Args>
       AddInstruction(Args... args): BinaryInstruction(args..., "add") {}
    };
@@ -133,8 +197,11 @@ namespace zc::z80 {
    class CallInstruction: public UnaryInstruction {
    public:
       /* TODO -- this might need to be marked as using everything... */
-      virtual void Gen(std::list<const Value *>& vals) const override;
-      virtual void Use(std::list<const Value *>& vals) const override;
+      virtual void Gen(alg::ValueInserter vals) const override;
+      virtual void Kill(alg::CondInserter conds) const override {
+         std::copy(alg::all_conds.begin(), alg::all_conds.end(), conds);
+      }
+      virtual void Kill(alg::ValueInserter vals) const override;      
       
       template <typename... Args>
       CallInstruction(Args... args): UnaryInstruction(args..., "call") {}
@@ -145,6 +212,13 @@ namespace zc::z80 {
     */
    class CcfInstruction: public Instruction {
    public:
+      virtual void Gen(alg::CondInserter conds) const override {
+         *conds++ = Cond::C, *conds++ = Cond::NC;
+      }
+      virtual void Kill(alg::CondInserter conds) const override {
+         *conds++ = Cond::C, *conds++ = Cond::NC;
+      }
+      
       template <typename... Args>
       CcfInstruction(Args... args): Instruction(args..., "ccf") {}
    };   
@@ -154,7 +228,10 @@ namespace zc::z80 {
     */
    class CompInstruction: public BinaryInstruction {
    public:
-      virtual void Gen(std::list<const Value *>& vals) const override {}
+      virtual void Kill(alg::CondInserter conds) const override {
+         std::copy(alg::all_conds.begin(), alg::all_conds.end(), conds);
+      }
+      virtual void Kill(alg::ValueInserter vals) const override {}
 
       template <typename... Args>
       CompInstruction(Args... args): BinaryInstruction(args..., "cp") {}
@@ -165,8 +242,8 @@ namespace zc::z80 {
     */
    class CplInstruction: public Instruction {
    public:
-      virtual void Gen(std::list<const Value *>& vals) const override;
-      virtual void Use(std::list<const Value *>& vals) const override;
+      virtual void Kill(alg::ValueInserter vals) const override;
+      virtual void Gen(alg::ValueInserter vals) const override;      
       
       template <typename... Args>
       CplInstruction(Args... args): Instruction(args..., "cpl") {}
@@ -175,19 +252,19 @@ namespace zc::z80 {
    /**
     * "DEC" instruction class
     */
-   class DecInstruction: public UnaryInstruction {
+   class DecInstruction: public IncDecInstruction {
    public:
       template <typename... Args>
-      DecInstruction(Args... args): UnaryInstruction(args..., "dec") {}
+      DecInstruction(Args... args): IncDecInstruction(args..., "dec") {}
    };
-
+   
    /**
     * "DJNZ" instruction
     */
    class DjnzInstruction: public UnaryInstruction {
    public:
-      virtual void Gen(std::list<const Value *>& vals) const override;
-      virtual void Use(std::list<const Value *>& vals) const override;
+      virtual void Kill(alg::ValueInserter vals) const override;
+      virtual void Gen(alg::ValueInserter vals) const override;
 
       template <typename... Args>
       DjnzInstruction(Args... args): UnaryInstruction(args..., "djnz") {}
@@ -198,7 +275,7 @@ namespace zc::z80 {
     */
    class ExInstruction: public BinaryInstruction {
    public:
-      /* TODO -- Gen and Use are nuanced. */
+      /* TODO -- Kill and Gen are nuanced. */
       
       template <typename... Args>
       ExInstruction(Args... args): BinaryInstruction(args..., "ex") {}
@@ -207,11 +284,10 @@ namespace zc::z80 {
    /**
     * "INC" instruction class
     */
-   class IncInstruction: public UnaryInstruction {
+   class IncInstruction: public IncDecInstruction {
    public:
-      
       template <typename... Args>
-      IncInstruction(Args... args): UnaryInstruction(args..., "inc") {}
+      IncInstruction(Args... args): IncDecInstruction(args..., "inc") {}
    };
 
    /**
@@ -219,8 +295,8 @@ namespace zc::z80 {
     */
    class JumpInstruction: public UnaryInstruction {
    public:
-      virtual void Gen(std::list<const Value *>& vals) const override {}
-      virtual void Use(std::list<const Value *>& vals) const override {}
+      virtual void Kill(alg::ValueInserter vals) const override {}
+      virtual void Gen(alg::ValueInserter vals) const override {}
       
       template <typename... Args>
       JumpInstruction(Args... args): UnaryInstruction(args..., "jp") {}
@@ -243,8 +319,8 @@ namespace zc::z80 {
     */
    class LoadInstruction: public BinaryInstruction {
    public:
-      virtual void Gen(std::list<const Value *>& vals) const override;
-      virtual void Use(std::list<const Value *>& vals) const override;
+      virtual void Kill(alg::ValueInserter vals) const override;
+      virtual void Gen(alg::ValueInserter vals) const override;
       
       template <typename... Args>
       LoadInstruction(Args... args): BinaryInstruction(args..., "ld") {}
@@ -258,7 +334,7 @@ namespace zc::z80 {
     */
    class LeaInstruction: public BinaryInstruction {
    public:
-      virtual void Use(std::list<const Value *>& vals) const override {}
+      virtual void Gen(alg::ValueInserter vals) const override {}
       
       template <typename... Args>
       LeaInstruction(Args... args): BinaryInstruction(args..., "lea") {}
@@ -278,8 +354,11 @@ namespace zc::z80 {
     */
    class NegInstruction: public Instruction {
    public:
-      virtual void Gen(std::list<const Value *>& vals) const override;
-      virtual void Use(std::list<const Value *>& vals) const override;
+      virtual void Kill(alg::ValueInserter vals) const override;
+      virtual void Kill(alg::CondInserter conds) const override {
+         std::copy(alg::all_conds.begin(), alg::all_conds.end(), conds);
+      }
+      virtual void Gen(alg::ValueInserter vals) const override;
 
       template <typename... Args>
       NegInstruction(Args... args): Instruction(args..., "neg") {}
@@ -299,7 +378,7 @@ namespace zc::z80 {
     */
    class PeaInstruction: public UnaryInstruction {
    public:
-      virtual void Use(std::list<const Value *>& vals) const override {}
+      virtual void Gen(alg::ValueInserter vals) const override {}
       
       template <typename... Args>
       PeaInstruction(Args... args): UnaryInstruction(args..., "pea") {}
@@ -310,8 +389,8 @@ namespace zc::z80 {
     */
    class PopInstruction: public UnaryInstruction {
    public:
-      virtual void Use(std::list<const Value *>& vals) const override {}
-      
+      virtual void Gen(alg::ValueInserter vals) const override {}
+
       template <typename... Args>
       PopInstruction(Args... args): UnaryInstruction(args..., "pop") {}
    };
@@ -321,7 +400,7 @@ namespace zc::z80 {
     */
    class PushInstruction: public UnaryInstruction {
    public:
-      virtual void Gen(std::list<const Value *>& vals) const override {}
+      virtual void Gen(alg::ValueInserter vals) const override {}
 
       template <typename... Args>
       PushInstruction(Args... args): UnaryInstruction(args..., "push") {}
@@ -354,37 +433,37 @@ namespace zc::z80 {
    /**
     * "RL" instruction class
     */
-   class RlInstruction: public UnaryInstruction {
+   class RlInstruction: public RotateCarryInstruction {
    public:
       template <typename... Args>
-      RlInstruction(Args... args): UnaryInstruction(args..., "rl") {}
+      RlInstruction(Args... args): RotateCarryInstruction(args..., "rl") {}
    };
 
    /**
     * "RLC" instruction class
     */
-   class RlcInstruction: public UnaryInstruction {
+   class RlcInstruction: public RotateInstruction {
    public:
       template <typename... Args>
-      RlcInstruction(Args... args): UnaryInstruction(args..., "rlc") {}
+      RlcInstruction(Args... args): RotateInstruction(args..., "rlc") {}
    };
 
    /**
     * "RR" instruction class
     */
-   class RrInstruction: public UnaryInstruction {
+   class RrInstruction: public RotateCarryInstruction {
    public:
       template <typename... Args>
-      RrInstruction(Args... args): UnaryInstruction(args..., "rr") {}
+      RrInstruction(Args... args): RotateCarryInstruction(args..., "rr") {}
    };
 
    /**
     * "RRC" instruction class
     */
-   class RrcInstruction: public UnaryInstruction {
+   class RrcInstruction: public RotateInstruction {
    public:
       template <typename... Args>
-      RrcInstruction(Args... args): UnaryInstruction(args..., "rrc") {}
+      RrcInstruction(Args... args): RotateInstruction(args..., "rrc") {}
    };
 
    /**
@@ -392,8 +471,14 @@ namespace zc::z80 {
     */
    class SbcInstruction: public BinaryInstruction {
    public:
-      virtual void Gen(std::list<const Value *>& vals) const override;
-      virtual void Use(std::list<const Value *>& vals) const override;
+      virtual void Kill(alg::ValueInserter vals) const override;
+      virtual void Kill(alg::CondInserter conds) const override {
+         std::copy(alg::all_conds.begin(), alg::all_conds.end(), conds);
+      }
+      virtual void Gen(alg::ValueInserter vals) const override;
+      virtual void Gen(alg::CondInserter conds) const override {
+         *conds++ = Cond::C, *conds++ = Cond::NC;
+      }
       
       template <typename... Args>
       SbcInstruction(Args... args): BinaryInstruction(args..., "sbc") {}
@@ -404,6 +489,8 @@ namespace zc::z80 {
     */
    class ScfInstruction: public Instruction {
    public:
+      virtual void Kill(alg::CondInserter conds) const override { *conds++ = Cond::C; }
+      
       template <typename... Args>
       ScfInstruction(Args... args): Instruction(args..., "scf") {}
    };
@@ -413,6 +500,10 @@ namespace zc::z80 {
     */
    class SlaInstruction: public UnaryInstruction {
    public:
+      virtual void Kill(alg::CondInserter conds) const override {
+         std::copy(alg::all_conds.begin(), alg::all_conds.end(), conds);
+      }
+      
       template <typename... Args>
       SlaInstruction(Args... args): UnaryInstruction(args..., "sla") {}
    };
@@ -422,6 +513,10 @@ namespace zc::z80 {
     */
    class SraInstruction: public UnaryInstruction {
    public:
+      virtual void Kill(alg::CondInserter conds) const override {
+         std::copy(alg::all_conds.begin(), alg::all_conds.end(), conds);
+      }
+      
       template <typename... Args>
       SraInstruction(Args... args): UnaryInstruction(args..., "sra") {}
    };
@@ -431,6 +526,10 @@ namespace zc::z80 {
     */
    class SrlInstruction: public UnaryInstruction {
    public:
+      virtual void Kill(alg::CondInserter conds) const override {
+         std::copy(alg::all_conds.begin(), alg::all_conds.end(), conds);
+      }
+      
       template <typename... Args>
       SrlInstruction(Args... args): UnaryInstruction(args..., "srl") {}
    };
@@ -440,6 +539,10 @@ namespace zc::z80 {
     */
    class SubInstruction: public BinaryInstruction {
    public:
+      virtual void Kill(alg::CondInserter conds) const override {
+         std::copy(alg::all_conds.begin(), alg::all_conds.end(), conds);
+      }
+      
       template <typename... Args>
       SubInstruction(Args... args): BinaryInstruction(args..., "sub") {}
    };
