@@ -2,124 +2,142 @@
 
 #include "asm.hpp"
 #include "cgen.hpp"
+#include "alg.hpp"
 
 namespace zc::z80 {
+   
+   using alg::ValueInserter;
+    
+    void Instruction::Emit(std::ostream& os) const {
+       os << "\t" << name();
+       if (cond_ || !operands_.empty()) {
+          os << "\t";
+       }
+       if (cond_) {
+          os << *cond_;
+       }
+       for (auto it = operands_.begin(), end = operands_.end(); it != end; ++it) {
+          if (it != operands_.begin() || cond_) {
+             os << ",";
+          }
+          (**it)->Emit(os);         
+       }
+       os << std::endl;
+    }
 
-   void Instruction::Emit(std::ostream& os) const {
-      os << "\t" << name();
-      if (cond_ || !operands_.empty()) {
-         os << "\t";
-      }
-      if (cond_) {
-         os << *cond_;
-      }
-      for (auto it = operands_.begin(), end = operands_.end(); it != end; ++it) {
-         if (it != operands_.begin() || cond_) {
-            os << ",";
-         }
-         (**it)->Emit(os);         
-      }
-      os << std::endl;
+    void JrInstruction::Emit(std::ostream& os) const {
+       os << "\t" << name() << "\t";
+       if (cond_) {
+          os << *cond_ << ",";
+       }
+       os << "$+";
+       dst()->Emit(os);
+       os << std::endl;
+    }
+
+    bool Instruction::Eq(const Instruction *other) const {
+       if (name() != other->name()) {
+          return false;
+       }
+
+       auto it = operands_.begin(), other_it = other->operands_.begin(),
+          end = operands_.end(), other_end = other->operands_.end();      
+       for (; it != end && other_it != other_end; ++it, ++other_it) {
+          if (!(**it)->Eq(**other_it)) {
+             return false;
+          }
+       }
+
+       return it == end && other_it == other_end;
+    }
+
+    bool Instruction::Match(const Instruction *other) const {
+       if (name() != other->name()) {
+          return false;
+       }
+
+       auto it = operands_.begin(), other_it = other->operands_.begin(),
+          end = operands_.end(), other_end = other->operands_.end();      
+       for (; it != end && other_it != other_end; ++it, ++other_it) {
+          if (*it) {
+             if (!(**it)->Match(**other_it)) {
+                return false;
+             }
+          } else {
+             it->send(**other_it);
+          }
+       }
+
+       return it == end && other_it == other_end;
+    }
+
+    /*** GEN & USE ***/
+
+    void BinaryInstruction::Kill(alg::ValueInserter vals) const { dst()->Kill(vals); }
+    void BinaryInstruction::Gen(alg::ValueInserter vals) const {
+       dst()->Gen(vals); 
+      src()->Gen(vals);
    }
 
-   void JrInstruction::Emit(std::ostream& os) const {
-      os << "\t" << name() << "\t";
-      if (cond_) {
-         os << *cond_ << ",";
-      }
-      os << "$+";
-      dst()->Emit(os);
-      os << std::endl;
-   }
+    void UnaryInstruction::Kill(ValueInserter vals) const { dst()->Kill(vals); }
+    void UnaryInstruction::Gen(ValueInserter vals) const { dst()->Gen(vals); }
 
-   bool Instruction::Eq(const Instruction *other) const {
-      if (name() != other->name()) {
-         return false;
-      }
-
-      auto it = operands_.begin(), other_it = other->operands_.begin(),
-         end = operands_.end(), other_end = other->operands_.end();      
-      for (; it != end && other_it != other_end; ++it, ++other_it) {
-         if (!(**it)->Eq(**other_it)) {
-            return false;
-         }
-      }
-
-      return it == end && other_it == other_end;
-   }
-
-   bool Instruction::Match(const Instruction *other) const {
-      if (name() != other->name()) {
-         return false;
-      }
-
-      auto it = operands_.begin(), other_it = other->operands_.begin(),
-         end = operands_.end(), other_end = other->operands_.end();      
-      for (; it != end && other_it != other_end; ++it, ++other_it) {
-         if (*it) {
-            if (!(**it)->Match(**other_it)) {
-               return false;
-            }
-         } else {
-            it->send(**other_it);
-         }
-      }
-
-      return it == end && other_it == other_end;
-   }
-
-   /*** GEN & USE ***/
-
-   void BinaryInstruction::Gen(std::list<const Value *>& vals) const { dst()->Gen(vals); }
-   void BinaryInstruction::Use(std::list<const Value *>& vals) const {
-      dst()->Use(vals); src()->Use(vals);
-   }
-
-   void UnaryInstruction::Gen(std::list<const Value *>& vals) const { dst()->Gen(vals); }
-   void UnaryInstruction::Use(std::list<const Value *>& vals) const { dst()->Use(vals); }
-
-   void LoadInstruction::Gen(std::list<const Value *>& vals) const { dst()->Gen(vals); }
-   void LoadInstruction::Use(std::list<const Value *>& vals) const {
-      src()->Use(vals);
+    void LoadInstruction::Kill(ValueInserter vals) const { dst()->Kill(vals); }
+    void LoadInstruction::Gen(ValueInserter vals) const {
+      src()->Gen(vals);
       auto mv = dynamic_cast<const MemoryValue *>(dst());
-      if (mv) { mv->Use(vals); } /* ugh, this is hideous */
+      if (mv) { mv->Gen(vals); } /* ugh, this is hideous */
    }
 
-   void BitwiseInstruction::Gen(std::list<const Value *>& vals) const {
-      if (!dst()->Eq(src())) { dst()->Gen(vals); }
+   void BitwiseInstruction::Kill(ValueInserter vals) const {
+      if (!dst()->Eq(src())) { dst()->Kill(vals); }
    }
-   void BitwiseInstruction::Use(std::list<const Value *>& vals) const {
-      if (!dst()->Eq(src())) { dst()->Use(vals); src()->Use(vals); }
+   void BitwiseInstruction::Gen(ValueInserter vals) const {
+      if (!dst()->Eq(src())) { dst()->Gen(vals); src()->Gen(vals); }
    }
 
-   void CallInstruction::Gen(std::list<const Value *>& vals) const {
+   void CallInstruction::Kill(ValueInserter vals) const {
+      rv_hl.Kill(vals);
+      rv_bc.Kill(vals);
+      }
+   void CallInstruction::Gen(ValueInserter vals) const {
       rv_hl.Gen(vals);
       rv_bc.Gen(vals);
-      }
-   void CallInstruction::Use(std::list<const Value *>& vals) const {
-      rv_hl.Use(vals);
-      rv_bc.Use(vals);
    }
    
-   void CplInstruction::Gen(std::list<const Value *>& vals) const { rv_a.Gen(vals); }
-   void CplInstruction::Use(std::list<const Value *>& vals) const { rv_a.Use(vals); }
+   void CplInstruction::Kill(ValueInserter vals) const { rv_a.Kill(vals); }
+   void CplInstruction::Gen(ValueInserter vals) const { rv_a.Gen(vals); }
 
-   void NegInstruction::Gen(std::list<const Value *>& vals) const { rv_a.Gen(vals); }
-   void NegInstruction::Use(std::list<const Value *>& vals) const { rv_a.Use(vals); }
+   void NegInstruction::Kill(ValueInserter vals) const { rv_a.Kill(vals); }
+   void NegInstruction::Gen(ValueInserter vals) const { rv_a.Gen(vals); }
 
-   void DjnzInstruction::Gen(std::list<const Value *>& vals) const { rv_b.Gen(vals); }
-   void DjnzInstruction::Use(std::list<const Value *>& vals) const { rv_b.Use(vals); }
+   void DjnzInstruction::Kill(ValueInserter vals) const { rv_b.Kill(vals); }
+   void DjnzInstruction::Gen(ValueInserter vals) const { rv_b.Gen(vals); }
 
-   void SbcInstruction::Gen(std::list<const Value *>& vals) const { dst()->Gen(vals); }
-   void SbcInstruction::Use(std::list<const Value *>& vals) const {
+   void SbcInstruction::Kill(ValueInserter vals) const { dst()->Kill(vals); }
+   void SbcInstruction::Gen(ValueInserter
+                            vals) const {
       if (!dst()->Eq(src())) {
-         dst()->Gen(vals);
-         src()->Gen(vals);
+         dst()->Kill(vals);
+         src()->Kill(vals);
       }
    }
    
-   
+   /*** COND KILL/GEN ***/
+   void AddInstruction::Kill(alg::CondInserter conds) const {
+      if (dst()->size() == byte_size) {
+         std::copy(alg::all_conds.begin(), alg::all_conds.end(), conds);
+      } else {
+         *conds++ = Cond::C; *conds++ = Cond::NC;
+      }
+   }
 
+   void IncDecInstruction::Kill(alg::CondInserter conds) const {
+      if (dst()->size() == byte_size) {
+         *conds++ = Cond::C, *conds++ = Cond::NC;
+      }
+   }
+   
    /*** VARS ***/
    void Instruction::ReplaceVar(const VariableValue *var, const Value *with) {
       for (Values::iterator operand_it = operands_.begin(), operand_end = operands_.end();
