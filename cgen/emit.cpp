@@ -1,5 +1,6 @@
 #include "cgen.hpp"
 #include "emit.hpp"
+#include "asm.hpp"
 
 namespace zc {
 
