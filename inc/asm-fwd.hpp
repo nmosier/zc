@@ -4,6 +4,7 @@
 #include <vector>
 #include <list>
 
+#include "asm/asm-mode.hpp"
 #include "util.hpp"
 
 namespace zc::z80 {
