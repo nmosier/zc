@@ -443,7 +443,10 @@
 
     void CallExpr::TypeCheck(SemantEnv& env) {
        fn()->TypeCheck(env);
-       params()->TypeCheck(env);
+       for (ASTExpr *param : *params()) {
+          param->TypeCheck(env);
+       }
+       // params()->TypeCheck(env);
 
        /* Verify that called expression is of function or function pointer type. */
        const FunctionType *type;
@@ -456,18 +459,18 @@
        type_ = type->return_type();
        
        /* verify that argument parameters can be coerced to function parameter types */
-       if (type->params()->size() != params()->vec().size()) {
+       if (type->params()->size() != params()->size()) {
           env.error()(g_filename, this) << "incorrect number of arguments given (expected"
                                         << type->params()->size() << " but got "
-                                        << params()->vec().size() << ")" << std::endl;
+                                        << params()->size() << ")" << std::endl;
           return;
        }
 
        /* coerce types one-by-one */
        auto type_it = type->params()->begin();
        auto type_end = type->params()->end();
-       auto arg_it = params()->vec().begin();
-       auto arg_end = params()->vec().end();
+       auto arg_it = params()->begin();
+       auto arg_end = params()->end();
        for (int i = 1; type_it != type_end; ++type_it, ++arg_it, ++i) {
           const ASTType *arg_type = (*arg_it)->type();
           if (!(*type_it)->type()->TypeCoerce(arg_type)) {

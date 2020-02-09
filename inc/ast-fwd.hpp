@@ -1,6 +1,8 @@
 #ifndef __AST_FWD
 #define __AST_FWD
 
+#include <list>
+
 namespace zc {
 
    /* ast-base */
@@ -13,7 +15,8 @@ namespace zc {
    
    /* ast-expr */
    class ASTExpr;
-   typedef ASTNodeVec<ASTExpr> ASTExprs;
+   typedef std::list<ASTExpr *> ASTExprs;
+   // typedef ASTNodeVec<ASTExpr> ASTExprs;
    class ASTUnaryExpr;
    class ASTBinaryExpr;
    class AssignmentExpr;

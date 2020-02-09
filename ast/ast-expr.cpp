@@ -64,7 +64,8 @@ namespace zc {
 
    void CallExpr::DumpChildren(std::ostream& os, int level, bool with_types) const {
       fn()->Dump(os, level, with_types);
-      params()->Dump(os, level, with_types);
+      for (auto param : *params()) { param->Dump(os, level, with_types); }
+      // params()->Dump(os, level, with_types);
    }
 
    void CastExpr::DumpNode(std::ostream& os) const {

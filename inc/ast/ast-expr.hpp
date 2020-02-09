@@ -3,6 +3,8 @@
 
 #include <cstdint>
 #include <variant>
+#include <forward_list>
+#include <any>
 
 #include "cgen-fwd.hpp"
 #include "asm-fwd.hpp"
@@ -43,17 +45,17 @@ namespace zc {
        * Push cast down expr.
        */
       virtual ASTExpr *Cast(ASTType *type);
-
+      
       /**
        * Transform into DAG.
        */
 #if 0
-      virtual ASTExpr *DAG(alg::// DAGSet& dagset);
+      virtual ASTExpr *DAG(alg::DAGSet& dagset);
       ASTExpr *DAG() { alg::DAGSet dagset; return DAG(dagset); }
 #endif
-
+                           
       void DumpType(std::ostream& os) const;
-
+                           
       /**
        * Abstract code generation function.
        * @param env code generation environment
@@ -63,7 +65,7 @@ namespace zc {
        */
       virtual Block *CodeGen(CgenEnv& env, Block *block, const Value **out,
                              ExprKind mode) = 0;
-
+                           
       /**
        * Expression equality.
        */
@@ -71,6 +73,8 @@ namespace zc {
       virtual ASTExpr *ExprEq(const ASTExpr *other) const; // TODO
 #endif
 
+
+      
    protected:
       /**
        * Type of expression; populated by @see TypeCheck()
@@ -85,8 +89,6 @@ namespace zc {
       template <typename... Args>
       ASTExpr(ASTType *type, Args... args): ASTNode(args...), type_(type) {}
    };
-
-
    
    class ASTUnaryExpr: public ASTExpr {
    public:
@@ -136,8 +138,8 @@ namespace zc {
       virtual Block *CodeGen(CgenEnv& env, Block *block, const Value **out, ExprKind mode) override;
 
    protected:
-      AssignmentExpr(ASTExpr *lhs, ASTExpr *rhs, const SourceLoc& loc):
-         ASTBinaryExpr(lhs, rhs, loc) {}
+      template <typename... Args>
+      AssignmentExpr(Args... args): ASTBinaryExpr(args...) {}
    };
 
    class UnaryExpr: public ASTUnaryExpr {

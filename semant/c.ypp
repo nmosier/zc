@@ -534,12 +534,12 @@ postfix_exp:    primary_exp
                 }   
         ; /* incomplete */
 optional_argument_exp_list:
-                /* empty */ { $$ = zc::ASTExprs::Create(0); }
+                /* empty */ { $$ = new zc::ASTExprs(); }
         |       argument_exp_list { $$ = $1; }
         ;
 argument_exp_list:
-                assignment_exp { $$ = zc::ASTExprs::Create($1, @1); }
-        |       argument_exp_list ',' assignment_exp { $$ = $1; $$->vec().push_back($3); }
+                assignment_exp { $$ = new zc::ASTExprs {$1}; }
+        |       argument_exp_list ',' assignment_exp { $$ = $1; $$->push_back($3); }
         ;
 primary_exp:    ID { $$ = zc::IdentifierExpr::Create($1, @1); }
         |       constant_exp

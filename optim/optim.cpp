@@ -166,7 +166,7 @@ namespace zc {
    void CallExpr::ReduceConst_rec() {
       fn_ = fn()->ReduceConst();
 
-      for (auto it = params()->vec().begin(), end = params()->vec().end(); it != end; ++it) {
+      for (auto it = params()->begin(), end = params()->end(); it != end; ++it) {
          *it = (*it)->ReduceConst();
       }
    }

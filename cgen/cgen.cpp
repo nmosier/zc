@@ -868,7 +868,7 @@ namespace zc {
 
    Block *CallExpr::CodeGen(CgenEnv& env, Block *block, const Value **out, ExprKind mode) {
       /* codegen params */
-      for (auto it = params()->vec().rbegin(), end = params()->vec().rend(); it != end; ++it) {
+      for (auto it = params()->rbegin(), end = params()->rend(); it != end; ++it) {
          auto param = *it;
          int param_bytes = param->type()->Decay()->bytes();
          // const Value *param_var = new VariableValue(param_bytes);
@@ -904,7 +904,7 @@ namespace zc {
       }
       
       /* pop off args */
-      for (ASTExpr *param : params()->vec()) {
+      for (ASTExpr *param : *params()) {
          /* TODO: this could be optimized. */
          block->instrs().push_back(new PopInstruction(&rv_de)); /* pop off into scrap register */
       }
