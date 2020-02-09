@@ -1,7 +1,3 @@
-#ifndef __AST_HPP
-#error "include ast.hpp, not ast/ast-decl.h directly"
-#endif
-
 #ifndef __AST_DECL_HPP
 #define __AST_DECL_HPP
 
