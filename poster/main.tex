@@ -92,16 +92,17 @@
   \block{Introduction \& Motivation}{
 %    The Zilog Z80 is an 8-bit microprocessor that used to be ubiquitious in personal computing and arcade gaming in the 1970-80's. We introduce ZC, a C compiler for the eZ80 variant of the Z, is still used to this day in Texas Instrument's TI-83/84+ graphing calculators. More recently, the eZ80 processor, introduced in the early 2000's, features a minor, backwards-compatible update to the original Z80 ISA, and is used in the TI's higher-end calculators, e.g. the TI-84+ CE. TI calculator programmers (including me), 
 
-    \begin{minipage}{0.55\linewidth}
+    \begin{minipage}{0.57\linewidth}
     \innerblock{Motivation}{
       \begin{itemize}
       \item Z80 \& eZ80 still used in Texas Instruments graphing calculators
-      \item Large code size output of existing C compilers targeting the eZ80
-      \item High-performance C compiler essential for large (e)Z80 projects
+      \item Programs are limited to 16 KB in size
+      \item Existing C compilers generate space-inefficient code, 
+         forcing developers to use assembly for large projects
       \end{itemize}
     }
     \end{minipage}
-    \begin{minipage}{0.35\linewidth}
+    \begin{minipage}{0.34\linewidth}
     \innerblock{The Zilog Z80 \& eZ80}{
       \begin{itemize}
       \item 8-bit CISC mircoprocessor
