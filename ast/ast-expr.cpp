@@ -294,5 +294,26 @@ namespace zc {
    ASTExpr *IndexExpr::Cast(ASTType *type) {
       return ASTExpr::Cast(type);
    }
+
+   ASTExpr::Subexprs CallExpr::subexprs() {
+      Subexprs subexprs;
+      for (auto it = params()->begin(), end = params()->end(); it != end; ++it) {
+         subexprs.push_back(&*it);
+      }
+      subexprs.push_back(&fn_);
+      return subexprs;
+   }
+
+   bool ASTExpr::ExprEq(ASTExpr *other) {
+      auto this_subexprs = subexprs(), other_subexprs = other->subexprs();
+      if (this_subexprs.size() != other_subexprs.size()) { return false; }
+      for (auto it = this_subexprs.begin(), end = this_subexprs.end(),
+              other_it = other_subexprs.begin();
+           it != end; ++it, ++other_it) {
+         if (!(**it)->ExprEq(**other_it)) { return false; }
+      }
+      if (!type()->TypeEq(other->type())) { return false; }
+      return true;
+   }
    
 }
