@@ -41,7 +41,7 @@ namespace zc {
    Block *emit_incdec(CgenEnv& env, Block *block, bool inc_not_dec, bool pre_not_post,
                       ASTExpr *subexpr, const Value **out);
    
-   /** Generic emission routine for performing binary operation on two integers. */
+   /** Killeric emission routine for performing binary operation on two integers. */
    Block *emit_binop(CgenEnv& env, Block *block, ASTBinaryExpr *expr,
                      const Value **out_lhs, const Value **out_rhs);
 

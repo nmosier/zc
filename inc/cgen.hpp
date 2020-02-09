@@ -7,7 +7,7 @@
 #include <numeric>
 
 #include "cgen-fwd.hpp"
-#include "asm.hpp"
+#include "asm-fwd.hpp"
 #include "ast.hpp"
 #include "scopedtab.hpp"
 
@@ -366,8 +366,8 @@ namespace zc {
 
    
    /*** C RUNTIME ***/
-   const Label crt_l_indcall("__indcall");
-   const LabelValue crt_lv_indcall(&crt_l_indcall);
+   extern const Label crt_l_indcall;
+   extern const LabelValue crt_lv_indcall;
    
 }
 
