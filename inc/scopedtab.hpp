@@ -36,7 +36,7 @@ limitations under the License.
 #pragma once
 
 #include <stdexcept>
-#include <forward_list>
+#include <list>
 #include <unordered_map>
 
 namespace zc {
@@ -54,11 +54,11 @@ namespace zc {
   template<class Key, class Value>
   class ScopedTable {
     typedef std::unordered_map<Key, Value*> ScopeEntry;
-    typedef std::forward_list<ScopeEntry> ScopeStack;
+    typedef std::list<ScopeEntry> ScopeStack;
 
    public:
 
-    /**
+     /**
      * Push new scope onto the stack
      */
      void EnterScope() { scopes_.emplace_front(); }
@@ -120,6 +120,8 @@ namespace zc {
       return nullptr;
     }
 
+     std::size_t Depth() const { return scopes_.size(); }
+     
    private:
     ScopeStack scopes_;
   };

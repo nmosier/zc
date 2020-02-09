@@ -144,27 +144,29 @@
 
 translation_unit:
                 external_decl {
-                    g_AST_root = $$ = zc::TranslationUnit::Create(zc::ExternalDecls::Create(@1), @1);
-                    $$->decls()->vec().insert($$->decls()->vec().end(),
-                                              $1->vec().begin(),
-                                              $1->vec().end());
+                    g_AST_root = $$ =
+                        zc::TranslationUnit::Create
+                        (new zc::ExternalDecls($1->begin(), $1->end()), @1);
+                    //g_AST_root = $$ = zc::TranslationUnit::Create(zc::ExternalDecls::Create(@1), @1);
+                    //$$->decls()->vec().insert($$->decls()->vec().end(),
+                    //$1->vec().begin(),
+                    //$1->vec().end());
                 }
         |       translation_unit external_decl {
                   $$ = $1;
-                  $$->decls()->vec().insert($$->decls()->vec().end(),
-                                           $2->vec().begin(),
-                                           $2->vec().end());
+                  $$->decls()->insert($$->decls()->end(), $2->begin(), $2->end());
                 }
         ;
 external_decl:  function_definition {
-                    $$ = zc::ExternalDecls::Create(@1);
-                    $$->vec().push_back($1);
+                    $$ = new zc::ExternalDecls {$1};
                 }
-        |       decl { $$ = zc::ExternalDecls::Create
-                        ($1->begin(), $1->end(),
-                         [&](zc::Declaration *decl) -> zc::ExternalDecl * {
-                            return zc::ExternalDecl::Create(decl, @1);
-                        }, @1); }
+        |       decl {
+            $$ = new zc::ExternalDecls();
+            std::transform($1->begin(), $1->end(), std::back_inserter(*$$), 
+                           [&](zc::Declaration *decl) -> zc::ExternalDecl * {
+                               return zc::ExternalDecl::Create(decl, @1);
+                           });
+                }
         ;
 function_definition:
                 decl_specs declarator compound_stat {
@@ -369,11 +371,11 @@ stat:           exp_stat { $$ = $1; }
         |       labeled_stat { $$ = $1; }
         ; /* incomplete */
 optional_stat_list:
-                /* empty */ { $$ = zc::ASTStats::Create(@$); @$ = 0; }
+                /* empty */ { $$ = new zc::ASTStats(); }
         |       stat_list { $$ = $1; }
         ;
-stat_list:      stat { $$ = zc::ASTStats::Create(@1); $$->vec().push_back($1); }
-        |       stat_list stat { $$->vec().push_back($2); }
+stat_list:      stat { $$ = new zc::ASTStats {$1}; }
+        |       stat_list stat { $$->push_back($2); }
         ;
 compound_stat:  '{' optional_decl_list optional_stat_list '}' {
                     $$ = zc::CompoundStat::Create($2, $3, @1);
@@ -386,7 +388,7 @@ jump_stat:      RETURN optional_exp ';' { $$ = zc::ReturnStat::Create($2, @1); }
         |       CONTINUE ';' { $$ = zc::ContinueStat::Create(@1); }
         |       BREAK ';' { $$ = zc::BreakStat::Create(@1); }
         ;
-selection_stat: IF '(' exp ')' stat { $$ = zc::IfStat::Create($3, $5, nullptr, @1); }
+selection_stat: IF '(' exp ')' stat { $$ = zc::IfStat::Create($3, $5, zc::NoStat::Create(@1), @1); }
         |       IF '(' exp ')' stat ELSE stat { $$ = zc::IfStat::Create($3, $5, $7, @1); }
         ;
 iteration_stat:

@@ -147,6 +147,11 @@ int main(int argc, char *argv[]) {
   /* first optimization pass */
   OptimizeAST(g_AST_root);
 
+  /* DAG */
+  if (zc::g_optim.DAG) {
+     g_AST_root->DAG();
+  }
+
   // Don't touch the output file until we know that earlier phases of the
   // compiler have succeeded.
   if (out_filename.empty() && firstfile_index < argc) {  // no -o option

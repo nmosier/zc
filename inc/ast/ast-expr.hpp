@@ -62,7 +62,7 @@ namespace zc {
                              ExprKind mode) = 0;
                            
       template <typename... Args>
-      ASTExpr *transform(ASTExpr *(ASTExpr::*method)(Args...), Args... args) {
+      ASTExpr *transform(ASTExpr *(ASTExpr::*method)(Args...), Args&&... args) {
          for (ASTExpr **subexpr : subexprs()) {
             *subexpr = (*subexpr)->transform(method, args...);
          }
@@ -363,13 +363,14 @@ namespace zc {
       virtual Block *CodeGen(CgenEnv& env, Block *block, const Value **out, ExprKind mode) override;
       
       virtual bool ExprEq(ASTExpr *other) override {
-         abort(); /* TODO: need unique identifier after type checking to distinguish scopes. */
          auto other_ = dynamic_cast<const IdentifierExpr *>(other);
-         return other_ && *id()->id() == *other_->id()->id() && ASTExpr::ExprEq(other);
+         return other_ && *id()->id() == *other_->id()->id() && scope_id_ == other_->scope_id_ &&
+            ASTExpr::ExprEq(other);
       }
 
    protected:
       Identifier *id_;
+      std::size_t scope_id_;
       bool is_const_;
       
       IdentifierExpr(Identifier *id, const SourceLoc& loc):

@@ -22,7 +22,7 @@ namespace zc {
       virtual void DumpNode(std::ostream& os) const override { os << "TranslationUnit"; }
 
       virtual void DumpChildren(std::ostream& os, int level, bool with_types) const override {
-         decls()->Dump(os, level, with_types);
+         for (auto decl : *decls()) { decl->Dump(os, level, with_types); }
       }
 
       /* Semantic Analysis */
@@ -33,8 +33,10 @@ namespace zc {
       /* Code Generation */
       void CodeGen(CgenEnv& env);
 
-      /* Optimization */
+      /* AST Transformations */
       void ReduceConst();
+      void DAG();
+
 
    protected:
       ExternalDecls *decls_;

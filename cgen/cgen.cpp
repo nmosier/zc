@@ -119,7 +119,7 @@ namespace zc {
    void TranslationUnit::CodeGen(CgenEnv& env) {
       env.EnterScope();
 
-      for (ExternalDecl *decl : decls()->vec()) {
+      for (ExternalDecl *decl : *decls()) {
          decl->CodeGen(env);
       }
       
@@ -181,7 +181,7 @@ namespace zc {
          decl->Declare(env);
       }
 
-      for (ASTStat *stat : stats()->vec()) {
+      for (ASTStat *stat : *stats()) {
          block = stat->CodeGen(env, block);
       }
       
@@ -1451,7 +1451,7 @@ namespace zc {
    void CompoundStat::FrameGen(StackFrame& frame) const {
       for (const Declaration *decl : *decls()) {
          decl->FrameGen(frame);
-         for (const ASTStat *stat : stats()->vec()) {
+         for (const ASTStat *stat : *stats()) {
             stat->FrameGen(frame);
          }
       }

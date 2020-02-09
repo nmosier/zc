@@ -2,6 +2,7 @@
 #define __ENV_HPP
 
 #include <set>
+#include <forward_list>
 
 #include "scopedtab.hpp"
 #include "symtab.hpp"

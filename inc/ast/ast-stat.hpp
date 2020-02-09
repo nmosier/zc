@@ -21,13 +21,14 @@ namespace zc {
       virtual Block *CodeGen(CgenEnv& env, Block *block) = 0;
       virtual void FrameGen(StackFrame& frame) const = 0;
 
-      /* Optimization */
+      /* AST Transformations */
       virtual ASTStat *ReduceConst() = 0;
+      virtual void DAG() = 0;
       
    protected:
       ASTStat(const SourceLoc& loc): ASTNode(loc) {}
    };
-   template <> const char *ASTStats::name() const;   
+   //   template <> const char *ASTStats::name() const;   
 
    class CompoundStat: public ASTStat {
    public:
@@ -53,8 +54,9 @@ namespace zc {
       Block *CodeGen(CgenEnv& env, Block *block, bool new_scope);
       virtual void FrameGen(StackFrame& env) const override;
 
-      /* Optimization */
+      /* AST Transformation */
       virtual ASTStat *ReduceConst() override;
+      virtual void DAG() override { for (auto stat : *stats()) { stat->DAG(); } }
       
    protected:
       Declarations *decls_;
@@ -85,8 +87,9 @@ namespace zc {
       virtual Block *CodeGen(CgenEnv& env, Block *block) override;
       virtual void FrameGen(StackFrame& env) const override {}
 
-      /* Optimization */
+      /* AST Transformation */
       virtual ASTStat *ReduceConst() override;
+      virtual void DAG() override;
       
    protected:
       ASTExpr *expr_;
@@ -122,8 +125,9 @@ namespace zc {
       virtual Block *CodeGen(CgenEnv& env, Block *block) override;
       virtual void FrameGen(StackFrame& env) const override {}    
 
-      /* Optimization */
+      /* AST Transformation */
       virtual ASTStat *ReduceConst() override;
+      virtual void DAG() override;
       
    protected:
       ASTExpr *expr_;
@@ -144,8 +148,9 @@ namespace zc {
       virtual Block *CodeGen(CgenEnv& env, Block *) override;
       virtual void FrameGen(StackFrame& frame) const override {}
 
-      /* Optimization */
+      /* AST Transformation */
       virtual ASTStat *ReduceConst() override { return this; }
+      virtual void DAG() override {}
       
       template <typename... Args>
       static BreakStat *Create(Args... args) { return new BreakStat(args...); }
@@ -167,8 +172,9 @@ namespace zc {
       virtual Block *CodeGen(CgenEnv& env, Block *) override;
       virtual void FrameGen(StackFrame& frame) const override {}
 
-      /* Optimization */
-      virtual ASTStat *ReduceConst() override { return this; }      
+      /* AST Transformation */
+      virtual ASTStat *ReduceConst() override { return this; }
+      virtual void DAG() override {}
       
       template <typename... Args>
       static ContinueStat *Create(Args... args) { return new ContinueStat(args...); }
@@ -211,8 +217,9 @@ namespace zc {
       virtual Block *CodeGen(CgenEnv& env, Block *block) override;
       virtual void FrameGen(StackFrame& env) const override;          
       
-      /* Optimization */
+      /* AST Transformation */
       virtual ASTStat *ReduceConst() override;
+      virtual void DAG() override;
 
    protected:
       ASTExpr *cond_;
@@ -233,9 +240,10 @@ namespace zc {
       virtual bool can_break() const override { return true; }
       virtual bool can_continue() const override { return true; }
       
-      /* Optimization */
+      /* AST Optimization */
       virtual ASTStat *ReduceConst() override;
       virtual ASTStat *ReduceConst_aux() = 0;
+      virtual void DAG() override;
 
    protected:
       ASTExpr *pred_;
@@ -263,8 +271,9 @@ namespace zc {
       virtual Block *CodeGen(CgenEnv& env, Block *block) override;
       virtual void FrameGen(StackFrame& frame) const override;
 
-      /* Optimization */
+      /* AST Transformation */
       virtual ASTStat *ReduceConst() override { return this; }
+      virtual void DAG() override { body()->DAG(); }
 
       template <typename... Args>
       static LoopStat *Create(Args... args) { return new LoopStat(args...); }
@@ -293,7 +302,7 @@ namespace zc {
       virtual Block *CodeGen(CgenEnv& env, Block *block) override;
       virtual void FrameGen(StackFrame& env) const override;
 
-      /* Optimization */
+      /* AST Transformation */
       virtual ASTStat *ReduceConst_aux() override;
       
    protected:
@@ -313,8 +322,9 @@ namespace zc {
       virtual Block *CodeGen(CgenEnv& env, Block *block) override;
       virtual void FrameGen(StackFrame& env) const override;
       
-      /* Optimization */
+      /* AST Transformation */
       virtual ASTStat *ReduceConst_aux() override;
+      virtual void DAG() override;
 
       template <typename... Args>
       static ForStat *Create(Args... args) { return new ForStat(args...); }
@@ -347,8 +357,9 @@ namespace zc {
       virtual Block *CodeGen(CgenEnv& env, Block *block) override;
       virtual void FrameGen(StackFrame& env) const override {}
 
-      /* Optimization */
+      /* AST Transformation */
       virtual ASTStat *ReduceConst() override { return this; }
+      virtual void DAG() override {}
       
    private:
       Identifier *label_id_;
@@ -372,8 +383,9 @@ namespace zc {
       /* Code Generation */
       virtual Block *CodeGen(CgenEnv& env, Block *block) override;
       
-      /* Optimization */
+      /* AST Transformation */
       virtual ASTStat *ReduceConst() override;
+      virtual void DAG() override { stat()->DAG(); }
 
    protected:
       ASTStat *stat_;
@@ -421,8 +433,9 @@ namespace zc {
       virtual Block *CodeGen(CgenEnv& env, Block *block) override { return block; }
       virtual void FrameGen(StackFrame& env) const override {}
 
-      /* Optimization */
+      /* AST Transformation */
       virtual ASTStat *ReduceConst() override { return this; }
+      virtual void DAG() override {}
 
    private:
       template <typename... Args>

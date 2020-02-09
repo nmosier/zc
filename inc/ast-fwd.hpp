@@ -34,7 +34,8 @@ namespace zc {
 
    /* ast-stat */
    class ASTStat;
-   typedef ASTNodeVec<ASTStat> ASTStats;
+   typedef std::list<ASTStat *> ASTStats;
+   // typedef ASTNodeVec<ASTStat> ASTStats;
    class CompoundStat;
    class ExprStat;
    class JumpStat;
@@ -53,7 +54,8 @@ namespace zc {
 
    /* ast-decl */
    class ExternalDecl;
-   typedef ASTNodeVec<ExternalDecl> ExternalDecls;   
+   typedef std::list<ExternalDecl *> ExternalDecls;
+   //typedef ASTNodeVec<ExternalDecl> ExternalDecls;   
    class FunctionDef;
    class DeclSpecs;
    class TypeSpec;

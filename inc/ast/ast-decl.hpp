@@ -28,11 +28,12 @@ namespace zc {
       virtual void Enscope(SemantEnv& env) const;
       virtual void Descope(SemantEnv& env) const;
 
-     /* Code Generation */
+      /* Code Generation */
       virtual void CodeGen(CgenEnv& env);
-
-      /* Optimization */
+      
+      /* AST Transformations */
       virtual void ReduceConst() {}
+      virtual void DAG() {}
       
    protected:
       Declaration *decl_;
@@ -43,7 +44,7 @@ namespace zc {
 
    
    
-   template <> const char *ExternalDecls::name() const;
+   //template <> const char *ExternalDecls::name() const;
 
    class FunctionDef: public ExternalDecl {
    public:
@@ -66,8 +67,9 @@ namespace zc {
       virtual void CodeGen(CgenEnv& env) override;
       void FrameGen(StackFrame& frame) const;
 
-      /* Optimization */
+      /* AST Transformation */
       virtual void ReduceConst() override;
+      virtual void DAG() override;
       
    protected:
       CompoundStat *comp_stat_;

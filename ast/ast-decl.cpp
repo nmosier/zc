@@ -9,7 +9,7 @@
 namespace zc {
 
 
-   template <> const char *ExternalDecls::name() const { return "ExternalDecls"; }      
+   // template <> const char *ExternalDecls::name() const { return "ExternalDecls"; }      
 
    Symbol *ASTDeclarator::sym() const {
       return id() ? id()->id() : nullptr;

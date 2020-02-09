@@ -312,7 +312,9 @@
 
     void TranslationUnit::TypeCheck(SemantEnv& env) {
        Enscope(env);
-       decls()->TypeCheck(env);
+       for (auto decl : *decls()) {
+          decl->TypeCheck(env);
+       }
        Descope(env);
     }
 
@@ -335,7 +337,9 @@
          decl->Declare(env);
       }
       
-      stats()->TypeCheck(env);
+      for (auto stat : *stats()) {
+         stat->TypeCheck(env);
+      }
 
       if (scoped) {
          env.ExitScope();
@@ -718,6 +722,7 @@
                                           << std::endl;
             type_ = default_type;
          }
+         scope_id_ = env.symtab().Depth();
       }
    }
 

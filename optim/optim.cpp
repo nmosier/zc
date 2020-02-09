@@ -46,16 +46,13 @@ namespace zc {
       {"bool-flag", &CgenOptimInfo::bool_flag},
       {"minimize-transitions", &CgenOptimInfo::minimize_transitions},
       {"direct-call", &CgenOptimInfo::direct_call},
+      {"DAG", &CgenOptimInfo::DAG},
    });
 
    
    /*** CONSTANTS ***/
 
-   void TranslationUnit::ReduceConst() {
-      for (auto decl : decls()->vec()) {
-         decl->ReduceConst();
-      }
-   }
+   void TranslationUnit::ReduceConst() { for (auto decl : *decls()) { decl->ReduceConst(); } }
 
    ASTExpr *ASTExpr::ReduceConst() {
       if (is_const()) {
@@ -81,7 +78,7 @@ namespace zc {
    }
 
    ASTStat *CompoundStat::ReduceConst() {
-      for (auto it = stats()->vec().begin(), end = stats()->vec().end(); it != end; ++it) {
+      for (auto it = stats()->begin(), end = stats()->end(); it != end; ++it) {
          *it = (*it)->ReduceConst();
       }
       return this;
@@ -142,13 +139,13 @@ namespace zc {
       if (pred()->is_const()) {
          if (pred()->int_const()) {
             /* convert to simpler while loop */
-            auto body_stats = ASTStats::Create(loc());
-            body_stats->vec().push_back(body());
-            body_stats->vec().push_back(ExprStat::Create(after(), loc()));
+            auto body_stats = new ASTStats();
+            body_stats->push_back(body());
+            body_stats->push_back(ExprStat::Create(after(), loc()));
             auto body = CompoundStat::Create(new Declarations(loc()), body_stats, loc());
             auto loop = LoopStat::Create(body, loc());
             auto pre = ExprStat::Create(init(), loc());
-            auto stats = ASTStats::Create(loc());
+            auto stats = new ASTStats();
             return CompoundStat::Create(new Declarations(), stats, loc());
          } else {
             return ExprStat::Create(init(), loc());
