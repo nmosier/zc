@@ -1,7 +1,3 @@
-#ifndef __AST_HPP
-#error "include ast.hpp, not ast/ast-expr.h directly"
-#endif
-
 #ifndef __AST_EXPR_HPP
 #define __AST_EXPR_HPP
 
@@ -11,12 +7,12 @@
 #include "cgen-fwd.hpp"
 #include "asm-fwd.hpp"
 #include "symtab.hpp"
+#include "alg/alg-dag.hpp"
 
 namespace zc {
 
    using z80::Value;
-   
-   
+
    class ASTExpr: public ASTNode {
    public:
       ASTType *type() const { return type_; }
@@ -48,6 +44,14 @@ namespace zc {
        */
       virtual ASTExpr *Cast(ASTType *type);
 
+      /**
+       * Transform into DAG.
+       */
+#if 0
+      virtual ASTExpr *DAG(alg::// DAGSet& dagset);
+      ASTExpr *DAG() { alg::DAGSet dagset; return DAG(dagset); }
+#endif
+
       void DumpType(std::ostream& os) const;
 
       /**
@@ -59,6 +63,13 @@ namespace zc {
        */
       virtual Block *CodeGen(CgenEnv& env, Block *block, const Value **out,
                              ExprKind mode) = 0;
+
+      /**
+       * Expression equality.
+       */
+#if 0
+      virtual ASTExpr *ExprEq(const ASTExpr *other) const; // TODO
+#endif
 
    protected:
       /**

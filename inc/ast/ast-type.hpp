@@ -9,7 +9,7 @@
 
 #include "uniq_vector.hpp"
 #include "ast-decl.hpp"
-#include "asm.hpp"
+#include "asm-fwd.hpp"
 
 extern const char *g_filename;
 
@@ -504,7 +504,7 @@ namespace zc {
    private:
       Identifier *id_;
       ASTExpr *val_;
-      const Enumerator *prev_; /*!< Previous enumerator. Used for assigning values. */
+      const Enumerator *prev_; /*!< Previous enumerator. Gend for assigning values. */
       EnumType *enum_type_; /*!< Type, which shall be assigned during semantic analysis. */
       
       template <typename... Args>
