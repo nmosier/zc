@@ -62,18 +62,22 @@
 
 \usepackage{mwe} % for placeholder images
 
+\hyphenpenalty=5000
+
+\usepackage{xspace}
 
 % Custom Macros
 \newcommand{\MiddFS}[2]{#1{M}#2{iddFS }#1{i}#2{s'nt mi}#1{d}#2{\quad \quad}#1{d}#2{\quad \quad}#1{F}#2{ile\quad}#1{S}} % #1 large; #2 small
 \newcommand{\middfs}{\texttt{middfs}}
 \newcommand{\rc}{\rowcolor}
+\newcommand{\ZC}{{\textsc{ZC}}\xspace}
 
 % set theme parameters
 \tikzposterlatexaffectionproofoff
 \usetheme{EmoryTheme}
 \usecolorstyle{EmoryStyle}
 
-\title{\texttt{ZC} -- an (e)Z80 Compiler}
+\title{\rm \ZC: a C Compiler for the (e)Z80}
 \author{\vspace{1cm} Nicholas Mosier '20 \\ \vspace{1cm} \small \texttt{https://github.com/nmosier/zc.git}}
 \titlegraphic{\includegraphics[width=0.2\textwidth]{mdl_master_left_blue.png}}
 
@@ -88,60 +92,74 @@
   \block{Introduction \& Motivation}{
 %    The Zilog Z80 is an 8-bit microprocessor that used to be ubiquitious in personal computing and arcade gaming in the 1970-80's. We introduce ZC, a C compiler for the eZ80 variant of the Z, is still used to this day in Texas Instrument's TI-83/84+ graphing calculators. More recently, the eZ80 processor, introduced in the early 2000's, features a minor, backwards-compatible update to the original Z80 ISA, and is used in the TI's higher-end calculators, e.g. the TI-84+ CE. TI calculator programmers (including me), 
 
-    \begin{minipage}{0.5\linewidth}
+    \begin{minipage}{0.55\linewidth}
+    \innerblock{Motivation}{
+      \begin{itemize}
+      \item Z80 \& eZ80 still used in Texas Instruments graphing calculators
+      \item Large code size output of existing C compilers targeting the eZ80
+      \item High-performance C compiler essential for large (e)Z80 projects
+      \end{itemize}
+    }
+    \end{minipage}
+    \begin{minipage}{0.35\linewidth}
     \innerblock{The Zilog Z80 \& eZ80}{
       \begin{itemize}
       \item 8-bit CISC mircoprocessor
       \item Accumulator machine model
       \item 16-/24-bit register pairs \& addresses
-      \item Backwards-compatible eZ80 adds several new instructions to the Z80 ISA
       \end{itemize}
     }
   \end{minipage}
-  \begin{minipage}{0.5\linewidth}
-    \innerblock{Motivation}{
-      \begin{itemize}
-      \item Z80 \& eZ80 still used in Texas Instruments graphing calculators
-      \item Most calculator programming done in Z80 assembly
-      \item No C compilers target both the Z80 and eZ80
-      \item Large code size output of existing C compilers targeting the eZ80
-      \item High-performance C compiler essential for large (e)Z80 projects
-      \end{itemize}
-    }
-  \end{minipage}
-  To fulfill this need, I wrote {\bf ZC}, a C compiler for the eZ80 architecture optimizing for code size.
+
+  Due to shortcomings in existing compilers, I wrote \ZC,
+  a C compiler for the eZ80 architecture that optimizes for code size.
   }
 
   \block{Compiler Anatomy}{
-    ZC accepts a C source file as input and produces (e)Z80 assembly as output.
-    The ZC compiler frontend parses the input file into an
-    {\it abstract syntax tree} (AST) and annotates it with type information,
-    while the ZC backend translates the abstract syntax tree into a control flow
-    graph, performs optimization, and outputs an (e)Z80 assembly instruction stream.
-
+    \begin{center}
+    \begin{minipage}{0.95\linewidth}
+    \ZC accepts a C source file as input and produces (e)Z80 assembly as output.
+    The \ZC compiler frontend parses the input into an
+    {\it abstract syntax tree} (AST) and annotates it,% with type information,
+    while the backend translates the AST into a control flow
+    graph and performs optimizations.
+  \end{minipage}
+  \end{center}
+    \vspace{1cm}
+    
     \begin{minipage}{0.5\linewidth}
     \innerblock{Frontend}{
       {\bf Lexer and parser:}
-      The lexer and parser, written for the {\tt flex} and {\tt bison} tools,
-      implement the C grammar and define the rules for constructing an AST
-      representing the input program.
+      \begin{itemize}
+      \item Parses input C program into AST
+      \item Implemented using {\tt flex} and {\tt bison} tools
+      \end{itemize}
+      %The lexer and parser, written for the {\tt flex} and {\tt bison} tools, implement the C grammar and define the rules for constructing an AST representing the input program.
 
       {\bf Semantic Analysis:}
-      ZC infers the types of expressions in the AST,
-      resolves user-defined types such as {\tt struct}s and {\tt typedef}s,
-      and checks semantic validity of the program.
+      \begin{itemize}
+      \item Infers types of AST expressions
+      \item Checks semantic validity
+      \item Resolve user-defined types such as {\tt typedef}s
+      \end{itemize}
+      %ZC infers the types of expressions in the AST, resolves user-defined types such as {\tt struct}s and {\tt typedef}s, and checks semantic validity of the program.
     }
     \end{minipage}
     \begin{minipage}{0.5\linewidth}
     \innerblock{Backend}{
       {\bf Code Generation:}
-      For each function, ZC generates a control flow diagram of
-      basic blocks containing symbolic (e)Z80 instructions and determines
-      an activation record layout.
+      \begin{itemize}
+      \item Outputs control flow graph of basic blocks
+      \item Blocks contain symbolic (e)Z80 instructions
+      \item Generates function activation record layout
+      \end{itemize}
+      %For each function, ZC generates a control flow diagram of basic blocks containing symbolic (e)Z80 instructions and determines an activation record layout.
 
       {\bf Register allocation: }
-      ZC traverses the control flow graph and assigns registers or memory locations
-      to all variables created during code generation.
+      \begin{itemize}
+      \item Assigns registers to variables in basic blocks
+      \item Stack- and frame-spill when necessary
+      \end{itemize}
     }
     \end{minipage}
 
@@ -181,56 +199,62 @@
   }
 
   \block{Register Allocation} {
-
+    Two approaches to code generation are the {\it stack machine} model and the
+    {\it register allocator} model.
+    \ZC performs register allocation in order to minimize code size.
+    % While implementing a stack machine is simpler, implementing a register allocator better utilizes resources and exposes code to more optimizations.
+    
     % Stack Machine vs. Register Allocation
     \begin{minipage}{0.5\linewidth}
       \innerblock{Stack Machine}{
-        A stack-machine compiler pushes intermediate values onto the stack and pops them
-        off when they are ready to be used.
-        A stack machine is easy to implement; the first version of ZC's code generator
-        was a stack machine.
+        \begin{itemize}
+        \item Pushes variables onto the stack and pops them off when ready for use
+        \item Easy to implement
+        \item \ZC's first code generator used a stack machine
+        \end{itemize}
+        % A stack-machine compiler pushes intermediate values onto the stack and pops them off when they are ready to be used. A stack machine is easy to implement; the first version of ZC's code generator was a stack machine.
       }
     \end{minipage}
     \begin{minipage}{0.5\linewidth}
       \innerblock{Register Allocation}{
-        A compiler with a register allocator stores intermediate values into registers
-        rather than pushing them onto the stack.
-        However, there are often more intermediate values
-        than there are physical registers.
-        For example, the (e)Z80 has {\bf 7 single-byte registers}
-        but only {\bf 3 allocatable multi-byte registers}.
-        When intermediate values exceed physical registers in number,
-        those values must be \textit{spilled} into memory.
+        \begin{itemize}
+        \item Stores variables in registers, not on the stack
+        \item {\it Spills} variables into memory if all registers are in use
+        \item Exposes code to more optimizations
+        \end{itemize}
+        %A compiler with a register allocator stores intermediate values into registers rather than pushing them onto the stack. However, there are often more intermediate values than there are physical registers. For example, the (e)Z80 has {\bf 7 single-byte registers} but only {\bf 3 allocatable multi-byte registers}. When intermediate values exceed physical registers in number, those values must be \textit{spilled} into memory.
       }
     \end{minipage}
-
+    
     \begin{minipage}{0.5\linewidth}
-    \innerblock{(e)Z80 Restrictions}{
-      The (e)Z80's instruction set is accumulator-based:
-      most operations aside from moves require the destination and first operand
-      to be the byte register {\tt a} or the multibyte register {\tt hl}.
-      Traditional register allocation does not account for this bias,
-      so our ZC compiler implements a specialized register allocation algorithm
-      that accounts for some operands being fixed registers and others
-      being unbound variables.
-      
+      \innerblock{(e)Z80 Restrictions}{
+        \begin{itemize}
+        \item Only 3 allocatable multibyte registers
+        \item Instruction set biased towards accumulator
+        \item Most register allocation algorithms assume all registers are equal
+        \item \ZC implements specialized algorithm accounting for mixture of fixed registers and unbound variables
+        \end{itemize}
+        % The (e)Z80's instruction set is accumulator-based: most operations aside from moves require the destination and first operand to be the byte register {\tt a} or the multibyte register {\tt hl}. Traditional register allocation does not account for this bias, so our ZC compiler implements a specialized register allocation algorithm that accounts for some operands being fixed registers and others being unbound variables.
     }
     \end{minipage}
     \begin{minipage}{0.5\linewidth}
-      \innerblock{Frame vs. Stack Spilling in ZC}{
-        Most compilers use {\it frame spilling}, i.e. spill intermediate values to
-        the activation record.
-      However, accessing memory through the frame pointer register
-      {\tt ix} is costly in (e)Z80;
-      {\it stack spilling}, i.e. to push/pop intermediate values to/from the stack,
-      is more efficient.
-      Stack spilling is {\bf cheap but restrictive};
-      frame spilling is {\bf costly but versatile}.
+      \innerblock{Frame vs. Stack Spilling in \ZC}{
+        \ZC spills variables in two ways.
+
+        \begin{itemize}
+          \item {\bf Frame spilling}: {\it Costly but versatile}. 
+        Most compilers perform frame spilling, i.e. spill variables to the activation record. However, memory access through the frame pointer register {\tt ix} is costly in (e)Z80.
+        \item {\bf Stack spilling}: {\it Cheap but restrictive}.
+          To stack spill, i.e. push/pop variables to/from the stack, is more efficient in (e)Z80. Stack spilling is a novel feature of \ZC's register allocator.
+        \end{itemize}
+        
+        
+        %Most compilers use {\it frame spilling}, i.e. spill intermediate values to the activation record. However, accessing memory through the frame pointer register {\tt ix} is costly in (e)Z80; {\it stack spilling}, i.e. to push/pop intermediate values to/from the stack, is more efficient. Stack spilling is {\bf cheap but restrictive}; frame spilling is {\bf costly but versatile}.
     }
     \end{minipage}
 
     \begin{tikzfigure}
-    {\tt \Large
+    {\tt
       \begin{tabular}{|>{\bf}ll|>{\bf}ll|>{\bf}ll|}\hline
         \multicolumn{2}{|c|}{\hspace{0.5cm}\bf Stack Machine \hspace{0.5cm}}
         & \multicolumn{4}{|c|}{\bf Register Allocation} \\
@@ -254,12 +278,12 @@
 
   
   \block{Performance}{
-    I tested ZC on four programs against a reference compiler,
+    I tested \ZC on four programs against a reference compiler,
     Zilog's C compiler for the eZ80 \cite{ez80cc}.
-    On average, ZC's performance is comparable to the reference compiler,
-    though each compiler more compact code in a subset of programs.
+    On average, \ZC's performance is comparable to the reference compiler,
+    though each compiler produces more compact code in a subset of programs.
     These results are encouraging, since there are many unimplemented
-    optimizations for future work on ZC.
+    optimizations for future work on \ZC.
     \begin{tikzfigure}
       \begin{tikzpicture}
         \begin{axis}[
@@ -284,7 +308,7 @@
           x tick label style={font=\small, text width=4cm, align=center},
           bar width=0.75cm,
           title style={align=center},
-          title={Code size relative to ZC with no optimization}
+          title={Code size relative to \ZC with no optimization}
           ]
 
           % chars.c
