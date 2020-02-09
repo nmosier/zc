@@ -13,6 +13,9 @@
 
 namespace zc {
 
+   const Label crt_l_indcall("__indcall");
+   const LabelValue crt_lv_indcall(&crt_l_indcall);   
+
    static Block dead_block;
    
    void Cgen(TranslationUnit *root, std::ostream& os, const char *filename) {
@@ -33,7 +36,6 @@ namespace zc {
       env.Resolve();
       
       OptimizeIR(env);
-      // OptimizeIR(env);
 
       env.DumpAsm(os);
    }
