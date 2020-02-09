@@ -12,6 +12,7 @@
 #include "asm-fwd.hpp"
 #include "asm/asm-lab.hpp"
 #include "util.hpp"
+#include "alg.hpp"
 
 namespace zc::z80 {
 
@@ -36,8 +37,8 @@ namespace zc::z80 {
       }
       bool Match(const Value *to) const;
 
-      virtual void Gen(std::list<const Value *>& vals) const {}
-      virtual void Use(std::list<const Value *>& vals) const {}
+      virtual void Kill(alg::ValueInserter vals) const {}
+      virtual void Gen(alg::ValueInserter vals) const {}
 
       virtual const Value *Resolve() const { return this; }
 
@@ -82,9 +83,9 @@ namespace zc::z80 {
       virtual bool requires_alloc() const { return true; }
       int id() const { return *id_; }
 
-      virtual void Gen(std::list<const Value *>& vals) const override { vals.push_back(this); }
-      virtual void Use(std::list<const Value *>& vals) const override { vals.push_back(this); }
-    
+      virtual void Kill(alg::ValueInserter vals) const override { *vals++ = this; }
+      virtual void Gen(alg::ValueInserter vals) const override { *vals++ = this; }
+      
       virtual void Emit(std::ostream& os) const override;
       virtual Value *Add(const intmax_t& offset) const override
       { throw std::logic_error("attempted to add to abstract value"); }
@@ -121,8 +122,8 @@ namespace zc::z80 {
       Cond cond_1() const { return *cond_1_; }      
        
        
-      virtual void Gen(std::list<const Value *>& vals) const override {}
-      virtual void Use(std::list<const Value *>& vals) const override {}
+      virtual void Kill(alg::ValueInserter vals) const override {}
+      virtual void Gen(alg::ValueInserter vals) const override {}
 
       virtual void Emit(std::ostream& os) const override;
       virtual Value *Add(const intmax_t& offset) const override {
@@ -215,8 +216,8 @@ namespace zc::z80 {
       virtual void Emit(std::ostream& os) const override;
       virtual Value *Add(const intmax_t& offset) const override;
 
-      virtual void Gen(std::list<const Value *>& vals) const override { vals.push_back(this); }
-      virtual void Use(std::list<const Value *>& vals) const override { vals.push_back(this); }
+      virtual void Kill(alg::ValueInserter vals) const override { *vals++ = this; }
+      virtual void Gen(alg::ValueInserter vals) const override { *vals++ = this; }
 
       RegisterValue(const ByteRegister *reg): Value_(byte_size), reg_(reg) {}
       RegisterValue(const MultibyteRegister *reg): Value_(long_size), reg_(reg) {}
@@ -342,7 +343,7 @@ namespace zc::z80 {
       MemoryValue *Next(int size) const;
       MemoryValue *Prev(int size) const;
 
-      virtual void Use(std::list<const Value *>& vals) const override { addr()->Use(vals); }
+      virtual void Gen(alg::ValueInserter vals) const override { addr()->Gen(vals); }
 
       virtual const Value *ReplaceVar(const VariableValue *var, const Value *with) const override
       { return new MemoryValue((*addr_)->ReplaceVar(var, with), size_); }
@@ -373,8 +374,8 @@ namespace zc::z80 {
          return new ByteValue(all()->Add(offset), kind());
       }
 
-      virtual void Gen(std::list<const Value *>& vals) const override { all()->Gen(vals); }       
-      virtual void Use(std::list<const Value *>& vals) const override { all()->Use(vals); }
+      virtual void Kill(alg::ValueInserter vals) const override { all()->Kill(vals); }       
+      virtual void Gen(alg::ValueInserter vals) const override { all()->Gen(vals); }
 
       virtual const Value *Resolve() const override;
       virtual const Value *ReplaceVar(const VariableValue *var, const Value *with) const override {
