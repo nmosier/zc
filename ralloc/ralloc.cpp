@@ -76,7 +76,11 @@ namespace zc::z80 {
 
    void RegisterAllocator::ComputeIntervals() {
 
+#if 1
+      alg::ValueSet gens, uses;
+#else
       std::list<const Value *> gens, uses;
+#endif
 
       IntervalMap<const ByteRegister *> byte_regs;
       IntervalMap<const VariableValue *> vars;
@@ -92,8 +96,8 @@ namespace zc::z80 {
            instr_it != block()->instrs().end();
            ++instr_it, ++instr_index, gens.clear(), uses.clear()) {
          /* get gens and uses in instrution */
-         (*instr_it)->Gen(gens);
-         (*instr_it)->Use(uses);
+         (*instr_it)->Kill(std::inserter(gens, gens.begin()));
+         (*instr_it)->Gen(std::inserter(uses, uses.begin()));
 
          auto fn =
             [&](mode m)
@@ -563,7 +567,7 @@ namespace zc::z80 {
    const VariableValue *VariableRallocInfo::joinable() {
       /* Requirements for joining:
        *  - Variable must have exactly one use. 
-       *  - Use instruction must be a `ld`.
+       *  - Gen instruction must be a `ld`.
        *  - Variables must have compatible traits (e.g. both must require registers or not).
        */
 
