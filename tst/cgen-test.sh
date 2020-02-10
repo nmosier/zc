@@ -28,23 +28,25 @@ fail()
     echo "failed: '$1': $2"
 }
 
-for test in "${tests[@]}"; do
-    (( ++total ))
+COMMAND=$@
 
+# $1 -- test
+run_test() {
+    test="$1"
     name="$(basename $test)"
     OUT_ASM="${test/%.c/.z80}"
     OUT_8XP="${test/%.c/.8xp}"
 
     # code generation
-    if ! "$@" -o "$OUT_ASM" "$test" >/dev/null; then
+    if ! $COMMAND -o "$OUT_ASM" "$test" >/dev/null 2>&1; then
         fail "$test" "code generation failed"
-        continue
+        return 1
     fi
 
     # assemble
     if ! [ -f "$test".z80 ]; then
         fail "$test" "missing z80 wrapper file '$test.z80'"
-        continue
+        return 1
     fi
 
 
@@ -52,7 +54,7 @@ for test in "${tests[@]}"; do
     if ! spasm -E -L -I. -I"$(dirname $test)" "$test".z80 "$OUT_8XP" > "$SPASM_ERR"; then
         fail "$test" "assembler failed"
         cat "$SPASM_ERR"
-        continue
+        return 1
     fi
 
     # run autotester
@@ -60,10 +62,29 @@ for test in "${tests[@]}"; do
     if ! cemu-autotester "$test".json >"$AUTO_ERR"; then
         fail "$test" "autotester failed"
         cat "$AUTO_ERR"
-        continue
+        return 1
     fi
 
     (( ++passed ))
+    
+    return 0
+}
+
+for test in "${tests[@]}"; do
+    (( ++total ))
+    run_test "$test" > "$OUT_DIR/$total.out" &
+done
+
+wait
+
+total=0
+for test in "${tests[@]}"; do
+    (( ++total ))
+    if [ -s "$OUT_DIR/$total.out" ]; then
+        cat "$OUT_DIR/$total.out"
+    else
+        (( ++passed ))
+    fi
 done
 
 echo "Total tests: $total"
